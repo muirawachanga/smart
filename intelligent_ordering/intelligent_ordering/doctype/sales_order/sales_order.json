@@ -1,0 +1,38 @@
+{
+  "doctype": "DocType",
+  "name": "Sales Order",
+  "module": "Intelligent Ordering",
+  "autoname": "naming_series:",
+  "naming_rule": "By \"Naming Series\" field",
+  "engine": "InnoDB",
+  "field_order": ["naming_series", "order_datetime", "customer", "customer_name_snapshot", "customer_phone_snapshot", "delivery_address", "delivery_address_snapshot", "delivery_area", "delivery_fee", "status", "payment_status", "currency", "subtotal", "items", "total", "checkout_token"],
+  "fields": [
+    {"default": "SO-.YYYY.-.#####", "fieldname": "naming_series", "fieldtype": "Select", "label": "Naming Series", "options": "SO-.YYYY.-.#####", "reqd": 1},
+    {"fieldname": "order_datetime", "fieldtype": "Datetime", "label": "Order Date and Time", "read_only": 1, "in_list_view": 1},
+    {"fieldname": "customer", "fieldtype": "Link", "label": "Customer", "options": "Customer Profile", "reqd": 1, "read_only": 1},
+    {"fieldname": "customer_name_snapshot", "fieldtype": "Data", "label": "Customer Name", "read_only": 1, "in_list_view": 1},
+    {"fieldname": "customer_phone_snapshot", "fieldtype": "Data", "label": "Customer Phone", "read_only": 1, "in_list_view": 1},
+    {"fieldname": "delivery_address", "fieldtype": "Link", "label": "Delivery Address", "options": "Customer Address", "read_only": 1},
+    {"fieldname": "delivery_address_snapshot", "fieldtype": "Small Text", "label": "Delivery Address Snapshot", "read_only": 1},
+    {"fieldname": "delivery_area", "fieldtype": "Link", "label": "Delivery Area", "options": "Delivery Area", "read_only": 1},
+    {"fieldname": "delivery_fee", "fieldtype": "Currency", "label": "Delivery Fee", "options": "currency", "default": "0", "read_only": 1},
+    {"default": "Pending", "fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Pending\nConfirmed\nProcessing\nReady for Delivery\nCompleted\nCancelled", "reqd": 1, "in_list_view": 1},
+    {"default": "Unpaid", "fieldname": "payment_status", "fieldtype": "Select", "label": "Payment Status", "options": "Unpaid\nPending\nPaid\nFailed\nRefunded", "reqd": 1, "read_only": 1},
+    {"default": "KES", "fieldname": "currency", "fieldtype": "Data", "label": "Currency", "reqd": 1, "read_only": 1},
+    {"fieldname": "subtotal", "fieldtype": "Currency", "label": "Subtotal", "options": "currency", "reqd": 1, "default": "0", "read_only": 1},
+    {"fieldname": "items", "fieldtype": "Table", "label": "Items", "options": "Sales Order Item", "reqd": 1, "read_only": 1},
+    {"fieldname": "total", "fieldtype": "Currency", "label": "Total", "options": "currency", "reqd": 1, "default": "0", "read_only": 1},
+    {"fieldname": "checkout_token", "fieldtype": "Data", "label": "Checkout Request Token", "unique": 1, "hidden": 1, "read_only": 1}
+  ],
+  "permissions": [
+    {"role": "Customer", "read": 1},
+    {"role": "Business Admin", "read": 1, "write": 1},
+    {"role": "Store Manager", "read": 1, "write": 1},
+    {"role": "Order Manager", "read": 1, "write": 1},
+    {"role": "Inventory Manager", "read": 1}
+  ],
+  "search_fields": "name,customer_name_snapshot,customer_phone_snapshot,status",
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "track_changes": 1
+}

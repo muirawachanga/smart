@@ -1,0 +1,22 @@
+{
+  "doctype": "DocType",
+  "name": "Delivery Area",
+  "module": "Intelligent Ordering",
+  "autoname": "field:area_name",
+  "engine": "InnoDB",
+  "field_order": ["area_name", "enabled", "currency", "delivery_fee"],
+  "fields": [
+    {"fieldname": "area_name", "fieldtype": "Data", "label": "Area Name", "reqd": 1, "unique": 1, "in_list_view": 1},
+    {"fieldname": "enabled", "fieldtype": "Check", "label": "Enabled", "default": "1", "in_list_view": 1},
+    {"fieldname": "currency", "fieldtype": "Data", "label": "Currency", "default": "KES", "reqd": 1},
+    {"fieldname": "delivery_fee", "fieldtype": "Currency", "label": "Delivery Fee", "options": "currency", "default": "0", "reqd": 1, "in_list_view": 1}
+  ],
+  "permissions": [
+    {"role": "System Manager", "read": 1, "write": 1, "create": 1},
+    {"role": "Business Admin", "read": 1, "write": 1, "create": 1},
+    {"role": "Store Manager", "read": 1, "write": 1, "create": 1},
+    {"role": "Delivery Manager", "read": 1},
+    {"role": "Order Manager", "read": 1, "write": 1, "create": 1}
+  ],
+  "track_changes": 1
+}

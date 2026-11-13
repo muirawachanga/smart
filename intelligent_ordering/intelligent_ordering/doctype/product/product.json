@@ -1,0 +1,29 @@
+{
+  "doctype": "DocType",
+  "name": "Product",
+  "module": "Intelligent Ordering",
+  "autoname": "field:sku",
+  "engine": "InnoDB",
+  "field_order": ["sku", "product_name", "category", "description", "image", "price", "currency", "enabled"],
+  "fields": [
+    {"fieldname": "sku", "fieldtype": "Data", "label": "SKU", "reqd": 1, "unique": 1, "in_list_view": 1},
+    {"fieldname": "product_name", "fieldtype": "Data", "label": "Product Name", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "category", "fieldtype": "Link", "label": "Category", "options": "Product Category", "in_list_view": 1},
+    {"fieldname": "description", "fieldtype": "Small Text", "label": "Description"},
+    {"fieldname": "image", "fieldtype": "Attach Image", "label": "Product Image"},
+    {"fieldname": "price", "fieldtype": "Currency", "label": "Price", "options": "currency", "reqd": 1, "default": "0"},
+    {"default": "KES", "fieldname": "currency", "fieldtype": "Data", "label": "Currency", "reqd": 1},
+    {"default": "1", "fieldname": "enabled", "fieldtype": "Check", "label": "Enabled", "in_list_view": 1}
+  ],
+  "permissions": [
+    {"role": "Customer", "read": 1},
+    {"role": "Business Admin", "read": 1, "write": 1, "create": 1, "delete": 1},
+    {"role": "Store Manager", "read": 1, "write": 1, "create": 1},
+    {"role": "Order Manager", "read": 1, "write": 1, "create": 1},
+    {"role": "Inventory Manager", "read": 1},
+    {"role": "Delivery Staff", "read": 1}
+  ],
+  "sort_field": "product_name",
+  "sort_order": "ASC",
+  "track_changes": 1
+}

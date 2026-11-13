@@ -1,0 +1,23 @@
+{
+  "doctype": "DocType",
+  "name": "Admin Audit Log",
+  "module": "Intelligent Ordering",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "field_order": ["event_type", "reference_doctype", "reference_name", "responsible_user", "event_datetime", "details"],
+  "fields": [
+    {"fieldname": "event_type", "fieldtype": "Data", "label": "Event", "reqd": 1, "read_only": 1, "in_list_view": 1},
+    {"fieldname": "reference_doctype", "fieldtype": "Data", "label": "Reference Type", "read_only": 1, "in_list_view": 1},
+    {"fieldname": "reference_name", "fieldtype": "Data", "label": "Reference", "read_only": 1, "in_list_view": 1},
+    {"fieldname": "responsible_user", "fieldtype": "Link", "options": "User", "label": "Responsible User", "read_only": 1, "in_list_view": 1},
+    {"fieldname": "event_datetime", "fieldtype": "Datetime", "label": "Event Date and Time", "read_only": 1, "in_list_view": 1},
+    {"fieldname": "details", "fieldtype": "Small Text", "label": "Changed Fields / Context", "read_only": 1}
+  ],
+  "permissions": [
+    {"role": "System Manager", "read": 1},
+    {"role": "Business Admin", "read": 1},
+    {"role": "Store Manager", "read": 1}
+  ],
+  "sort_field": "event_datetime",
+  "sort_order": "DESC"
+}

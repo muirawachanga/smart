@@ -1,0 +1,37 @@
+{
+  "doctype": "DocType",
+  "name": "Delivery",
+  "module": "Intelligent Ordering",
+  "autoname": "naming_series:",
+  "engine": "InnoDB",
+  "field_order": ["naming_series", "order", "customer", "customer_name", "customer_phone", "delivery_address", "delivery_area", "assigned_delivery_person", "currency", "delivery_fee", "scheduled_delivery_date", "dispatch_date", "completion_date", "completed_by", "status", "delivery_notes", "activities"],
+  "fields": [
+    {"fieldname": "naming_series", "fieldtype": "Select", "options": "DEL-.YYYY.-.#####", "default": "DEL-.YYYY.-.#####", "label": "Naming Series", "reqd": 1},
+    {"fieldname": "order", "fieldtype": "Link", "options": "Sales Order", "label": "Order", "reqd": 1, "unique": 1, "read_only": 1, "in_list_view": 1},
+    {"fieldname": "customer", "fieldtype": "Link", "options": "Customer Profile", "label": "Customer", "reqd": 1, "read_only": 1},
+    {"fieldname": "customer_name", "fieldtype": "Data", "label": "Customer Name", "read_only": 1},
+    {"fieldname": "customer_phone", "fieldtype": "Data", "label": "Customer Phone", "read_only": 1},
+    {"fieldname": "delivery_address", "fieldtype": "Small Text", "label": "Delivery Address", "read_only": 1},
+    {"fieldname": "delivery_area", "fieldtype": "Link", "options": "Delivery Area", "label": "Delivery Area", "read_only": 1, "in_list_view": 1},
+    {"fieldname": "assigned_delivery_person", "fieldtype": "Link", "options": "User", "label": "Assigned Delivery Person", "read_only": 1, "in_list_view": 1},
+    {"fieldname": "currency", "fieldtype": "Data", "label": "Currency", "read_only": 1},
+    {"fieldname": "delivery_fee", "fieldtype": "Currency", "options": "currency", "label": "Delivery Fee", "read_only": 1},
+    {"fieldname": "scheduled_delivery_date", "fieldtype": "Date", "label": "Scheduled Delivery Date", "read_only": 1},
+    {"fieldname": "dispatch_date", "fieldtype": "Datetime", "label": "Dispatch Date", "read_only": 1},
+    {"fieldname": "completion_date", "fieldtype": "Datetime", "label": "Completion Date", "read_only": 1},
+    {"fieldname": "completed_by", "fieldtype": "Link", "options": "User", "label": "Completed By", "read_only": 1},
+    {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Awaiting Assignment\nAssigned\nPreparing\nReady for Dispatch\nDispatched\nIn Transit\nDelivered\nFailed\nCancelled", "default": "Awaiting Assignment", "reqd": 1, "read_only": 1, "in_list_view": 1},
+    {"fieldname": "delivery_notes", "fieldtype": "Small Text", "label": "Delivery Notes", "read_only": 1},
+    {"fieldname": "activities", "fieldtype": "Table", "options": "Delivery Activity", "label": "Activity History", "read_only": 1}
+  ],
+  "permissions": [
+    {"role": "System Manager", "read": 1},
+    {"role": "Business Admin", "read": 1},
+    {"role": "Store Manager", "read": 1},
+    {"role": "Delivery Manager", "read": 1},
+    {"role": "Order Manager", "read": 1},
+    {"role": "Delivery Staff", "read": 1}
+  ],
+  "search_fields": "order,delivery_area,assigned_delivery_person,status",
+  "track_changes": 1
+}

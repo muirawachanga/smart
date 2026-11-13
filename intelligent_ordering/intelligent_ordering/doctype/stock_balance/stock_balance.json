@@ -1,0 +1,23 @@
+{
+  "doctype": "DocType",
+  "name": "Stock Balance",
+  "module": "Intelligent Ordering",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "field_order": ["product", "warehouse", "quantity_on_hand", "reserved_quantity", "available_quantity"],
+  "fields": [
+    {"fieldname": "product", "fieldtype": "Link", "label": "Product", "options": "Product", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "warehouse", "fieldtype": "Link", "label": "Warehouse", "options": "Stock Warehouse", "reqd": 1, "in_list_view": 1},
+    {"default": "0", "fieldname": "quantity_on_hand", "fieldtype": "Int", "label": "Quantity on Hand", "reqd": 1, "read_only": 1, "in_list_view": 1},
+    {"default": "0", "fieldname": "reserved_quantity", "fieldtype": "Int", "label": "Reserved Quantity", "reqd": 1, "read_only": 1, "in_list_view": 1},
+    {"default": "0", "fieldname": "available_quantity", "fieldtype": "Int", "label": "Available Quantity", "reqd": 1, "read_only": 1, "in_list_view": 1}
+  ],
+  "permissions": [
+    {"role": "Business Admin", "read": 1},
+    {"role": "Inventory Manager", "read": 1},
+    {"role": "Order Manager", "read": 1},
+    {"role": "Delivery Staff", "read": 1}
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC"
+}

@@ -1,0 +1,33 @@
+{
+  "doctype": "DocType",
+  "name": "Stock Ledger Entry",
+  "module": "Intelligent Ordering",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "field_order": ["product", "warehouse", "location", "transaction_type", "quantity", "quantity_change", "reserved_change", "reference_document", "reference_order", "transaction_date", "user_responsible", "remarks", "notes", "idempotency_key"],
+  "fields": [
+    {"fieldname": "product", "fieldtype": "Link", "label": "Product", "options": "Product", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "warehouse", "fieldtype": "Link", "label": "Warehouse", "options": "Stock Warehouse", "in_list_view": 1},
+    {"fieldname": "location", "fieldtype": "Link", "label": "Legacy Inventory Location", "options": "Inventory Location"},
+    {"fieldname": "transaction_type", "fieldtype": "Select", "label": "Transaction Type", "options": "Opening\nReceipt\nIssue\nAdjustment\nReservation\nRelease\nDispatch\nReturn", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "quantity", "fieldtype": "Int", "label": "Quantity", "default": "0", "read_only": 1, "in_list_view": 1},
+    {"fieldname": "quantity_change", "fieldtype": "Float", "label": "Quantity Change", "reqd": 1},
+    {"fieldname": "reserved_change", "fieldtype": "Float", "label": "Reserved Quantity Change", "default": "0", "read_only": 1},
+    {"fieldname": "reference_document", "fieldtype": "Data", "label": "Reference Document", "read_only": 1},
+    {"fieldname": "reference_order", "fieldtype": "Link", "label": "Reference Order", "options": "Sales Order"},
+    {"fieldname": "transaction_date", "fieldtype": "Datetime", "label": "Transaction Date", "read_only": 1, "in_list_view": 1},
+    {"fieldname": "user_responsible", "fieldtype": "Link", "label": "User Responsible", "options": "User", "read_only": 1},
+    {"fieldname": "remarks", "fieldtype": "Small Text", "label": "Remarks"},
+    {"fieldname": "notes", "fieldtype": "Small Text", "label": "Legacy Notes"},
+    {"fieldname": "idempotency_key", "fieldtype": "Data", "label": "Idempotency Key", "hidden": 1, "read_only": 1}
+  ],
+  "permissions": [
+    {"role": "Business Admin", "read": 1},
+    {"role": "Inventory Manager", "read": 1},
+    {"role": "Order Manager", "read": 1},
+    {"role": "Delivery Staff", "read": 1}
+  ],
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "track_changes": 1
+}

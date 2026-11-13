@@ -1,0 +1,36 @@
+{
+  "doctype": "DocType",
+  "name": "Payment Transaction",
+  "module": "Intelligent Ordering",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "field_order": ["order", "customer", "phone_number", "amount", "payment_method", "environment", "merchant_request_id", "checkout_request_id", "mpesa_receipt_number", "transaction_date", "status", "callback_response", "query_response", "failure_description", "callback_token_hash"],
+  "fields": [
+    {"fieldname": "order", "fieldtype": "Link", "label": "Order", "options": "Sales Order", "reqd": 1, "read_only": 1, "in_list_view": 1},
+    {"fieldname": "customer", "fieldtype": "Link", "label": "Customer", "options": "Customer Profile", "reqd": 1, "read_only": 1},
+    {"fieldname": "phone_number", "fieldtype": "Data", "label": "Phone Number", "reqd": 1, "read_only": 1},
+    {"fieldname": "amount", "fieldtype": "Currency", "label": "Amount (KES)", "reqd": 1, "read_only": 1},
+    {"fieldname": "payment_method", "fieldtype": "Select", "label": "Payment Method", "options": "M-Pesa", "default": "M-Pesa", "read_only": 1},
+    {"fieldname": "environment", "fieldtype": "Select", "label": "Environment", "options": "Sandbox\nProduction", "reqd": 1, "read_only": 1},
+    {"fieldname": "merchant_request_id", "fieldtype": "Data", "label": "Merchant Request ID", "read_only": 1},
+    {"fieldname": "checkout_request_id", "fieldtype": "Data", "label": "Checkout Request ID", "unique": 1, "read_only": 1},
+    {"fieldname": "mpesa_receipt_number", "fieldtype": "Data", "label": "M-Pesa Receipt Number", "unique": 1, "read_only": 1, "in_list_view": 1},
+    {"fieldname": "transaction_date", "fieldtype": "Datetime", "label": "Transaction Date", "read_only": 1},
+    {"fieldname": "status", "fieldtype": "Select", "label": "Payment Status", "options": "Initiated\nPending\nSuccessful\nFailed\nCancelled\nReversed", "default": "Initiated", "reqd": 1, "read_only": 1, "in_list_view": 1},
+    {"fieldname": "callback_response", "fieldtype": "Long Text", "label": "Callback Response", "read_only": 1},
+    {"fieldname": "query_response", "fieldtype": "Long Text", "label": "Reconciliation Response", "read_only": 1},
+    {"fieldname": "failure_description", "fieldtype": "Small Text", "label": "Failure Description", "read_only": 1},
+    {"fieldname": "callback_token_hash", "fieldtype": "Data", "label": "Callback Token Hash", "unique": 1, "hidden": 1, "read_only": 1}
+  ],
+  "permissions": [
+    {"role": "Business Admin", "read": 1, "report": 1},
+    {"role": "Finance Manager", "read": 1, "report": 1},
+    {"role": "Store Manager", "read": 1, "report": 1},
+    {"role": "Order Manager", "read": 1, "report": 1},
+    {"role": "System Manager", "read": 1, "report": 1}
+  ],
+  "search_fields": "order,mpesa_receipt_number,checkout_request_id,status",
+  "track_changes": 1,
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

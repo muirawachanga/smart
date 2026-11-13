@@ -1,0 +1,24 @@
+{
+  "doctype": "DocType",
+  "name": "Customer Profile",
+  "module": "Intelligent Ordering",
+  "autoname": "field:user",
+  "engine": "InnoDB",
+  "field_order": ["user", "full_name", "phone", "enabled"],
+  "fields": [
+    {"fieldname": "user", "fieldtype": "Link", "label": "User", "options": "User", "reqd": 1, "unique": 1, "in_list_view": 1},
+    {"fieldname": "full_name", "fieldtype": "Data", "label": "Full Name", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "phone", "fieldtype": "Data", "label": "Phone"},
+    {"default": "1", "fieldname": "enabled", "fieldtype": "Check", "label": "Enabled"}
+  ],
+  "permissions": [
+    {"role": "Customer", "read": 1},
+    {"role": "Business Admin", "read": 1, "write": 1, "create": 1, "delete": 1},
+    {"role": "Store Manager", "read": 1, "write": 1, "create": 1},
+    {"role": "Order Manager", "read": 1, "write": 1, "create": 1},
+    {"role": "Inventory Manager", "read": 1}
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "track_changes": 1
+}
