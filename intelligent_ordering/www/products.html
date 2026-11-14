@@ -7,6 +7,10 @@
   <p class="smarto-eyebrow">Shop SmartO</p>
   <h1>Products</h1>
   <p>Search products or choose a category to find what you need.</p>
+  <div class="smarto-actions">
+    <a class="smarto-button smarto-button-secondary" href="/categories">Shop by category</a>
+    <a class="smarto-button" href="/cart">View shopping cart</a>
+  </div>
   <form id="catalog-form" class="smarto-catalog-form">
     <label>Search products
       <input name="search" type="search" maxlength="100" placeholder="Name, SKU, or description">
@@ -33,7 +37,7 @@
     <span id="catalog-page"></span>
     <button id="catalog-next" class="smarto-button smarto-button-secondary" type="button">Next</button>
   </nav>
-  <p><a href="/cart">Review your cart</a></p>
+  <p>After adding products, open your shopping cart to review quantities and continue to checkout.</p>
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/catalog-pages.js"></script>
 {% endblock %}

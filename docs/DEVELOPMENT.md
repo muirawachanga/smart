@@ -79,6 +79,11 @@ route-aware page labels.
 | `/dashboard/support` | Read-only order enquiries and customer-profile access |
 | `/store` | Existing database-backed storefront and staff workflows |
 
+Adding a product keeps the customer on the catalogue so they can continue
+shopping. A successful addition displays **View cart and continue to checkout**
+beside its confirmation; catalogue and detail pages also have a prominent cart
+link. The cart reviews quantities before `/checkout`, where guests must sign in.
+
 Customer and staff pages reuse the existing database-backed catalog, cart,
 checkout, order, inventory, delivery, payment, and reporting APIs. The account,
 orders, inventory, and delivery workspaces use the current user's records and

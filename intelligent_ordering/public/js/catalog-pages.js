@@ -105,6 +105,9 @@ async function addToCart(product, quantity) {
     cartFeedback.textContent = result.removed_products?.length
       ? `Added to cart. ${result.removed_products.length} unavailable item(s) were removed.`
       : "Added to cart.";
+    const nextStep = element("a", "View cart and continue to checkout", "smarto-button");
+    nextStep.href = "/cart";
+    cartFeedback.append(element("span", " "), nextStep);
   } catch (error) {
     cartFeedback.textContent = `Could not add to cart: ${error.message}`;
   } finally {

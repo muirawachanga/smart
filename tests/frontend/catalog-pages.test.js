@@ -98,6 +98,9 @@ test("catalog loads filters and adds a real product to the persisted guest cart"
   assert.deepEqual(JSON.parse([...storage.values()][0]), [{ product: "SKU/1", quantity: 1 }]);
   assert.equal(events.at(-1).detail, 1);
   assert.equal(nodes.get("#cart-feedback").textContent, "Added to cart.");
+  const nextStep = nodes.get("#cart-feedback").children.at(-1);
+  assert.equal(nextStep.href, "/cart");
+  assert.equal(nextStep.textContent, "View cart and continue to checkout");
 });
 
 test("detail page reports an unavailable product without fabricating data", async (t) => {
@@ -142,6 +145,7 @@ test("customer cart merges saved guest items before adding a product", async (t)
   await button.listeners.click();
   assert.equal(calls.find((call) => call.url.includes("cart.add_item")).options.body.get("quantity"), "2");
   assert.equal(events.at(-1).detail, 4);
+  assert.equal(nodes.get("#cart-feedback").children.at(-1).href, "/cart");
 });
 
 test("out of stock products cannot be added and cart failures are shown", async (t) => {
@@ -170,6 +174,7 @@ test("catalog submits filters and advances through server-sorted pages", async (
       products: [product], categories: [{ name: "Drinks", category_name: "Drinks" }],
       page, page_size: 20, total: 21, has_more: page === 1,
     });
+
   });
   await import(`../../intelligent_ordering/public/js/catalog-pages.js?filters=${Date.now()}`);
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -187,4 +192,20 @@ test("catalog submits filters and advances through server-sorted pages", async (
   assert.equal(requests.at(-1).get("page"), "2");
   assert.equal(nodes.get("#catalog-next").disabled, true);
   assert.equal(nodes.get("#catalog-page").textContent, "Page 2");
+});
+
+test("a rejected addition shows an error instead of a checkout success action", async (t) => {
+  const { nodes } = installPage(t, "products");
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("catalog.get_catalog")) return response({
+      products: [product], categories: [], page: 1, page_size: 20, total: 1, has_more: false,
+    });
+    if (url.includes("cart.get_cart")) return response({ items: [], item_count: 0, is_guest: true });
+    return { ok: false, json: async () => ({ message: "Insufficient stock." }) };
+  });
+  await import(`../../intelligent_ordering/public/js/catalog-pages.js?rejected=${Date.now()}`);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await nodes.get("#catalog-products").children[0].children.at(-1).listeners.click();
+  assert.match(nodes.get("#cart-feedback").textContent, /Could not add to cart: Insufficient stock/);
+  assert.equal(nodes.get("#cart-feedback").children.length, 0);
 });
