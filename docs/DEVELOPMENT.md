@@ -93,6 +93,24 @@ bench build --app intelligent_ordering
 bench restart
 ```
 
+If a page still shows an old catalogue placeholder, check that the running
+Bench uses the intended app checkout and site. From that Bench directory:
+
+```bash
+git -C apps/intelligent_ordering log -1 --oneline
+bench --site <site-name> clear-cache
+bench build --app intelligent_ordering
+bench restart
+```
+
+Replace `<site-name>` with the confirmed existing site name, then reload `/`,
+`/products`, `/categories`, and `/cart` in a browser. If the old page persists,
+check for a site-specific Website Page or route configuration using the same
+route before making changes; do not delete site records without reviewing them.
+Check the browser console and server logs for asset or API errors. An empty
+catalogue can also mean there are no enabled products in enabled categories;
+products need available stock before they can be added to the cart.
+
 ## Configuration and secrets
 
 Copy `.env.example` only as a reference for the external credentials that
@@ -399,6 +417,14 @@ returns to those APIs. The product picker includes disabled products for
 authorized inventory staff to manage their existing stock; disabled products
 remain unavailable for customer orders. Inventory API permissions remain
 authoritative.
+
+For received goods, select the product in **Matching products**, choose an
+active warehouse, and use **Receive stock** (the default) with the received
+whole-number quantity. **Initial stock** is only for a product/warehouse pair
+without prior movements. Submission status and server errors appear beside
+the submit button; the product stays selected for subsequent movements.
+If saving succeeds but refreshing the display fails, reload and check the
+balance/movement history before submitting the same receipt again.
 
 ## Delivery management
 

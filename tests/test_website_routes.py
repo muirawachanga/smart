@@ -53,7 +53,7 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
         for _, template in expected:
             self.assertTrue((WWW / f"{template}.html").is_file())
 
-    def test_customer_pages_load_their_phase_scripts(self):
+    def test_customer_pages_load_their_scripts(self):
         expected = {
             "index.html": "catalog-pages.js",
             "products.html": "catalog-pages.js",
@@ -72,6 +72,30 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
             with self.subTest(template=template):
                 source = (WWW / template).read_text()
                 self.assertIn(f"/assets/intelligent_ordering/js/{script}", source)
+
+    def test_customer_navigation_links_to_connected_shopping_pages(self):
+        header = (APP_ROOT / "templates/includes/smarto_header.html").read_text()
+        footer = (APP_ROOT / "templates/includes/smarto_footer.html").read_text()
+        home = (WWW / "index.html").read_text()
+        for route in ("/products", "/categories", "/cart"):
+            with self.subTest(route=route):
+                self.assertIn(f'href="{route}"', header)
+                self.assertIn(f'href="{route}"', footer)
+                self.assertIn(f'href="{route}"', home)
+        for page in ("payment.html", "track-order.html"):
+            with self.subTest(page=page):
+                self.assertIn('href="/account"', (WWW / page).read_text())
+
+    def test_customer_pages_do_not_show_development_phase_placeholders(self):
+        for path in list(WWW.glob("*.html")) + [
+            APP_ROOT / "templates/includes/smarto_header.html",
+            APP_ROOT / "templates/includes/smarto_footer.html",
+        ]:
+            with self.subTest(page=path.name):
+                source = path.read_text().lower()
+                self.assertNotRegex(source, r"\bphases?\b")
+                self.assertNotIn("open the current catalogue", source)
+                self.assertNotIn("open the existing storefront", source)
 
     def test_staff_pages_are_server_guarded(self):
         workflows = {

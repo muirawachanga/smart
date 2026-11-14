@@ -58,8 +58,8 @@
       </label>
       <label>Movement
         <select name="transaction_type" required>
-          <option value="Opening">Initial stock</option>
           <option value="Receipt">Receive stock</option>
+          <option value="Opening">Initial stock</option>
           <option value="Adjustment">Manual adjustment</option>
         </select>
       </label>
@@ -73,6 +73,7 @@
         <input name="remarks" type="text" maxlength="500">
       </label>
       <button class="smarto-button" type="submit">Record stock movement</button>
+      <p id="inventory-adjustment-feedback" role="status" aria-live="polite"></p>
     </form>
   </section>
 
@@ -92,6 +93,7 @@
         <input name="remarks" type="text" maxlength="500">
       </label>
       <button class="smarto-button" type="submit">Record order return</button>
+      <p id="inventory-return-feedback" role="status" aria-live="polite"></p>
     </form>
   </section>
 

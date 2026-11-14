@@ -8,6 +8,8 @@ const productSearch = document.querySelector("#inventory-product-search");
 const productSelect = document.querySelector("#inventory-product-options");
 const adjustmentForm = document.querySelector("#inventory-adjustment-form");
 const returnForm = document.querySelector("#inventory-return-form");
+const adjustmentFeedback = document.querySelector("#inventory-adjustment-feedback");
+const returnFeedback = document.querySelector("#inventory-return-feedback");
 const movementFilters = document.querySelector("#inventory-movement-filters");
 const movementList = document.querySelector("#inventory-movements");
 let stockPage = 1;
@@ -55,8 +57,7 @@ async function loadOverview() {
 }
 
 async function loadStock() {
-  feedback.textContent = "Loading stock balances...";
-  stockList.replaceChildren();
+  stockList.replaceChildren(node("p", "Loading stock balances..."));
   const result = await get("inventory.list_stock", {
     ...Object.fromEntries(new FormData(stockFilters)),
     page: String(stockPage),
@@ -80,7 +81,6 @@ async function loadStock() {
   } else {
     stockList.replaceChildren(...result.stock.map(stockRow));
   }
-  feedback.textContent = "";
 }
 
 function stockRow(row) {
@@ -168,9 +168,17 @@ async function loadMovements() {
   if (!result.movements.length) movementList.append(node("p", "No stock movements match these filters."));
 }
 
-async function refreshAfterMovement(message) {
-  await Promise.all([loadOverview(), loadStock(), loadMovements()]);
+function movementFeedback(target, message) {
+  target.textContent = message;
   feedback.textContent = message;
+}
+
+async function refreshAfterMovement(target, message) {
+  const results = await Promise.allSettled([loadOverview(), loadStock(), loadMovements()]);
+  const errors = results.filter((result) => result.status === "rejected");
+  movementFeedback(target, errors.length
+    ? `${message} Display refresh failed: ${errors.map((result) => result.reason.message).join("; ")}. Reload the page to check balances before recording this movement again.`
+    : message);
 }
 
 stockFilters.addEventListener("submit", (event) => {
@@ -194,6 +202,7 @@ productSearch.addEventListener("submit", (event) => {
   productSearchValue = productSearch.elements.search.value.trim();
   productPage = 1;
   selectedProduct = "";
+  productSelect.replaceChildren(new Option("Search to select a product", ""));
   loadProductOptions().catch((error) => { feedback.textContent = `Products could not be loaded: ${error.message}`; });
 });
 productSelect.addEventListener("change", () => { selectedProduct = productSelect.value; });
@@ -205,15 +214,19 @@ document.querySelector("#inventory-product-next").addEventListener("click", () =
 
 adjustmentForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!adjustmentForm.reportValidity() || !selectedProduct) {
-    feedback.textContent = "Select a product before recording stock.";
+  const button = adjustmentForm.querySelector('button[type="submit"]');
+  if (button.disabled) return;
+  if (!adjustmentForm.reportValidity()) return;
+  selectedProduct = productSelect.value;
+  if (!selectedProduct) {
+    movementFeedback(adjustmentFeedback, "Select a product in Matching products before recording stock.");
     return;
   }
   const values = Object.fromEntries(new FormData(adjustmentForm));
   let quantity = Number(values.quantity);
   if (values.transaction_type === "Adjustment" && values.direction === "decrease") quantity *= -1;
-  const button = adjustmentForm.querySelector('button[type="submit"]');
   button.disabled = true;
+  movementFeedback(adjustmentFeedback, "Recording stock movement...");
   try {
     await post("inventory.adjust_stock", {
       product: selectedProduct,
@@ -223,10 +236,9 @@ adjustmentForm.addEventListener("submit", async (event) => {
       remarks: values.remarks || "",
     });
     adjustmentForm.reset();
-    selectedProduct = "";
-    await refreshAfterMovement("Stock movement recorded.");
+    await refreshAfterMovement(adjustmentFeedback, "Stock movement recorded.");
   } catch (error) {
-    feedback.textContent = `Stock movement failed: ${error.message}`;
+    movementFeedback(adjustmentFeedback, `Stock movement failed: ${error.message}`);
   } finally {
     button.disabled = false;
   }
@@ -234,13 +246,17 @@ adjustmentForm.addEventListener("submit", async (event) => {
 
 returnForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!returnForm.reportValidity() || !selectedProduct) {
-    feedback.textContent = "Select a product before recording a return.";
+  const button = returnForm.querySelector('button[type="submit"]');
+  if (button.disabled) return;
+  if (!returnForm.reportValidity()) return;
+  selectedProduct = productSelect.value;
+  if (!selectedProduct) {
+    movementFeedback(returnFeedback, "Select a product in Matching products before recording a return.");
     return;
   }
   const values = Object.fromEntries(new FormData(returnForm));
-  const button = returnForm.querySelector('button[type="submit"]');
   button.disabled = true;
+  movementFeedback(returnFeedback, "Recording stock return...");
   try {
     await post("inventory.record_order_return", {
       order_name: values.order_name.trim(),
@@ -250,14 +266,19 @@ returnForm.addEventListener("submit", async (event) => {
       remarks: values.remarks || "",
     });
     returnForm.reset();
-    selectedProduct = "";
-    await refreshAfterMovement("Dispatched order stock return recorded.");
+    await refreshAfterMovement(returnFeedback, "Dispatched order stock return recorded.");
   } catch (error) {
-    feedback.textContent = `Stock return failed: ${error.message}`;
+    movementFeedback(returnFeedback, `Stock return failed: ${error.message}`);
   } finally {
     button.disabled = false;
   }
 });
+
+for (const [form, target] of [[adjustmentForm, adjustmentFeedback], [returnForm, returnFeedback]]) {
+  form.addEventListener("invalid", () => {
+    movementFeedback(target, "Complete the required fields and enter a valid whole-number quantity.");
+  }, true);
+}
 
 movementFilters.addEventListener("submit", (event) => {
   event.preventDefault();

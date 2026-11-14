@@ -157,6 +157,7 @@ const inventoryIds = [
   "inventory-stock-previous", "inventory-stock-next", "inventory-stock-page",
   "inventory-product-search", "inventory-product-options", "inventory-product-next",
   "inventory-adjustment-form", "inventory-return-form", "inventory-movement-filters",
+  "inventory-adjustment-feedback", "inventory-return-feedback",
   "inventory-movements", "inventory-movements-previous", "inventory-movements-next",
   "inventory-movements-page",
 ];
@@ -211,8 +212,14 @@ test("inventory page loads real balances and posts receipt through inventory API
   assert.equal(receipt.options.body.get("quantity"), "3");
   assert.match(nodes.get("#inventory-feedback").textContent, /Stock movement recorded/);
 
-  nodes.get("#inventory-product-options").value = "SKU-1";
-  nodes.get("#inventory-product-options").listeners.change();
+  // The shared product picker stays selected after the first submission.
+  form.elements.warehouse.value = "WH-1";
+  form.elements.transaction_type.value = "Receipt";
+  form.elements.quantity.value = "2";
+  await form.listeners.submit({ preventDefault() {} });
+  assert.equal(calls.filter((call) => call.url.includes("inventory.adjust_stock")).length, 2);
+  assert.equal(calls.filter((call) => call.url.includes("inventory.adjust_stock")).at(-1)
+    .options.body.get("product"), "SKU-1");
   const returnForm = nodes.get("#inventory-return-form");
   returnForm.elements.order_name.value = "SO-1";
   returnForm.elements.warehouse.value = "WH-1";
@@ -223,6 +230,76 @@ test("inventory page loads real balances and posts receipt through inventory API
   assert.equal(orderReturn.options.body.get("order_name"), "SO-1");
   assert.equal(orderReturn.options.body.get("product"), "SKU-1");
   assert.match(nodes.get("#inventory-feedback").textContent, /stock return recorded/);
+});
+
+function mockInventoryReads(url) {
+  if (url.includes("inventory.get_dashboard")) {
+    return response({ summary: {}, low_stock_threshold: 5 });
+  }
+  if (url.includes("inventory.list_stock")) {
+    return response({ stock: [], warehouses: [], has_more: false });
+  }
+  if (url.includes("inventory.list_movements")) {
+    return response({ movements: [], has_more: false });
+  }
+  throw new Error(`Unexpected request: ${url}`);
+}
+
+test("stock form reports missing product and server rejection beside the button", async (t) => {
+  const nodes = install(t, inventoryIds, "[data-inventory-page]", {});
+  let posted = 0;
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("inventory.adjust_stock")) {
+      posted += 1;
+      return { ok: false, status: 417, json: async () => ({
+        message: "Opening stock can only be recorded once.",
+      }) };
+    }
+    return mockInventoryReads(url);
+  });
+  await import(`../../intelligent_ordering/public/js/inventory-page.js?validation=${Date.now()}`);
+  await tick();
+  const form = nodes.get("#inventory-adjustment-form");
+  await form.listeners.submit({ preventDefault() {} });
+  assert.equal(posted, 0);
+  assert.match(nodes.get("#inventory-adjustment-feedback").textContent, /Select a product/);
+  nodes.get("#inventory-product-options").value = "SKU-1";
+  form.elements.warehouse.value = "WH-1";
+  form.elements.transaction_type.value = "Opening";
+  form.elements.quantity.value = "3";
+  await form.listeners.submit({ preventDefault() {} });
+  assert.equal(posted, 1);
+  assert.match(nodes.get("#inventory-adjustment-feedback").textContent, /Opening stock can only/);
+  assert.equal(form.elements.quantity.value, "3");
+  assert.equal(form.querySelector('button[type="submit"]').disabled, false);
+});
+
+test("successful stock save with failed refresh is not reported as a failed movement", async (t) => {
+  const nodes = install(t, inventoryIds, "[data-inventory-page]", {});
+  let saved = false;
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("inventory.adjust_stock")) {
+      saved = true;
+      return response({ name: "SLE-1" });
+    }
+    if (saved && url.includes("inventory.list_stock")) {
+      throw new Error("Connection lost");
+    }
+    return mockInventoryReads(url);
+  });
+  await import(`../../intelligent_ordering/public/js/inventory-page.js?refresh=${Date.now()}`);
+  await tick();
+  nodes.get("#inventory-product-options").value = "SKU-1";
+  const form = nodes.get("#inventory-adjustment-form");
+  form.elements.warehouse.value = "WH-1";
+  form.elements.transaction_type.value = "Receipt";
+  form.elements.quantity.value = "3";
+  await form.listeners.submit({ preventDefault() {} });
+  const message = nodes.get("#inventory-adjustment-feedback").textContent;
+  assert.match(message, /Stock movement recorded.*Display refresh failed/);
+  assert.match(message, /Reload the page/);
+  assert.doesNotMatch(message, /Stock movement failed/);
+  assert.equal(nodes.get("#inventory-product-options").value, "SKU-1");
 });
 
 const deliveryIds = [
