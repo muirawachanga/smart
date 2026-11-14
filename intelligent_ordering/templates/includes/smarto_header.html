@@ -1,0 +1,38 @@
+<header class="smarto-header">
+  <div class="smarto-header-inner">
+    <a class="smarto-brand" href="/" aria-label="SmartO home">
+      <span class="smarto-brand-mark" aria-hidden="true">S</span>
+      <span>SmartO</span>
+    </a>
+    <button class="smarto-menu-toggle" id="smarto-menu-toggle" type="button"
+      aria-controls="smarto-primary-navigation" aria-expanded="false">
+      <span class="smarto-menu-icon" aria-hidden="true"></span>
+      <span class="smarto-visually-hidden">Toggle navigation</span>
+    </button>
+    <nav class="smarto-navigation" id="smarto-primary-navigation" aria-label="Main navigation">
+      <a data-nav-path="/" href="/">Home</a>
+      <a data-nav-path="/about" href="/about">About</a>
+      <a data-nav-path="/products" href="/products">Products</a>
+      <a data-nav-path="/categories" href="/categories">Categories</a>
+      <a data-nav-path="/contact" href="/contact">Contact</a>
+      <a class="smarto-cart-link" data-nav-path="/cart" href="/cart" aria-label="Shopping cart">
+        Cart <span class="smarto-cart-count" id="cart-count" aria-live="polite">0</span>
+      </a>
+      <span class="smarto-account-links">
+        <a id="smarto-login-link" href="/login">Log in</a>
+        <a id="smarto-register-link" href="/register">Register</a>
+        <a id="smarto-account-link" href="/account" hidden>My account</a>
+        <a id="smarto-logout-link" href="/api/method/logout" hidden>Log out</a>
+      </span>
+    </nav>
+    <nav class="smarto-staff-navigation" id="smarto-staff-navigation"
+      aria-label="Staff workspaces" hidden>
+      <a id="staff-orders-link" href="/store#staff-orders" hidden>Orders</a>
+      <a id="payments-link" href="/store#payment-dashboard" hidden>Payments</a>
+      <a id="deliveries-link" href="/store#delivery-dashboard" hidden>Deliveries</a>
+      <a id="admin-dashboard-link" href="/store#admin-dashboard" hidden>Reports</a>
+      <a id="inventory-dashboard-link" href="/store#inventory-dashboard" hidden>Inventory</a>
+      <a id="smarto-workspace-link" href="/account" hidden>Workspace</a>
+    </nav>
+  </div>
+</header>

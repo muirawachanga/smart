@@ -1,0 +1,16 @@
+{% extends "templates/smarto_base.html" %}
+
+{% block title %}Products | SmartO{% endblock %}
+
+{% block smarto_content %}
+<main class="smarto-page" data-page-title="Products">
+  <p class="smarto-eyebrow">Shop SmartO</p>
+  <h1>Products</h1>
+  <p>Product listings, search, categories, and sorting will be connected to the existing product database in Phase 3.</p>
+  <div class="smarto-state" role="status" aria-live="polite">
+    <strong>Catalogue connection not yet available on this page</strong>
+    <p>No sample or placeholder products are shown. The current database-backed catalogue is still available in the existing storefront.</p>
+    <a href="/store#catalog">Open the current catalogue</a>
+  </div>
+</main>
+{% endblock %}

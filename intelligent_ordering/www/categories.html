@@ -1,0 +1,16 @@
+{% extends "templates/smarto_base.html" %}
+
+{% block title %}Categories | SmartO{% endblock %}
+
+{% block smarto_content %}
+<main class="smarto-page" data-page-title="Categories">
+  <p class="smarto-eyebrow">Shop by category</p>
+  <h1>Product categories</h1>
+  <p>Available categories will be read from the product database in Phase 3.</p>
+  <div class="smarto-state" role="status" aria-live="polite">
+    <strong>Category listing not yet connected</strong>
+    <p>No categories are fabricated for this page. The existing storefront currently provides the database-backed category filter.</p>
+    <a href="/store#catalog">Open the current catalogue and category filter</a>
+  </div>
+</main>
+{% endblock %}

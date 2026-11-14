@@ -3,6 +3,9 @@
 This repository contains a custom Frappe app. The Frappe framework and MariaDB
 are managed by a Frappe Bench installation; this repository is installed as an
 app inside that bench. The project proposal remains in the root `README.md`.
+The website product name is SmartO. The internal Frappe app, Python package,
+and DocType module remain `intelligent_ordering` / `Intelligent Ordering` to
+preserve existing identifiers and database compatibility.
 
 ## Prerequisites
 
@@ -34,9 +37,59 @@ ln -s /absolute/path/to/smart apps/intelligent_ordering
 bench --site <site-name> install-app intelligent_ordering
 ```
 
-Open the site URL printed by `bench start`. The product catalog is available
-at `/`. Frappe's login and session handling provide the authentication
+Open the site URL printed by `bench start`. The SmartO homepage is available
+at `/`, and the existing database-backed catalog and operations are at
+`/store`. Frappe's login and session handling provide the authentication
 foundation. Assign the app roles to test users from the Frappe Desk.
+
+## SmartO website routes
+
+The public website uses native Frappe `www` routes and a shared Jinja layout;
+it does not add a JavaScript framework. The shared layout provides the SmartO
+header, responsive navigation, breadcrumbs, account links, footer, and
+route-aware page labels.
+
+| Route | Current Phase 2 page |
+| --- | --- |
+| `/` | SmartO homepage |
+| `/about` | About SmartO |
+| `/products` | Product catalogue page shell |
+| `/products/<product_id>` | Product detail shell using a Frappe route rule |
+| `/categories` | Category page shell |
+| `/cart` | Cart page shell |
+| `/checkout` | Checkout page shell |
+| `/payment` | Payment page shell |
+| `/order-confirmation/<order_id>` | Order confirmation shell using a Frappe route rule |
+| `/track-order` | Tracking page shell |
+| `/contact` | Contact page shell; business contact data is not configured |
+| `/login` | Frappe's native login page; it is not replaced |
+| `/register` | Registration information page; account creation is not implemented here |
+| `/forgot-password` | Password recovery information page |
+| `/reset-password` | Password reset information page; it accepts no credentials or tokens |
+| `/account` | Customer account page shell |
+| `/dashboard/owner` | Business owner dashboard shell |
+| `/dashboard/admin` | Administrator dashboard shell |
+| `/dashboard/sales` | Sales dashboard shell |
+| `/dashboard/orders` | Order dashboard shell |
+| `/dashboard/inventory` | Inventory dashboard shell |
+| `/dashboard/delivery` | Delivery dashboard shell |
+| `/store` | Existing database-backed storefront and staff workflows |
+
+Phase 2 page shells deliberately do not invent customer data, accept payment
+details, create accounts, or submit orders. Existing catalog, cart, checkout,
+order, payment, inventory, delivery, and administration workflows remain
+available at `/store` until the later page-specific phases connect them. The
+dashboard shells contain no operational data; their role-specific data and
+server-side access controls will be connected with personnel dashboards.
+Frappe's native `/login` remains the authentication authority.
+
+After changing website templates, route rules, or public assets, rebuild app
+assets and restart the Bench site:
+
+```bash
+bench build --app intelligent_ordering
+bench restart
+```
 
 ## Configuration and secrets
 

@@ -1,0 +1,20 @@
+{% extends "templates/web.html" %}
+
+{% block title %}SmartO{% endblock %}
+
+{% block page_content %}
+{% include "templates/includes/smarto_header.html" %}
+<div class="smarto-main" id="main-content">
+  <nav class="smarto-breadcrumb" aria-label="Breadcrumb">
+    <ol>
+      <li><a href="/">Home</a></li>
+      <li aria-current="page" id="smarto-breadcrumb-current">SmartO</li>
+    </ol>
+  </nav>
+  {% block smarto_content %}{% endblock %}
+</div>
+{% include "templates/includes/smarto_footer.html" %}
+<p id="smarto-nav-status" class="smarto-visually-hidden" role="status" aria-live="polite"></p>
+<link rel="stylesheet" href="/assets/intelligent_ordering/css/site.css">
+<script type="module" src="/assets/intelligent_ordering/js/site.js"></script>
+{% endblock %}

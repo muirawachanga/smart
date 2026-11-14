@@ -1,0 +1,17 @@
+{% extends "templates/smarto_base.html" %}
+
+{% block title %}Track an order | SmartO{% endblock %}
+
+{% block smarto_content %}
+<main class="smarto-page" data-page-title="Track an order">
+  <p class="smarto-eyebrow">Order progress</p>
+  <h1>Track an order</h1>
+  <p>Order and delivery tracking will be connected to authenticated, customer-owned records in a later phase.</p>
+  <div class="smarto-state">
+    <strong>Tracking is not enabled on this page yet</strong>
+    <p>No public reference lookup is available, so another customer's order information cannot be exposed.</p>
+    <a href="/login">Log in through Frappe</a>
+    <a href="/store#order-history">Open the existing order history</a>
+  </div>
+</main>
+{% endblock %}

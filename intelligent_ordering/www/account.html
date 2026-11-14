@@ -1,0 +1,16 @@
+{% extends "templates/smarto_base.html" %}
+
+{% block title %}My account | SmartO{% endblock %}
+
+{% block smarto_content %}
+<main class="smarto-page" data-page-title="My account">
+  <p class="smarto-eyebrow">Personal account</p>
+  <h1>My account</h1>
+  <p>Profile, saved addresses, order history, payment history, and tracking will be connected to the signed-in Frappe user in later phases.</p>
+  <div class="smarto-state">
+    <strong>Account data is not displayed on this page yet</strong>
+    <p>The existing customer order history remains available in the storefront and is restricted to the signed-in customer.</p>
+    <a href="/store#order-history">Open existing order history</a>
+  </div>
+</main>
+{% endblock %}

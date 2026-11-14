@@ -1,0 +1,544 @@
+{% extends "templates/smarto_base.html" %}
+
+{% block title %}SmartO Storefront{% endblock %}
+
+{% block smarto_content %}
+<main class="ordering-shell">
+  <header class="ordering-header store-page-heading">
+    <p class="eyebrow">SmartO ordering</p>
+    <h1>Storefront and operations</h1>
+    <p class="intro">Browse products, manage your cart, and access the existing order and staff workflows.</p>
+    <a class="cart-link" href="#order-history">My orders</a>
+  </header>
+
+  <section id="catalog" class="catalog" aria-label="Product catalog">
+    <form id="catalog-filters" class="catalog-filters">
+      <label class="search-field">
+        <span>Search products</span>
+        <input id="catalog-search" name="search" type="search" maxlength="100" autocomplete="off"
+          placeholder="Search by name, SKU, or description">
+      </label>
+      <label class="category-field">
+        <span>Category</span>
+        <select id="catalog-category" name="category">
+          <option value="">All categories</option>
+        </select>
+      </label>
+      <button class="primary-button" type="submit">Search</button>
+    </form>
+
+    <p id="catalog-status" class="catalog-status" role="status" aria-live="polite">
+      Loading products…
+    </p>
+    <div id="catalog-products" class="product-grid"></div>
+    <nav id="catalog-pagination" class="pagination" aria-label="Catalog pages" hidden>
+      <button id="previous-page" class="secondary-button" type="button">Previous</button>
+      <span id="page-indicator"></span>
+      <button id="next-page" class="secondary-button" type="button">Next</button>
+    </nav>
+  </section>
+
+  <section id="shopping-cart" class="shopping-cart" aria-labelledby="cart-heading">
+    <div class="cart-heading-row">
+      <h2 id="cart-heading">Shopping cart</h2>
+      <button id="clear-cart" class="text-button" type="button" hidden>
+        Clear cart
+      </button>
+    </div>
+    <p id="cart-status" class="catalog-status" role="status" aria-live="polite">
+      Loading cart…
+    </p>
+    <div id="cart-items" class="cart-items"></div>
+    <div class="cart-summary">
+      <p class="cart-total-label">Total</p>
+      <p id="cart-total" class="cart-total">KES 0.00</p>
+      <div class="cart-actions">
+        <a class="secondary-button continue-shopping" href="#catalog">
+          Continue shopping
+        </a>
+        <button id="proceed-checkout" class="primary-button" type="button" disabled>
+          Proceed to Checkout
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section id="checkout-section" class="checkout-section" aria-labelledby="checkout-heading" hidden>
+    <h2 id="checkout-heading">Review and place your order</h2>
+    <p id="checkout-status" class="catalog-status" role="status" aria-live="polite"></p>
+    <div id="checkout-review" class="order-items"></div>
+    <div class="order-total-row">
+      <span>Subtotal</span>
+      <strong id="checkout-subtotal"></strong>
+    </div>
+    <div class="order-total-row">
+      <span>Delivery fee</span>
+      <strong id="checkout-delivery-fee">Select a delivery area</strong>
+    </div>
+    <div class="order-total-row">
+      <span>Total</span>
+      <strong id="checkout-total"></strong>
+    </div>
+    <form id="checkout-form" class="checkout-form">
+      <fieldset>
+        <legend>Customer details</legend>
+        <label>Full name
+          <input id="customer-name" name="customer_name" type="text" maxlength="140"
+            autocomplete="name" required>
+        </label>
+        <label>Phone number
+          <input id="customer-phone" name="phone" type="tel" maxlength="20"
+            autocomplete="tel" required>
+        </label>
+      </fieldset>
+      <fieldset>
+        <legend>Delivery address</legend>
+        <label>Delivery area
+          <select id="checkout-delivery-area" name="delivery_area" required>
+            <option value="">Select delivery area</option>
+          </select>
+        </label>
+        <label>Address line 1
+          <input name="address_line_1" type="text" maxlength="140"
+            autocomplete="address-line1" required>
+        </label>
+        <label>Address line 2
+          <input name="address_line_2" type="text" maxlength="140"
+            autocomplete="address-line2">
+        </label>
+        <label>City
+          <input name="city" type="text" maxlength="140" autocomplete="address-level2" required>
+        </label>
+        <label>Region
+          <input name="region" type="text" maxlength="140" autocomplete="address-level1">
+        </label>
+        <label>Postal code
+          <input name="postal_code" type="text" maxlength="40" autocomplete="postal-code">
+        </label>
+      </fieldset>
+      <div class="checkout-actions">
+        <button id="submit-order" class="primary-button" type="submit" disabled>
+          Place order
+        </button>
+        <button id="cancel-checkout" class="secondary-button" type="button">
+          Return to cart
+        </button>
+      </div>
+    </form>
+    <div id="order-confirmation" class="order-confirmation" role="status" hidden></div>
+  </section>
+
+  <section id="order-history" class="orders-section" aria-labelledby="orders-heading">
+    <div class="section-heading">
+      <h2 id="orders-heading">My orders</h2>
+      <button id="refresh-orders" class="secondary-button" type="button">Refresh orders</button>
+    </div>
+    <p id="orders-status" class="catalog-status" role="status" aria-live="polite"></p>
+    <div id="customer-orders" class="order-list"></div>
+    <div id="customer-order-detail" class="order-detail" hidden></div>
+  </section>
+
+  <section id="staff-orders" class="orders-section" aria-labelledby="staff-orders-heading">
+    <h2 id="staff-orders-heading">Staff order management</h2>
+    <form id="staff-order-filters" class="order-filters">
+      <label>Search orders
+        <input name="search" type="search" maxlength="100" placeholder="Order number, customer, or phone">
+      </label>
+      <label>Filter by status
+        <select name="status">
+          <option value="">All statuses</option>
+        </select>
+      </label>
+      <button class="primary-button" type="submit">Search</button>
+    </form>
+    <p id="staff-orders-status" class="catalog-status" role="status" aria-live="polite"></p>
+    <div id="staff-orders-list" class="order-list"></div>
+    <div id="staff-order-detail" class="order-detail" hidden></div>
+  </section>
+
+  <section id="inventory-dashboard" class="orders-section" aria-labelledby="inventory-heading">
+    <h2 id="inventory-heading">Inventory management</h2>
+    <div id="inventory-summary" class="inventory-summary"></div>
+    <p id="inventory-status" class="catalog-status" role="status" aria-live="polite"></p>
+
+    <section class="inventory-panel" aria-labelledby="stock-heading">
+      <h3 id="stock-heading">Stock by product and warehouse</h3>
+      <form id="inventory-stock-filters" class="order-filters">
+        <label>Search products
+          <input name="search" type="search" maxlength="100">
+        </label>
+        <label>Warehouse
+          <select name="warehouse"><option value="">All warehouses</option></select>
+        </label>
+        <label>Availability
+          <select name="availability">
+            <option value="all">All stock</option>
+            <option value="available">Available</option>
+            <option value="low">Low stock (1–5)</option>
+            <option value="out_of_stock">Out of stock</option>
+          </select>
+        </label>
+        <button class="primary-button" type="submit">Search stock</button>
+      </form>
+      <div id="inventory-stock-list" class="inventory-list"></div>
+    </section>
+
+    <section class="inventory-panel" aria-labelledby="stock-adjustment-heading">
+      <h3 id="stock-adjustment-heading">Receive or adjust stock</h3>
+      <form id="inventory-adjustment-form" class="checkout-form">
+        <label>Product
+          <select name="product" required>
+            <option value="">Select a product from the stock list</option>
+          </select>
+        </label>
+        <label>Warehouse
+          <select name="warehouse" required>
+            <option value="">Select warehouse</option>
+          </select>
+        </label>
+        <label>Movement
+          <select name="transaction_type" required>
+            <option value="Opening">Initial stock</option>
+            <option value="Receipt">Receive stock</option>
+            <option value="Adjustment">Manual adjustment</option>
+          </select>
+        </label>
+        <label>Adjustment direction
+          <select name="direction">
+            <option value="increase">Increase</option>
+            <option value="decrease">Decrease</option>
+          </select>
+        </label>
+        <label>Quantity
+          <input name="quantity" type="number" min="1" step="1" required>
+        </label>
+        <label>Remarks
+          <input name="remarks" type="text" maxlength="500">
+        </label>
+        <button class="primary-button" type="submit">Record stock movement</button>
+      </form>
+    </section>
+
+    <section class="inventory-panel" aria-labelledby="stock-return-heading">
+      <h3 id="stock-return-heading">Return dispatched order stock</h3>
+      <form id="inventory-return-form" class="checkout-form">
+        <label>Order number
+          <input name="order_name" type="text" maxlength="140" required>
+        </label>
+        <label>Product
+          <select name="product" required>
+            <option value="">Select a product from the stock list</option>
+          </select>
+        </label>
+        <label>Return to warehouse
+          <select name="warehouse" required>
+            <option value="">Select warehouse</option>
+          </select>
+        </label>
+        <label>Quantity returned
+          <input name="quantity" type="number" min="1" step="1" required>
+        </label>
+        <label>Remarks
+          <input name="remarks" type="text" maxlength="500">
+        </label>
+        <button class="primary-button" type="submit">Record return</button>
+      </form>
+    </section>
+
+    <section class="inventory-panel" aria-labelledby="movement-heading">
+      <h3 id="movement-heading">Stock movement history</h3>
+      <form id="inventory-movement-filters" class="order-filters">
+        <label>Product
+          <input name="product" type="text" maxlength="140">
+        </label>
+        <label>Warehouse
+          <select name="warehouse"><option value="">All warehouses</option></select>
+        </label>
+        <label>Movement type
+          <select name="transaction_type">
+            <option value="">All movements</option>
+            <option>Opening</option>
+            <option>Receipt</option>
+            <option>Issue</option>
+            <option>Adjustment</option>
+            <option>Reservation</option>
+            <option>Release</option>
+            <option>Dispatch</option>
+            <option>Return</option>
+          </select>
+        </label>
+        <button class="primary-button" type="submit">Filter history</button>
+      </form>
+      <div id="inventory-movements" class="inventory-list"></div>
+    </section>
+  </section>
+
+  <section id="payment-dashboard" class="orders-section" aria-labelledby="payments-heading">
+    <h2 id="payments-heading">Payment management</h2>
+    <div id="payment-summary"></div>
+    <form id="payment-filters" class="order-filters">
+      <label>Order number or M-Pesa receipt
+        <input name="search" type="search" maxlength="140">
+      </label>
+      <label>Status
+        <select name="status">
+          <option value="">All statuses</option>
+          <option>Initiated</option><option>Pending</option>
+          <option>Successful</option><option>Failed</option>
+          <option>Cancelled</option><option>Reversed</option>
+        </select>
+      </label>
+      <button class="primary-button" type="submit">Search payments</button>
+    </form>
+    <p id="payment-feedback" role="status" aria-live="polite"></p>
+    <div id="payment-transactions" class="order-list"></div>
+    <nav class="pagination" aria-label="Payment pages">
+      <button id="payments-previous" class="secondary-button" type="button" disabled>Previous</button>
+      <button id="payments-next" class="secondary-button" type="button" disabled>Next</button>
+    </nav>
+    <div id="payment-detail"></div>
+  </section>
+  <section id="delivery-dashboard" class="orders-section" aria-labelledby="delivery-heading">
+    <div class="section-heading">
+      <h2 id="delivery-heading">Delivery management</h2>
+      <a class="secondary-button" href="/login?redirect-to=%2Fstore%23delivery-dashboard">Sign in</a>
+    </div>
+    <p id="delivery-feedback" role="status" aria-live="polite"></p>
+    <div id="delivery-manager" hidden>
+      <h3>Delivery personnel workloads</h3>
+      <div id="delivery-workloads" class="inventory-summary"></div>
+      <h3>Orders ready for delivery</h3>
+      <p>Inventory was dispatched at Ready for Delivery. Delivery tracking does not deduct stock again.</p>
+      <div id="delivery-ready-orders" class="order-list"></div>
+      <nav class="pagination" aria-label="Ready order pages">
+        <button id="delivery-ready-previous" class="secondary-button" type="button" disabled>Previous</button>
+        <button id="delivery-ready-next" class="secondary-button" type="button" disabled>Next</button>
+      </nav>
+      <h3>Configure delivery areas</h3>
+      <p>Changes apply only to new orders. Set a zero fee for free delivery.</p>
+      <div id="delivery-areas" class="order-list"></div>
+      <form id="delivery-area-form" class="checkout-form">
+        <label>Area name
+          <input name="area_name" type="text" maxlength="140" required>
+        </label>
+        <label>Currency
+          <input name="currency" type="text" value="KES" pattern="[A-Z]{3}" maxlength="3" required>
+        </label>
+        <label>Delivery fee
+          <input name="delivery_fee" type="number" min="0" max="250000" step="0.01" required>
+        </label>
+        <label>Status
+          <select name="enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select>
+        </label>
+        <button type="submit" class="primary-button">Save delivery area</button>
+      </form>
+    </div>
+    <h3>Deliveries</h3>
+    <p>Delivery personnel see only their own assignments.</p>
+    <form id="delivery-filters" class="order-filters">
+      <label>Search order or delivery
+        <input name="search" type="search" maxlength="100">
+      </label>
+      <label>Delivery status
+        <select name="status">
+          <option value="">All statuses</option>
+          <option>Awaiting Assignment</option><option>Assigned</option><option>Preparing</option>
+          <option>Ready for Dispatch</option><option>Dispatched</option><option>In Transit</option>
+          <option>Delivered</option><option>Failed</option><option>Cancelled</option>
+        </select>
+      </label>
+      <label>Delivery area
+        <input name="area" type="text" maxlength="140">
+      </label>
+      <button type="submit" class="primary-button">Search / refresh deliveries</button>
+    </form>
+    <div id="delivery-list" class="order-list"></div>
+    <nav class="pagination" aria-label="Delivery pages">
+      <button id="delivery-previous" class="secondary-button" type="button" disabled>Previous</button>
+      <button id="delivery-next" class="secondary-button" type="button" disabled>Next</button>
+    </nav>
+    <div id="delivery-detail" class="order-detail" hidden></div>
+  </section>
+  <section id="admin-dashboard" class="orders-section" aria-labelledby="admin-heading">
+    <h2 id="admin-heading">Administration, analytics &amp; reports</h2>
+    <p id="admin-feedback" class="catalog-status" role="status" aria-live="polite"></p>
+    <section class="admin-panel" aria-labelledby="business-metrics-heading">
+      <h3 id="business-metrics-heading">Business statistics</h3>
+      <div id="admin-business-metrics" class="admin-metrics"></div>
+    </section>
+    <section class="admin-panel" aria-labelledby="inventory-metrics-heading">
+      <h3 id="inventory-metrics-heading">Inventory statistics</h3>
+      <div id="admin-inventory-metrics" class="admin-metrics"></div>
+    </section>
+    <section class="admin-panel" aria-labelledby="delivery-metrics-heading">
+      <h3 id="delivery-metrics-heading">Delivery statistics</h3>
+      <div id="admin-delivery-metrics" class="admin-metrics"></div>
+    </section>
+    <section class="admin-panel" aria-labelledby="sales-analytics-heading">
+      <h3 id="sales-analytics-heading">Verified sales analytics</h3>
+      <p>Sales are verified successful M-Pesa payments grouped by transaction date. Product/category totals are item values from paid orders, classified using category snapshots captured when each order was placed.</p>
+      <form id="sales-analytics-filters" class="order-filters">
+        <label>From
+          <input name="start_date" type="date">
+        </label>
+        <label>To
+          <input name="end_date" type="date">
+        </label>
+        <label>Product
+          <select name="product"><option value="">All products</option></select>
+        </label>
+        <label>Category
+          <select name="category"><option value="">All categories</option></select>
+        </label>
+        <label>Order status
+          <select name="order_status">
+            <option value="">All statuses</option>
+            <option>Pending</option><option>Confirmed</option><option>Processing</option>
+            <option>Ready for Delivery</option><option>Completed</option><option>Cancelled</option>
+          </select>
+        </label>
+        <label>Payment status
+          <select name="payment_status">
+            <option value="">Successful payments (sales basis)</option>
+            <option>Initiated</option><option>Successful</option><option>Pending</option><option>Failed</option>
+            <option>Cancelled</option><option>Reversed</option>
+          </select>
+        </label>
+        <button type="submit" class="primary-button">Update charts</button>
+      </form>
+      <div class="admin-chart-grid">
+        <article class="admin-chart"><h4>Daily sales</h4><canvas id="chart-daily" aria-label="Daily verified sales chart"></canvas><div id="table-daily"></div></article>
+        <article class="admin-chart"><h4>Weekly sales</h4><canvas id="chart-weekly" aria-label="Weekly verified sales chart"></canvas><div id="table-weekly"></div></article>
+        <article class="admin-chart"><h4>Monthly sales</h4><canvas id="chart-monthly" aria-label="Monthly verified sales chart"></canvas><div id="table-monthly"></div></article>
+        <article class="admin-chart"><h4>Yearly sales</h4><canvas id="chart-yearly" aria-label="Yearly verified sales chart"></canvas><div id="table-yearly"></div></article>
+        <article class="admin-chart"><h4>Sales by product</h4><canvas id="chart-by-product" aria-label="Sales by product chart"></canvas><div id="table-by-product"></div></article>
+        <article class="admin-chart"><h4>Sales by category</h4><canvas id="chart-by-category" aria-label="Sales by category chart"></canvas><div id="table-by-category"></div></article>
+        <article class="admin-chart"><h4>Sales by delivery area</h4><canvas id="chart-by-delivery-area" aria-label="Sales by delivery area chart"></canvas><div id="table-by-delivery-area"></div></article>
+      </div>
+    </section>
+    <section class="admin-panel" aria-labelledby="admin-orders-heading">
+      <h3 id="admin-orders-heading">Order administration</h3>
+      <form id="admin-order-filters" class="order-filters">
+        <label>Search orders
+          <input name="search" type="search" maxlength="100">
+        </label>
+        <label>Status
+          <select name="status"><option value="">All statuses</option>
+            <option>Pending</option><option>Confirmed</option><option>Processing</option>
+            <option>Ready for Delivery</option><option>Completed</option><option>Cancelled</option>
+          </select>
+        </label>
+        <label>Payment status
+          <select name="payment_status"><option value="">All payment statuses</option>
+            <option>Unpaid</option><option>Pending</option><option>Paid</option>
+            <option>Failed</option><option>Refunded</option>
+          </select>
+        </label>
+        <button type="submit" class="primary-button">Search orders</button>
+      </form>
+      <div id="admin-orders" class="order-list"></div>
+      <nav class="pagination" aria-label="Administration order pages">
+        <button id="admin-orders-previous" class="secondary-button" type="button" disabled>Previous</button>
+        <button id="admin-orders-next" class="secondary-button" type="button" disabled>Next</button>
+      </nav>
+      <div id="admin-order-detail" class="order-detail" hidden></div>
+    </section>
+    <section class="admin-panel" aria-labelledby="admin-customers-heading">
+      <h3 id="admin-customers-heading">Customer activity</h3>
+      <form id="admin-customer-search" class="order-filters">
+        <label>Search customers
+          <input name="search" type="search" maxlength="100">
+        </label>
+        <button type="submit" class="primary-button">Search customers</button>
+      </form>
+      <div id="admin-customers" class="order-list"></div>
+      <nav class="pagination" aria-label="Customer pages">
+        <button id="admin-customers-previous" class="secondary-button" type="button" disabled>Previous</button>
+        <button id="admin-customers-next" class="secondary-button" type="button" disabled>Next</button>
+      </nav>
+      <div id="admin-customer-detail" class="order-detail" hidden></div>
+    </section>
+    <section class="admin-panel" aria-labelledby="admin-products-heading">
+      <h3 id="admin-products-heading">Product performance and catalog administration</h3>
+      <p>Product and category editing uses Frappe Desk permissions; products referenced by orders or stock history cannot be deleted.</p>
+      <a class="secondary-button" href="/app/product">Manage products</a>
+      <a class="secondary-button" href="/app/product-category">Manage categories</a>
+      <form id="admin-product-search" class="order-filters">
+        <label>Search products
+          <input name="search" type="search" maxlength="100">
+        </label>
+        <label>Category
+          <select name="category"><option value="">All categories</option></select>
+        </label>
+        <button type="submit" class="primary-button">View performance</button>
+      </form>
+      <div id="admin-products" class="order-list"></div>
+      <nav class="pagination" aria-label="Product performance pages">
+        <button id="admin-products-previous" class="secondary-button" type="button" disabled>Previous</button>
+        <button id="admin-products-next" class="secondary-button" type="button" disabled>Next</button>
+      </nav>
+    </section>
+    <section class="admin-panel" aria-labelledby="report-export-heading">
+      <h3 id="report-export-heading">Download reports</h3>
+      <p>Exports are permission checked and formula-injection guarded. Large reports are limited to 50,000 rows; inventory exports are current snapshots.</p>
+      <form id="admin-report-filters" class="order-filters">
+        <label>From
+          <input name="start_date" type="date">
+        </label>
+        <label>To
+          <input name="end_date" type="date">
+        </label>
+        <label>Product
+          <select name="product"><option value="">All products</option></select>
+        </label>
+        <label>Category
+          <select name="category"><option value="">All categories</option></select>
+        </label>
+        <label>Order status
+          <select name="order_status"><option value="">All statuses</option>
+            <option>Pending</option><option>Confirmed</option><option>Processing</option>
+            <option>Ready for Delivery</option><option>Completed</option><option>Cancelled</option>
+          </select>
+        </label>
+        <label>Payment status
+          <select name="payment_status"><option value="">All</option>
+            <option>Initiated</option><option>Pending</option><option>Successful</option>
+            <option>Failed</option><option>Cancelled</option><option>Reversed</option>
+          </select>
+        </label>
+      </form>
+      <div class="report-downloads">
+        <button data-report="sales" data-format="csv" class="secondary-button" type="button" hidden>Sales CSV</button>
+        <button data-report="sales" data-format="xlsx" class="secondary-button" type="button" hidden>Sales Excel</button>
+        <button data-report="orders" data-format="csv" class="secondary-button" type="button" hidden>Orders CSV</button>
+        <button data-report="orders" data-format="xlsx" class="secondary-button" type="button" hidden>Orders Excel</button>
+        <button data-report="customers" data-format="csv" class="secondary-button" type="button" hidden>Customers CSV</button>
+        <button data-report="customers" data-format="xlsx" class="secondary-button" type="button" hidden>Customers Excel</button>
+        <button data-report="payments" data-format="csv" class="secondary-button" type="button" hidden>Payments CSV</button>
+        <button data-report="payments" data-format="xlsx" class="secondary-button" type="button" hidden>Payments Excel</button>
+        <button data-report="inventory" data-format="csv" class="secondary-button" type="button" hidden>Inventory CSV</button>
+        <button data-report="inventory" data-format="xlsx" class="secondary-button" type="button" hidden>Inventory Excel</button>
+        <button data-report="deliveries" data-format="csv" class="secondary-button" type="button" hidden>Deliveries CSV</button>
+        <button data-report="deliveries" data-format="xlsx" class="secondary-button" type="button" hidden>Deliveries Excel</button>
+      </div>
+    </section>
+    <section class="admin-panel" aria-labelledby="audit-heading">
+      <h3 id="audit-heading">Administrative audit log</h3>
+      <form id="admin-audit-search" class="order-filters">
+        <label>Search audit history
+          <input name="search" type="search" maxlength="140">
+        </label>
+        <button type="submit" class="primary-button">Search audit log</button>
+      </form>
+      <div id="admin-audit-events" class="order-list"></div>
+      <nav class="pagination" aria-label="Audit history pages">
+        <button id="admin-audit-previous" class="secondary-button" type="button" disabled>Previous</button>
+        <button id="admin-audit-next" class="secondary-button" type="button" disabled>Next</button>
+      </nav>
+    </section>
+  </section>
+  <div id="app-feedback" class="feedback" role="alert" hidden></div>
+</main>
+<link rel="stylesheet" href="/assets/intelligent_ordering/css/app.css">
+<script type="module" src="/assets/intelligent_ordering/js/app.js"></script>
+{% endblock %}

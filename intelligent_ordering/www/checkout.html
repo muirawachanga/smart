@@ -1,0 +1,16 @@
+{% extends "templates/smarto_base.html" %}
+
+{% block title %}Checkout | SmartO{% endblock %}
+
+{% block smarto_content %}
+<main class="smarto-page" data-page-title="Checkout">
+  <p class="smarto-eyebrow">Review your order</p>
+  <h1>Checkout</h1>
+  <p>The dedicated checkout page will be connected to the existing server-validated order workflow in Phase 4.</p>
+  <div class="smarto-state">
+    <strong>No order is submitted from this page yet</strong>
+    <p>For now, the existing checkout remains available from the current storefront. Product prices and order totals continue to be calculated by the server.</p>
+    <a href="/store#shopping-cart">Continue through the current storefront</a>
+  </div>
+</main>
+{% endblock %}

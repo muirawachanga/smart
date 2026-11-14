@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "intelligent-ordering"
 version = "0.1.0"
-description = "Frappe application foundation for an AI-powered ordering and fulfillment system"
+description = "SmartO ordering, inventory, and fulfillment management for Frappe"
 requires-python = ">=3.10"
 dependencies = ["requests>=2.31,<3"]
 

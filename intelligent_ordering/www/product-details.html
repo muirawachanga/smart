@@ -1,0 +1,17 @@
+{% extends "templates/smarto_base.html" %}
+
+{% block title %}Product details | SmartO{% endblock %}
+
+{% block smarto_content %}
+<main class="smarto-page" data-page-title="Product details">
+  <p class="smarto-eyebrow">Product</p>
+  <h1>Product details</h1>
+  <p>Product information will be loaded from the database in Phase 3.</p>
+  <div class="smarto-state" role="status" aria-live="polite">
+    <strong>Requested product reference</strong>
+    <p><code data-route-reference>Loading route reference…</code></p>
+    <p>This route shell does not fetch or invent product information yet.</p>
+    <a href="/products">Return to products</a>
+  </div>
+</main>
+{% endblock %}

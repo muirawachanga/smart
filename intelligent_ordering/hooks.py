@@ -1,9 +1,14 @@
 app_name = "intelligent_ordering"
-app_title = "Intelligent Ordering"
+app_title = "SmartO"
 app_publisher = "Project Team"
-app_description = "AI-powered ordering and fulfillment management foundation"
+app_description = "SmartO ordering, inventory, and fulfillment management"
 app_email = "noreply@example.com"
 app_license = "MIT"
+
+website_route_rules = [
+    {"from_route": "/products/<product_id>", "to_route": "product-details"},
+    {"from_route": "/order-confirmation/<order_id>", "to_route": "order-confirmation"},
+]
 
 after_install = "intelligent_ordering.install.after_install"
 after_migrate = "intelligent_ordering.install.after_migrate"

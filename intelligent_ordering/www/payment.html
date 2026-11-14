@@ -1,0 +1,16 @@
+{% extends "templates/smarto_base.html" %}
+
+{% block title %}Payment | SmartO{% endblock %}
+
+{% block smarto_content %}
+<main class="smarto-page" data-page-title="Payment">
+  <p class="smarto-eyebrow">Secure payment</p>
+  <h1>Payment</h1>
+  <p>The payment page will use the existing Daraja integration in Phase 5. This page does not initiate a payment or display a fabricated result.</p>
+  <div class="smarto-state">
+    <strong>Existing payment workflow</strong>
+    <p>Payment attempts and verified status are currently available from customer order details in the existing storefront.</p>
+    <a href="/store#order-history">Open order history</a>
+  </div>
+</main>
+{% endblock %}

@@ -6,6 +6,6 @@ def get_data():
         {
             "module_name": "Intelligent Ordering",
             "type": "module",
-            "label": _("Intelligent Ordering"),
+            "label": _("SmartO"),
         }
     ]
