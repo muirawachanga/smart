@@ -469,6 +469,32 @@ button:focus-visible {
   cursor: pointer;
 }
 
+.smarto-product-quantity {
+  display: block;
+  margin-top: 0.75rem;
+}
+
+.smarto-product-quantity input {
+  width: 5rem;
+  min-height: 2.75rem;
+  padding: 0.55rem;
+  border: 1px solid #aebdd0;
+  border-radius: 0.5rem;
+}
+
+.smarto-cart-image {
+  width: 5rem;
+  height: 5rem;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  background: #f4f7fb;
+}
+
+.smarto-order-item .smarto-image-fallback {
+  width: 5rem;
+  height: 5rem;
+}
+
 .smarto-product-card button:disabled,
 .smarto-pagination button:disabled {
   opacity: 0.55;
@@ -490,6 +516,82 @@ button:focus-visible {
   border-radius: 0.5rem;
   background: #f8faff;
   font-weight: 650;
+}
+
+.smarto-cart-items {
+  display: grid;
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+
+.smarto-order-item {
+  padding: 1rem;
+  border: 1px solid #dce3ed;
+  border-radius: 0.65rem;
+  overflow-wrap: anywhere;
+}
+
+.smarto-order-item h2,
+.smarto-order-item h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.smarto-order-item p {
+  margin: 0.35rem 0;
+}
+
+.smarto-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+
+.smarto-actions input {
+  width: 5rem;
+  margin-left: 0.5rem;
+}
+
+.smarto-checkout-form {
+  display: grid;
+  gap: 1rem;
+  max-width: 42rem;
+}
+
+.smarto-checkout-form fieldset {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #dce3ed;
+  border-radius: 0.65rem;
+}
+
+.smarto-checkout-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 650;
+}
+
+.smarto-checkout-form input,
+.smarto-checkout-form select,
+.smarto-actions input {
+  min-height: 2.75rem;
+  padding: 0.55rem;
+  border: 1px solid #aebdd0;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #172033;
+}
+
+.smarto-checkout-form button {
+  justify-self: start;
+}
+
+.smarto-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .smarto-footer {

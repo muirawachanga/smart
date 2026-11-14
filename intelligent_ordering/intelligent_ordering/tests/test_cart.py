@@ -75,6 +75,17 @@ class TestShoppingCart(FrappeTestCase):
         self.assertEqual(removed["items"], [])
         self.assertEqual(removed["total"], 0)
 
+    def test_guest_and_customer_additions_cannot_exceed_available_stock(self):
+        frappe.set_user("Guest")
+        with self.assertRaises(frappe.ValidationError):
+            add_item(self.product.name, 101)
+        guest_cart = add_item(self.product.name, 1)
+        self.assertEqual(guest_cart["item_count"], 1)
+        frappe.set_user(self.customer.name)
+        add_item(self.product.name, 1)
+        with self.assertRaises(frappe.ValidationError):
+            add_item(self.product.name, 100)
+
     def test_empty_and_cleared_cart(self):
         self.assertEqual(get_cart()["items"], [])
         add_item(self.product.name, 1)

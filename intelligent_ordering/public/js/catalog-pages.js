@@ -1,5 +1,7 @@
-import { get, post } from "./api.js";
-import { clearGuestCart, readGuestCart, writeGuestCart } from "./cart-storage.js";
+import { get } from "./api.js";
+import { changeCart, loadCart } from "./cart-service.js";
+import { formatPrice } from "./components/order-display.js";
+import { productImage } from "./components/product-image.js";
 
 const page = document.querySelector("[data-catalog-page]");
 const kind = page.dataset.catalogPage;
@@ -27,27 +29,9 @@ function element(tag, text, className) {
   return node;
 }
 
-function formatPrice(amount, currency) {
-  const code = currency || "KES";
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency: code }).format(Number(amount));
-  } catch {
-    return `${code} ${Number(amount).toFixed(2)}`;
-  }
-}
-
 function productCard(product, withCart) {
   const card = element("article", null, "smarto-product-card");
-  if (product.image) {
-    const image = element("img", null, "smarto-product-image");
-    image.src = product.image;
-    image.alt = product.product_name;
-    image.loading = "lazy";
-    image.addEventListener("error", () => image.replaceWith(element("div", "No image", "smarto-image-fallback")), { once: true });
-    card.append(image);
-  } else {
-    card.append(element("div", "No image", "smarto-image-fallback"));
-  }
+  card.append(productImage(product.image, product.product_name));
 
   const heading = element("h2", null);
   const link = element("a", product.product_name);
@@ -61,11 +45,27 @@ function productCard(product, withCart) {
   card.append(element("p", available > 0 ? `${available} available` : "Out of stock"));
 
   if (withCart) {
+    let quantity;
+    if (kind === "detail") {
+      const label = element("label", "Quantity ", "smarto-product-quantity");
+      quantity = document.createElement("input");
+      quantity.type = "number";
+      quantity.min = "1";
+      quantity.max = String(Math.min(available, cart?.max_quantity || 9999));
+      quantity.step = "1";
+      quantity.value = "1";
+      quantity.disabled = !cartReady || cartBusy || !(available > 0);
+      label.append(quantity);
+      card.append(label);
+    }
     const button = element("button", "Add to cart", "smarto-button");
     button.type = "button";
     button.disabled = !cartReady || cartBusy || !(available > 0);
     button.setAttribute("aria-label", `Add ${product.product_name} to cart`);
-    button.addEventListener("click", () => addToCart(product.name));
+    button.addEventListener("click", () => {
+      if (quantity && !quantity.reportValidity()) return;
+      return addToCart(product.name, quantity ? quantity.value : "1");
+    });
     card.append(button);
   }
   return card;
@@ -76,49 +76,32 @@ function renderProducts() {
   target.replaceChildren(...products.map((product) => productCard(product, true)));
 }
 
-function notifyCart(cartResult) {
-  document.dispatchEvent(new CustomEvent("smarto:cart-updated", { detail: cartResult.item_count }));
-}
-
 async function initializeCart() {
   try {
-    const guestItems = readGuestCart();
-    let result = await post("cart.get_cart", { guest_items: JSON.stringify(guestItems) });
-    if (!result.is_guest) {
-      if (guestItems.length) {
-        result = await post("cart.merge_guest_cart", { guest_items: JSON.stringify(guestItems) });
-      }
-      clearGuestCart();
-    } else {
-      writeGuestCart(result.items);
-    }
+    const result = await loadCart();
     cart = result;
     cartReady = true;
-    notifyCart(result);
     if (result.removed_products?.length) {
       cartFeedback.textContent = `${result.removed_products.length} unavailable item(s) were removed from your cart.`;
     }
   } catch (error) {
-    cartFeedback.textContent = `Cart unavailable: ${error.message} Open the existing storefront to resolve cart issues.`;
+    cartFeedback.textContent = `Cart unavailable: ${error.message} Open your cart to resolve cart issues.`;
   } finally {
     renderProducts();
   }
 }
 
-async function addToCart(product) {
+async function addToCart(product, quantity) {
   if (!cartReady || cartBusy) return;
   cartBusy = true;
   renderProducts();
   cartFeedback.textContent = "Adding to cart...";
   try {
-    const result = await post("cart.add_item", {
+    const result = await changeCart("cart.add_item", {
       product,
-      quantity: "1",
-      guest_items: JSON.stringify(cart.is_guest ? readGuestCart() : []),
-    });
-    if (result.is_guest) writeGuestCart(result.items);
+      quantity,
+    }, cart.is_guest);
     cart = result;
-    notifyCart(result);
     cartFeedback.textContent = result.removed_products?.length
       ? `Added to cart. ${result.removed_products.length} unavailable item(s) were removed.`
       : "Added to cart.";
@@ -207,6 +190,10 @@ function setupProductListing() {
     try {
       const result = await get("catalog.get_catalog", filters);
       if (id !== requestId) return;
+      if (!result.products.length && result.total > 0 && currentPage > 1) {
+        currentPage = Math.ceil(result.total / result.page_size);
+        return load();
+      }
       const select = form.elements.category;
       select.replaceChildren(new Option("All categories", ""));
       for (const item of result.categories) select.add(new Option(item.category_name, item.name));

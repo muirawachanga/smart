@@ -1,12 +1,15 @@
+import json
 import uuid
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from intelligent_ordering.api.cart import add_item, get_cart
-from intelligent_ordering.api.checkout import create_order, get_checkout
+from intelligent_ordering.api.cart import add_item, get_cart, merge_guest_cart, update_item
+from intelligent_ordering.api.catalog import get_catalog, get_product
+from intelligent_ordering.api.checkout import create_order, get_checkout, get_checkout_attempt
 from intelligent_ordering.api.orders import (
     get_my_orders,
+    get_my_order,
     get_order,
     list_orders,
     update_order_status,
@@ -145,6 +148,108 @@ class TestCheckout(FrappeTestCase):
         frappe.set_user(other_customer.name)
         with self.assertRaises(frappe.PermissionError):
             get_order(result["order"]["name"])
+        with self.assertRaises(frappe.PermissionError):
+            get_my_order(result["order"]["name"])
+
+    def test_confirmation_remains_owner_scoped_for_customer_with_staff_role(self):
+        order = self._submit_order()["order"]
+        self.assertEqual(get_my_order(order["name"])["name"], order["name"])
+        other = self._make_user(
+            f"staff-customer-{frappe.generate_hash(length=8)}@example.test", "Customer"
+        )
+        frappe.set_user("Administrator")
+        other.add_roles("Order Manager")
+        frappe.set_user(other.name)
+        with self.assertRaises(frappe.PermissionError):
+            get_my_order(order["name"])
+
+    def test_checkout_attempt_recovers_only_the_owners_order(self):
+        token = str(uuid.uuid4())
+        self.assertIsNone(get_checkout_attempt(token)["order_name"])
+        order = self._submit_order(token=token)["order"]
+        self.assertEqual(get_checkout_attempt(token)["order_name"], order["name"])
+        other = self._make_user(
+            f"recovery-{frappe.generate_hash(length=8)}@example.test", "Customer"
+        )
+        frappe.set_user(other.name)
+        with self.assertRaises(frappe.PermissionError):
+            get_checkout_attempt(token)
+
+    def test_customer_journey_from_catalog_through_order_recovery(self):
+        frappe.set_user("Administrator")
+        category = frappe.get_doc({
+            "doctype": "Product Category",
+            "category_name": f"Journey {frappe.generate_hash(length=8)}",
+            "enabled": 1,
+        }).insert(ignore_permissions=True)
+        self.product.category = category.name
+        self.product.save(ignore_permissions=True)
+        self.delivery_area.delivery_fee = 30
+        self.delivery_area.save(ignore_permissions=True)
+
+        frappe.set_user("Guest")
+        listing = get_catalog(search=self.product.sku, category=category.name, sort="price_asc")
+        self.assertEqual(listing["products"][0]["name"], self.product.name)
+        self.assertEqual(get_product(self.product.name)["available_quantity"], 20)
+        guest_cart = add_item(self.product.name, 1)
+
+        frappe.set_user(self.customer.name)
+        merged = merge_guest_cart(json.dumps(guest_cart["items"]))
+        self.assertEqual(merged["items"][0]["quantity"], 3)
+        updated = update_item(self.product.name, 4)
+        self.assertEqual(updated["total"], 500)
+        quote = get_checkout(delivery_area=self.delivery_area.name)
+        self.assertEqual(quote["delivery_fee"], 30)
+        self.assertEqual(quote["total"], 530)
+        token = str(uuid.uuid4())
+        result = create_order(
+            customer_name="Test Customer",
+            phone="+254700000000",
+            address_line_1="1 Main Road",
+            city="Nairobi",
+            request_token=token,
+            cart_revision=quote["cart_revision"],
+            delivery_area=self.delivery_area.name,
+            delivery_quote=quote["delivery_quote"],
+        )
+        order = result["order"]
+        self.assertEqual(order["status"], "Pending")
+        self.assertEqual(order["payment_status"], "Unpaid")
+        self.assertEqual(order["total"], 530)
+        self.assertEqual(order["items"][0]["quantity"], 4)
+        self.assertEqual(order["items"][0]["unit_price"], 125)
+        self.assertEqual(result["cart"]["items"], [])
+        self.assertEqual(get_checkout_attempt(token)["order_name"], order["name"])
+        self.assertEqual(get_my_order(order["name"])["total"], 530)
+
+    def test_checkout_rejects_stock_reduced_after_review(self):
+        quote = get_checkout(delivery_area=self.delivery_area.name)
+        frappe.set_user("Administrator")
+        adjust_stock(self.product.name, self.warehouse.name, "Adjustment", -19)
+        frappe.set_user(self.customer.name)
+        with self.assertRaises(frappe.ValidationError):
+            create_order(
+                customer_name="Test Customer", phone="+254700000000",
+                address_line_1="1 Main Road", city="Nairobi",
+                request_token=str(uuid.uuid4()), cart_revision=quote["cart_revision"],
+                delivery_area=self.delivery_area.name, delivery_quote=quote["delivery_quote"],
+            )
+        self.assertEqual(get_cart()["items"][0]["quantity"], 2)
+
+    def test_changed_delivery_fee_rejects_old_quote(self):
+        quote = get_checkout(delivery_area=self.delivery_area.name)
+        frappe.set_user("Administrator")
+        self.delivery_area.delivery_fee = 50
+        self.delivery_area.save(ignore_permissions=True)
+        frappe.set_user(self.customer.name)
+        with self.assertRaises(frappe.ValidationError):
+            create_order(
+                customer_name="Test Customer", phone="+254700000000",
+                address_line_1="1 Main Road", city="Nairobi",
+                request_token=str(uuid.uuid4()), cart_revision=quote["cart_revision"],
+                delivery_area=self.delivery_area.name, delivery_quote=quote["delivery_quote"],
+            )
+        self.assertEqual(get_cart()["items"][0]["quantity"], 2)
 
     def test_customer_history_and_staff_order_management(self):
         result = self._submit_order()
@@ -153,10 +258,8 @@ class TestCheckout(FrappeTestCase):
             [row.name for row in history["orders"]], [result["order"]["name"]]
         )
 
-        pending = list_orders(status="Pending")
-        self.assertEqual(
-            [row.name for row in pending["orders"]], [result["order"]["name"]]
-        )
+        with self.assertRaises(frappe.PermissionError):
+            list_orders(status="Pending")
 
         staff = self._make_user(
             f"manager-{frappe.generate_hash(length=8)}@example.test",

@@ -1,5 +1,13 @@
 const API_ROOT = "/api/method/intelligent_ordering.api";
 
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 export async function get(endpoint, parameters = {}) {
   const query = new URLSearchParams(parameters);
   const suffix = query.size ? `?${query}` : "";
@@ -35,7 +43,7 @@ async function request(url, options) {
   }
 
   if (!response.ok) {
-    throw new Error(serverErrorMessage(payload));
+    throw new ApiError(serverErrorMessage(payload), response.status);
   }
 
   return payload.message;

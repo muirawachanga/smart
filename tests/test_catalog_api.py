@@ -45,6 +45,25 @@ class TestCatalogApi(unittest.TestCase):
                 self.catalog.get_catalog(sort=value)
         self.frappe.db.sql.assert_not_called()
 
+    def test_search_and_category_filters_are_parameterized(self):
+        self.frappe.db.exists.return_value = True
+        self.frappe.db.sql.side_effect = [[(0,)], []]
+        result = self.catalog.get_catalog(search="50%_off!", category="Drinks", page=2, page_size=5)
+        query, values = self.frappe.db.sql.call_args.args
+        self.assertIn("p.category = %s", query)
+        self.assertIn("LIKE %s ESCAPE '!'", query)
+        self.assertEqual(values, [
+            "Drinks", "%50!%!_off!!%", "%50!%!_off!!%", "%50!%!_off!!%", 6, 5,
+        ])
+        self.assertEqual(result["products"], [])
+        self.assertFalse(result["has_more"])
+
+    def test_disabled_category_is_not_available_as_a_filter(self):
+        self.frappe.db.exists.return_value = False
+        with self.assertRaisesRegex(CatalogError, "category is unavailable"):
+            self.catalog.get_catalog(category="disabled")
+        self.frappe.db.sql.assert_not_called()
+
     def test_detail_is_parameterized_and_only_returns_public_products(self):
         self.frappe.db.sql.return_value = [{"name": "SKU'1"}]
         result = self.catalog.get_product(" SKU'1 ")

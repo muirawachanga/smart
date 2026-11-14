@@ -35,7 +35,7 @@ def add_item(product, quantity=1, guest_items="[]"):
     user = frappe.session.user
 
     if user == "Guest":
-        items = merge_cart_items(
+        items = _merge_items(
             _parse_items(guest_items), [{"product": product, "quantity": quantity}]
         )
         _validate_stock_quantities(items, {product})
@@ -44,7 +44,7 @@ def add_item(product, quantity=1, guest_items="[]"):
     _require_customer(user)
     cart = _get_or_create_user_cart(user)
     removed = _remove_unavailable_rows(cart)
-    items = merge_cart_items(_document_items(cart), [{"product": product, "quantity": quantity}])
+    items = _merge_items(_document_items(cart), [{"product": product, "quantity": quantity}])
     _validate_stock_quantities(items, {product})
     _replace_items(cart, items)
     cart.save()
@@ -161,7 +161,7 @@ def merge_guest_cart(guest_items):
         cart = _get_or_create_user_cart(user)
     removed.extend(_remove_unavailable_rows(cart))
 
-    items = merge_cart_items(_document_items(cart), available_incoming)
+    items = _merge_items(_document_items(cart), available_incoming)
     _validate_stock_quantities(
         items, {item["product"] for item in available_incoming}
     )
@@ -244,6 +244,13 @@ def _parse_quantity(value):
 def _parse_items(value):
     try:
         return parse_cart_items(value)
+    except ValueError as error:
+        frappe.throw(str(error), frappe.ValidationError)
+
+
+def _merge_items(*groups):
+    try:
+        return merge_cart_items(*groups)
     except ValueError as error:
         frappe.throw(str(error), frappe.ValidationError)
 

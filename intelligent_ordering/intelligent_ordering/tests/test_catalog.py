@@ -62,6 +62,9 @@ class TestCatalog(FrappeTestCase):
         self.product.save(ignore_permissions=True)
         with self.assertRaises(frappe.DoesNotExistError):
             get_product(self.product.name)
+        listing = get_catalog(search=self.product.sku)
+        self.assertEqual(listing["products"], [])
+        self.assertEqual(listing["total"], 0)
 
     def test_sorting_is_applied_before_pagination(self):
         other = frappe.get_doc(

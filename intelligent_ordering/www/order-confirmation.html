@@ -3,15 +3,13 @@
 {% block title %}Order confirmation | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page" data-page-title="Order confirmation">
+<main class="smarto-page">
   <p class="smarto-eyebrow">Order update</p>
   <h1>Order confirmation</h1>
-  <p>Order details and payment status will be loaded for the authenticated order owner in Phase 4.</p>
-  <div class="smarto-state" role="status" aria-live="polite">
-    <strong>Order reference</strong>
-    <p><code data-route-reference>Loading route reference…</code></p>
-    <p>This page does not reveal order or customer information until owner-scoped loading is connected.</p>
-    <a href="/track-order">Track an order</a>
-  </div>
+  <p id="order-status" role="status" aria-live="polite">Loading order...</p>
+  <a id="order-login" hidden>Sign in to view this order</a>
+  <div id="order-detail"></div>
+  <p><a href="/store#order-history">View your order history and payment options</a></p>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/order-confirmation.js"></script>
 {% endblock %}

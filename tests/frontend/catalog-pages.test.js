@@ -16,6 +16,7 @@ class Node {
   add(node) { this.children.push(node); }
   setAttribute(name, value) { this[name] = value; }
   addEventListener(name, handler) { this.listeners[name] = handler; }
+  reportValidity() { return Number(this.value) >= Number(this.min) && Number(this.value) <= Number(this.max); }
 }
 
 function installPage(t, kind, search = "", pathname = "/products") {
@@ -125,8 +126,8 @@ test("customer cart merges saved guest items before adding a product", async (t)
       items: [{ product: "OLD", quantity: 2 }], item_count: 2, is_guest: false,
     });
     if (url.includes("cart.add_item")) return response({
-      items: [{ product: "OLD", quantity: 2 }, { product: "SKU-1", quantity: 1 }],
-      item_count: 3, is_guest: false,
+      items: [{ product: "OLD", quantity: 2 }, { product: "SKU-1", quantity: 2 }],
+      item_count: 4, is_guest: false,
     });
     throw new Error(`Unexpected request: ${url}`);
   });
@@ -135,9 +136,12 @@ test("customer cart merges saved guest items before adding a product", async (t)
   const merge = calls.find((call) => call.url.includes("merge_guest_cart"));
   assert.deepEqual(JSON.parse(merge.options.body.get("guest_items")), [{ product: "OLD", quantity: 2 }]);
   assert.equal(storage.size, 0);
-  const button = nodes.get("#product-detail").children[0].children.at(-1);
+  const card = nodes.get("#product-detail").children[0];
+  card.children.at(-2).children[0].value = "2";
+  const button = card.children.at(-1);
   await button.listeners.click();
-  assert.equal(events.at(-1).detail, 3);
+  assert.equal(calls.find((call) => call.url.includes("cart.add_item")).options.body.get("quantity"), "2");
+  assert.equal(events.at(-1).detail, 4);
 });
 
 test("out of stock products cannot be added and cart failures are shown", async (t) => {
@@ -150,7 +154,7 @@ test("out of stock products cannot be added and cart failures are shown", async 
   await new Promise((resolve) => setTimeout(resolve, 0));
   const card = nodes.get("#product-detail").children[0];
   assert.equal(card.children.at(-1).disabled, true);
-  assert.equal(card.children.at(-2).textContent, "Out of stock");
+  assert.ok(card.children.some((node) => node.textContent === "Out of stock"));
   assert.match(nodes.get("#cart-feedback").textContent, /Cart is unavailable/);
 });
 

@@ -1239,6 +1239,9 @@ initPaymentDashboard();
 initDeliveryDashboard();
 initAdministrationDashboard();
 loadCatalog();
+if (window.location.hash === "#order-history") {
+  loadCustomerOrders();
+}
 loadCart().then(() => {
   if (window.location.hash === "#checkout") {
     openCheckout();

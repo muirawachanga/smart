@@ -71,6 +71,26 @@ def get_order(order_name):
     return _serialize_order(order)
 
 
+@frappe.whitelist(allow_guest=True)
+def get_my_order(order_name):
+    """Return order details only to the customer who owns them."""
+    user = frappe.session.user
+    if user == "Guest":
+        return {"requires_login": True}
+    _require_customer(user)
+    order_name = _validate_order_name(order_name)
+    order_reference = frappe.db.get_value(
+        "Sales Order", order_name, ["name", "customer"], as_dict=True
+    )
+    if not order_reference:
+        frappe.throw("This order is unavailable.", frappe.PermissionError)
+    owner = frappe.db.get_value("Customer Profile", order_reference.customer, "user")
+    if owner != user:
+        frappe.throw("This order is unavailable.", frappe.PermissionError)
+    order = frappe.get_doc("Sales Order", order_reference.name)
+    return _serialize_order(order)
+
+
 @frappe.whitelist()
 def list_orders(search="", status="", payment_status="", page=1, page_size=20):
     _require_order_staff()

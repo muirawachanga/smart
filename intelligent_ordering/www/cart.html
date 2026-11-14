@@ -3,14 +3,19 @@
 {% block title %}Shopping cart | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page" data-page-title="Shopping cart">
+<main class="smarto-page">
   <p class="smarto-eyebrow">Your order</p>
   <h1>Shopping cart</h1>
-  <p>The dedicated cart page and quantity controls will be connected in Phase 4. No cart contents are duplicated or simulated here.</p>
-  <div class="smarto-state">
-    <strong>Current cart workflow</strong>
-    <p>Your existing cart remains available in the database-backed storefront.</p>
-    <a href="/store#shopping-cart">Open the current cart</a>
+  <p id="cart-status" role="status" aria-live="polite">Loading cart...</p>
+  <p id="cart-feedback" role="alert"></p>
+  <div id="cart-items" class="smarto-cart-items"></div>
+  <p id="cart-total"></p>
+  <div class="smarto-actions">
+    <a class="smarto-button smarto-button-secondary" href="/products">Continue shopping</a>
+    <a id="checkout-link" class="smarto-button" href="/checkout" hidden>Proceed to checkout</a>
+    <button id="clear-cart" class="smarto-button smarto-button-secondary" type="button" hidden>Clear cart</button>
+    <button id="clear-guest-cart" class="smarto-button smarto-button-secondary" type="button" hidden>Clear browser-saved guest cart</button>
   </div>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/cart-page.js"></script>
 {% endblock %}

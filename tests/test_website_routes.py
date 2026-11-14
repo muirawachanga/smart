@@ -52,6 +52,21 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
         for _, template in expected:
             self.assertTrue((WWW / f"{template}.html").is_file())
 
+    def test_customer_pages_load_their_phase_scripts(self):
+        expected = {
+            "index.html": "catalog-pages.js",
+            "products.html": "catalog-pages.js",
+            "categories.html": "catalog-pages.js",
+            "product-details.html": "catalog-pages.js",
+            "cart.html": "cart-page.js",
+            "checkout.html": "checkout-page.js",
+            "order-confirmation.html": "order-confirmation.js",
+        }
+        for template, script in expected.items():
+            with self.subTest(template=template):
+                source = (WWW / template).read_text()
+                self.assertIn(f"/assets/intelligent_ordering/js/{script}", source)
+
     def test_login_route_remains_frappe_native(self):
         self.assertFalse((WWW / "login.html").exists())
         header = (APP_ROOT / "templates/includes/smarto_header.html").read_text()

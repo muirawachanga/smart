@@ -3,14 +3,55 @@
 {% block title %}Checkout | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page" data-page-title="Checkout">
+<main class="smarto-page">
   <p class="smarto-eyebrow">Review your order</p>
   <h1>Checkout</h1>
-  <p>The dedicated checkout page will be connected to the existing server-validated order workflow in Phase 4.</p>
-  <div class="smarto-state">
-    <strong>No order is submitted from this page yet</strong>
-    <p>For now, the existing checkout remains available from the current storefront. Product prices and order totals continue to be calculated by the server.</p>
-    <a href="/store#shopping-cart">Continue through the current storefront</a>
+  <p id="checkout-status" role="status" aria-live="polite">Loading checkout...</p>
+  <p id="checkout-feedback" role="alert"></p>
+  <a id="checkout-login" href="/login?redirect-to=%2Fcheckout" hidden>Sign in to continue</a>
+  <div id="checkout-review" class="smarto-cart-items"></div>
+  <div id="checkout-totals" hidden>
+    <p>Subtotal: <strong id="checkout-subtotal"></strong></p>
+    <p>Delivery: <strong id="checkout-delivery-fee">Select a delivery area</strong></p>
+    <p>Total: <strong id="checkout-total">Select a delivery area</strong></p>
   </div>
+  <form id="checkout-form" class="smarto-checkout-form" hidden>
+    <fieldset>
+      <legend>Customer details</legend>
+      <label>Full name
+        <input name="customer_name" maxlength="140" autocomplete="name" required>
+      </label>
+      <label>Phone number
+        <input name="phone" type="tel" maxlength="20" autocomplete="tel" required>
+      </label>
+    </fieldset>
+    <fieldset>
+      <legend>Delivery address</legend>
+      <label>Delivery area
+        <select id="checkout-area" name="delivery_area" required>
+          <option value="">Select delivery area</option>
+        </select>
+      </label>
+      <button id="refresh-quote" class="smarto-button smarto-button-secondary" type="button">Refresh delivery quote</button>
+      <label>Address line 1
+        <input name="address_line_1" maxlength="140" autocomplete="address-line1" required>
+      </label>
+      <label>Address line 2
+        <input name="address_line_2" maxlength="140" autocomplete="address-line2">
+      </label>
+      <label>City
+        <input name="city" maxlength="140" autocomplete="address-level2" required>
+      </label>
+      <label>Region
+        <input name="region" maxlength="140" autocomplete="address-level1">
+      </label>
+      <label>Postal code
+        <input name="postal_code" maxlength="40" autocomplete="postal-code">
+      </label>
+    </fieldset>
+    <button id="checkout-submit" class="smarto-button" type="submit" disabled>Place order</button>
+  </form>
+  <p><a href="/cart">Return to cart</a></p>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/checkout-page.js"></script>
 {% endblock %}

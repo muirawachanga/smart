@@ -6,6 +6,7 @@ import frappe
 from intelligent_ordering.api.cart import get_cart
 from intelligent_ordering.utils.delivery_rates import get_area_quote, list_checkout_areas
 from intelligent_ordering.utils.cart import round_money
+from intelligent_ordering.utils.inventory import validate_checkout_stock
 from intelligent_ordering.utils.checkout import (
     checkout_cart_revision,
     validate_address,
@@ -44,6 +45,32 @@ def get_checkout(delivery_area=""):
         result.update(quote)
         result["total"] = round_money(cart["total"] + quote["delivery_fee"])
     return result
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+def get_checkout_attempt(request_token):
+    """Recover a submitted order after an interrupted checkout response."""
+    if frappe.session.user == "Guest":
+        return {"requires_login": True}
+    user = _require_customer()
+    try:
+        request_token = validate_request_token(request_token)
+    except ValueError as error:
+        frappe.throw(str(error), frappe.ValidationError)
+    previous_order = frappe.db.get_value(
+        "Sales Order",
+        {"checkout_token": request_token},
+        ["name", "customer"],
+        as_dict=True,
+    )
+    if not previous_order:
+        return {"order_name": None}
+    owner = frappe.db.get_value(
+        "Customer Profile", previous_order.customer, "user"
+    )
+    if owner != user:
+        frappe.throw("This checkout request is unavailable.", frappe.PermissionError)
+    return {"order_name": previous_order.name}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -108,7 +135,37 @@ def create_order(
     cart = get_cart()
     if not cart["items"]:
         frappe.throw("Your cart is empty.", frappe.ValidationError)
-    current_revision = checkout_cart_revision(cart["items"])
+    validate_checkout_stock(cart["items"])
+    locked_items = []
+    for item in cart["items"]:
+        rows = frappe.db.sql(
+            """SELECT price, currency, category, enabled
+               FROM `tabProduct` WHERE name = %s FOR UPDATE""",
+            item["product"],
+            as_dict=True,
+        )
+        product = rows[0] if rows else None
+        if not product or not product.enabled:
+            frappe.throw("The order contains an unavailable product.", frappe.ValidationError)
+        if product.category:
+            categories = frappe.db.sql(
+                "SELECT enabled FROM `tabProduct Category` WHERE name = %s FOR UPDATE",
+                product.category,
+                as_dict=True,
+            )
+            if not categories or not categories[0].enabled:
+                frappe.throw("The order contains an unavailable product.", frappe.ValidationError)
+        try:
+            unit_price = round_money(product.price)
+        except ValueError as error:
+            frappe.throw(str(error), frappe.ValidationError)
+        locked_items.append({
+            "product": item["product"],
+            "quantity": item["quantity"],
+            "unit_price": unit_price,
+            "currency": (product.currency or "KES").upper(),
+        })
+    current_revision = checkout_cart_revision(locked_items)
     if not compare_digest(cart_revision, current_revision):
         frappe.throw(
             "Your cart or product prices changed. Review the cart and submit again.",

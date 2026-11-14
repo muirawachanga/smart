@@ -37,10 +37,11 @@ ln -s /absolute/path/to/smart apps/intelligent_ordering
 bench --site <site-name> install-app intelligent_ordering
 ```
 
-Open the site URL printed by `bench start`. The SmartO homepage is available
-at `/`, and the existing database-backed catalog and operations are at
-`/store`. Frappe's login and session handling provide the authentication
-foundation. Assign the app roles to test users from the Frappe Desk.
+Open the site URL printed by `bench start`. The SmartO homepage and dedicated
+catalog are available at `/` and `/products`; the existing database-backed
+ordering and staff operations remain at `/store`. Frappe's login and session
+handling provide the authentication foundation. Assign the app roles to test
+users from the Frappe Desk.
 
 ## SmartO website routes
 
@@ -49,7 +50,7 @@ it does not add a JavaScript framework. The shared layout provides the SmartO
 header, responsive navigation, breadcrumbs, account links, footer, and
 route-aware page labels.
 
-| Route | Current Phase 2 page |
+| Route | Current page |
 | --- | --- |
 | `/` | SmartO homepage |
 | `/about` | About SmartO |
@@ -57,10 +58,11 @@ route-aware page labels.
 | `/products/<product_id>` | Database-backed product details |
 | `/product-details?product=<product_id>` | Product details for identifiers that cannot be used as a path segment |
 | `/categories` | Enabled product categories |
-| `/cart` | Cart page shell |
-| `/checkout` | Checkout page shell |
+| `/cart` | Database-backed customer or browser-saved guest cart |
+| `/checkout` | Authenticated checkout with server-calculated delivery quote |
 | `/payment` | Payment page shell |
-| `/order-confirmation/<order_id>` | Order confirmation shell using a Frappe route rule |
+| `/order-confirmation/<order_id>` | Owner-scoped order confirmation |
+| `/order-confirmation?order=<order_id>` | Confirmation for identifiers that cannot be used as a path segment |
 | `/track-order` | Tracking page shell |
 | `/contact` | Contact page shell; business contact data is not configured |
 | `/login` | Frappe's native login page; it is not replaced |
@@ -77,8 +79,8 @@ route-aware page labels.
 | `/store` | Existing database-backed storefront and staff workflows |
 
 Unconnected page shells deliberately do not invent customer data, accept payment
-details, create accounts, or submit orders. Existing cart, checkout,
-order, payment, inventory, delivery, and administration workflows remain
+details, create accounts, or submit orders. Existing payment, order history,
+inventory, delivery, and administration workflows remain
 available at `/store` until the later page-specific phases connect them. The
 dashboard shells contain no operational data; their role-specific data and
 server-side access controls will be connected with personnel dashboards.
@@ -154,7 +156,8 @@ authenticated Frappe session and returns the signed-in user's name and roles.
 The catalog does not calculate cart totals or reserve stock.
 The homepage shows the first four products by name, not a curated featured
 selection. Product listing and detail pages add to the existing guest or
-customer cart; cart review and checkout remain at `/store` for now.
+customer cart. Cart review and checkout are available on their dedicated pages.
+Product images intended for guests must be accessible to website visitors.
 
 ## Shopping cart API
 
@@ -177,17 +180,19 @@ Active warehouse availability is shown in the catalog and checked when a
 product is added to a cart. Final stock reservation happens only when an order
 is confirmed.
 
-The storefront includes cart quantity controls, removal and clear actions,
-subtotals, and totals. Guest carts are merged after sign-in; checkout requires
-an authenticated Customer role.
+The storefront and dedicated cart include quantity controls, removal and clear
+actions, subtotals, and totals. Guest carts are merged after sign-in; checkout
+requires an authenticated Customer role.
 
 ## Checkout and order management
 
 Checkout and order methods are available through Frappe's standard method API:
 
 - `GET /api/method/intelligent_ordering.api.checkout.get_checkout`
+- `POST /api/method/intelligent_ordering.api.checkout.get_checkout_attempt`
 - `POST /api/method/intelligent_ordering.api.checkout.create_order`
 - `GET /api/method/intelligent_ordering.api.orders.get_my_orders`
+- `GET /api/method/intelligent_ordering.api.orders.get_my_order`
 - `GET /api/method/intelligent_ordering.api.orders.get_order`
 - `GET /api/method/intelligent_ordering.api.orders.list_orders`
 - `POST /api/method/intelligent_ordering.api.orders.update_order_status`
@@ -198,7 +203,23 @@ contact information, and a delivery address. Product prices and totals are
 re-read and calculated from Product records; browser-submitted prices and
 totals are not accepted. The cart is cleared only after the Sales Order has
 been inserted successfully. Repeating a request token for the same customer
-returns the existing order.
+returns the existing order. Checkout rechecks stock under inventory locks, but
+does not reserve it: reservation happens when staff confirm the pending order.
+Consequently, multiple pending orders can compete for the same stock.
+
+The dedicated checkout stores its request token and a SHA-256 submission
+fingerprint in session storage before submission, and the order reference when
+known; no address or contact details are stored there. After an interrupted
+response or reload, it checks the token against the signed-in customer before
+recovering an existing order. An uncertain attempt can only be retried with the
+same reviewed cart, quote and customer details; contact the store if these cannot
+be restored. A definitive validation rejection allows a corrected new request.
+Session storage recovery is limited to the same browser tab.
+Checkout requires a secure browser context (HTTPS or localhost) for token
+generation and fingerprinting.
+The confirmation page uses an owner-scoped endpoint even for customer accounts
+that also have staff roles. Payment remains in the existing order-history
+workflow until the dedicated payment page is connected.
 
 Customers can list and view only their own orders. Business Admin and Order
 Manager roles can search, filter, inspect, and update order statuses. Submitted

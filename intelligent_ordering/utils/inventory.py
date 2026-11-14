@@ -53,6 +53,19 @@ def available_stock(product):
     return int(flt(row[0].available_quantity)) if row else 0
 
 
+def validate_checkout_stock(items):
+    """Check current stock under the same product and balance locks as inventory changes."""
+    _lock_products(sorted({item["product"] for item in items}))
+    for item in sorted(items, key=lambda row: row["product"]):
+        balances = _get_product_balances(item["product"], lock=True)
+        available = sum(int(flt(balance.available_quantity)) for balance in balances)
+        if item["quantity"] > available:
+            frappe.throw(
+                f"Insufficient available stock for {item['product']}.",
+                frappe.ValidationError,
+            )
+
+
 def handle_order_status_change(doc, method=None):
     original = doc.get_doc_before_save()
     if not original or original.status == doc.status:
