@@ -3,14 +3,36 @@
 {% block title %}Products | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page" data-page-title="Products">
+<main class="smarto-page" data-catalog-page="products">
   <p class="smarto-eyebrow">Shop SmartO</p>
   <h1>Products</h1>
-  <p>Product listings, search, categories, and sorting will be connected to the existing product database in Phase 3.</p>
-  <div class="smarto-state" role="status" aria-live="polite">
-    <strong>Catalogue connection not yet available on this page</strong>
-    <p>No sample or placeholder products are shown. The current database-backed catalogue is still available in the existing storefront.</p>
-    <a href="/store#catalog">Open the current catalogue</a>
-  </div>
+  <form id="catalog-form" class="smarto-catalog-form">
+    <label>Search products
+      <input name="search" type="search" maxlength="100" placeholder="Name, SKU, or description">
+    </label>
+    <label>Category
+      <select name="category"><option value="">All categories</option></select>
+    </label>
+    <label>Sort by
+      <select name="sort">
+        <option value="name_asc">Name: A to Z</option>
+        <option value="name_desc">Name: Z to A</option>
+        <option value="price_asc">Price: low to high</option>
+        <option value="price_desc">Price: high to low</option>
+      </select>
+    </label>
+    <button class="smarto-button" type="submit">Apply</button>
+  </form>
+  <p class="smarto-catalog-note">Price sorting compares numeric prices without currency conversion.</p>
+  <p id="catalog-status" role="status" aria-live="polite">Loading products...</p>
+  <p id="cart-feedback" role="status" aria-live="polite"></p>
+  <div id="catalog-products" class="smarto-product-grid"></div>
+  <nav id="catalog-pagination" class="smarto-pagination" aria-label="Product pages" hidden>
+    <button id="catalog-previous" class="smarto-button smarto-button-secondary" type="button">Previous</button>
+    <span id="catalog-page"></span>
+    <button id="catalog-next" class="smarto-button smarto-button-secondary" type="button">Next</button>
+  </nav>
+  <p><a href="/store#shopping-cart">Review your cart and checkout in the existing storefront</a></p>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/catalog-pages.js"></script>
 {% endblock %}

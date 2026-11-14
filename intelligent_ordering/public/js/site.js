@@ -5,6 +5,11 @@ const menuButton = document.querySelector("#smarto-menu-toggle");
 const primaryNavigation = document.querySelector("#smarto-primary-navigation");
 const pageStatus = document.querySelector("#smarto-nav-status");
 const cartCount = document.querySelector("#cart-count");
+let cartCountRevision = 0;
+document.addEventListener("smarto:cart-updated", (event) => {
+  cartCountRevision += 1;
+  cartCount.textContent = String(event.detail);
+});
 
 const ROUTE_LABELS = {
   "/": "Home",
@@ -132,6 +137,7 @@ function setupAccountNavigation(user) {
 }
 
 async function loadCartCount(user) {
+  const revision = cartCountRevision;
   try {
     const guestItems = readGuestCart();
     const cart = await post("cart.get_cart", {
@@ -140,7 +146,7 @@ async function loadCartCount(user) {
     const count = Number.isInteger(cart.item_count)
       ? cart.item_count
       : (cart.items || []).reduce((total, item) => total + Number(item.quantity || 0), 0);
-    cartCount.textContent = String(count);
+    if (revision === cartCountRevision) cartCount.textContent = String(count);
   } catch (error) {
     if (user?.roles?.includes("Customer")) {
       pageStatus.textContent = `Cart count could not be loaded: ${error.message}`;
@@ -148,9 +154,9 @@ async function loadCartCount(user) {
     }
     try {
       const count = readGuestCart().reduce((total, item) => total + item.quantity, 0);
-      cartCount.textContent = String(count);
+      if (revision === cartCountRevision) cartCount.textContent = String(count);
     } catch (cartError) {
-      cartCount.textContent = "0";
+      if (revision === cartCountRevision) cartCount.textContent = "0";
       pageStatus.textContent = cartError.message;
     }
   }

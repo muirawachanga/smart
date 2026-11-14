@@ -1,7 +1,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from intelligent_ordering.api.catalog import get_catalog
+from intelligent_ordering.api.catalog import get_catalog, get_product
 
 
 class TestCatalog(FrappeTestCase):
@@ -49,3 +49,41 @@ class TestCatalog(FrappeTestCase):
     def test_invalid_page_size_is_rejected(self):
         with self.assertRaises(frappe.ValidationError):
             get_catalog(page=1, page_size=101)
+
+    def test_product_detail_uses_public_visibility_rules(self):
+        self.assertEqual(get_product(self.product.name)["sku"], self.product.sku)
+        self.category.enabled = 0
+        self.category.save(ignore_permissions=True)
+        with self.assertRaises(frappe.DoesNotExistError):
+            get_product(self.product.name)
+        self.category.enabled = 1
+        self.category.save(ignore_permissions=True)
+        self.product.enabled = 0
+        self.product.save(ignore_permissions=True)
+        with self.assertRaises(frappe.DoesNotExistError):
+            get_product(self.product.name)
+
+    def test_sorting_is_applied_before_pagination(self):
+        other = frappe.get_doc(
+            {
+                "doctype": "Product",
+                "sku": f"{self.product.sku}-B",
+                "product_name": f"{self.product.product_name} B",
+                "category": self.category.name,
+                "price": 25,
+                "currency": "KES",
+                "enabled": 1,
+            }
+        ).insert(ignore_permissions=True)
+        first = get_catalog(category=self.category.name, page_size=1, sort="price_asc")
+        second = get_catalog(category=self.category.name, page=2, page_size=1, sort="price_asc")
+        self.assertEqual(first["products"][0]["name"], other.name)
+        self.assertTrue(first["has_more"])
+        self.assertEqual(second["products"][0]["name"], self.product.name)
+        self.assertFalse(second["has_more"])
+
+    def test_invalid_sort_and_product_reference_are_rejected(self):
+        with self.assertRaises(frappe.ValidationError):
+            get_catalog(sort="p.price DESC; DROP TABLE `tabProduct`")
+        with self.assertRaises(frappe.ValidationError):
+            get_product(" " * 2)

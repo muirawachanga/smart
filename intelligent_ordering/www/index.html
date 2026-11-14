@@ -3,7 +3,7 @@
 {% block title %}SmartO | Ordering and fulfillment, connected{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-home">
+<main class="smarto-home" data-catalog-page="home">
   <section class="smarto-hero" aria-labelledby="home-heading">
     <p class="smarto-eyebrow">SmartO ordering platform</p>
     <h1 id="home-heading">Ordering and fulfillment, connected.</h1>
@@ -36,17 +36,17 @@
 
   <section class="smarto-home-section" aria-labelledby="featured-products-heading">
     <p class="smarto-eyebrow">From the catalogue</p>
-    <h2 id="featured-products-heading">Featured products</h2>
-    <div class="smarto-state" role="status" aria-live="polite">
-      <p>Featured products will be loaded from the database when the dedicated catalogue is connected in Phase 3.</p>
-      <a href="/products">Browse products</a>
-    </div>
+    <h2 id="featured-products-heading">Explore products</h2>
+    <p id="home-products-status" role="status" aria-live="polite">Loading products...</p>
+    <div id="home-products" class="smarto-product-grid"></div>
+    <p><a href="/products">Browse all products</a></p>
   </section>
 
   <section class="smarto-home-section" aria-labelledby="home-categories-heading">
     <p class="smarto-eyebrow">Explore</p>
     <h2 id="home-categories-heading">Shop by category</h2>
-    <p>Categories are managed with the product catalogue; no sample categories are shown here.</p>
+    <p id="categories-status" role="status" aria-live="polite">Loading categories...</p>
+    <div id="categories-list" class="smarto-category-list"></div>
     <a class="smarto-button smarto-button-secondary" href="/categories">View categories</a>
   </section>
 
@@ -78,4 +78,5 @@
     <a href="/store">Open the existing storefront</a>
   </section>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/catalog-pages.js"></script>
 {% endblock %}

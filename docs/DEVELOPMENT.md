@@ -53,9 +53,10 @@ route-aware page labels.
 | --- | --- |
 | `/` | SmartO homepage |
 | `/about` | About SmartO |
-| `/products` | Product catalogue page shell |
-| `/products/<product_id>` | Product detail shell using a Frappe route rule |
-| `/categories` | Category page shell |
+| `/products` | Searchable, filterable, sortable product catalogue |
+| `/products/<product_id>` | Database-backed product details |
+| `/product-details?product=<product_id>` | Product details for identifiers that cannot be used as a path segment |
+| `/categories` | Enabled product categories |
 | `/cart` | Cart page shell |
 | `/checkout` | Checkout page shell |
 | `/payment` | Payment page shell |
@@ -75,8 +76,8 @@ route-aware page labels.
 | `/dashboard/delivery` | Delivery dashboard shell |
 | `/store` | Existing database-backed storefront and staff workflows |
 
-Phase 2 page shells deliberately do not invent customer data, accept payment
-details, create accounts, or submit orders. Existing catalog, cart, checkout,
+Unconnected page shells deliberately do not invent customer data, accept payment
+details, create accounts, or submit orders. Existing cart, checkout,
 order, payment, inventory, delivery, and administration workflows remain
 available at `/store` until the later page-specific phases connect them. The
 dashboard shells contain no operational data; their role-specific data and
@@ -135,18 +136,25 @@ Frappe exposes the starter methods through its standard method API:
 - `GET /api/method/intelligent_ordering.api.v1.ping`
 - `GET /api/method/intelligent_ordering.api.v1.current_user`
 - `GET /api/method/intelligent_ordering.api.catalog.get_catalog`
+- `GET /api/method/intelligent_ordering.api.catalog.get_product`
 
-The catalog endpoint supports `search`, `category`, `page`, and `page_size`
+The catalog endpoint supports `search`, `category`, `page`, `page_size`, and `sort`
 query parameters. It returns enabled products and enabled categories from the
 site database; disabled categories and products are not shown. Search covers
-product name, SKU, and description. Results are ordered by product name and
-paginated, with a maximum page size of 100. Catalog responses include current
+product name, SKU, and description. Allowed sort values are `name_asc` (default),
+`name_desc`, `price_asc`, and `price_desc`. Price sorting compares numeric
+amounts without currency conversion. Results are paginated, with a maximum page
+size of 100. The detail endpoint accepts `product` and applies the same
+visibility rules. Catalog responses include current
 available stock and an In Stock/Out of Stock label. Product management is
 available to authorized staff through Frappe Desk DocTypes.
 
 `ping` returns a minimal service status. `current_user` requires an
 authenticated Frappe session and returns the signed-in user's name and roles.
 The catalog does not calculate cart totals or reserve stock.
+The homepage shows the first four products by name, not a curated featured
+selection. Product listing and detail pages add to the existing guest or
+customer cart; cart review and checkout remain at `/store` for now.
 
 ## Shopping cart API
 

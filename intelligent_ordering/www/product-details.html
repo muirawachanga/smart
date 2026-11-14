@@ -3,15 +3,13 @@
 {% block title %}Product details | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page" data-page-title="Product details">
+<main class="smarto-page" data-catalog-page="detail">
   <p class="smarto-eyebrow">Product</p>
   <h1>Product details</h1>
-  <p>Product information will be loaded from the database in Phase 3.</p>
-  <div class="smarto-state" role="status" aria-live="polite">
-    <strong>Requested product reference</strong>
-    <p><code data-route-reference>Loading route reference…</code></p>
-    <p>This route shell does not fetch or invent product information yet.</p>
-    <a href="/products">Return to products</a>
-  </div>
+  <p id="product-status" role="status" aria-live="polite">Loading product...</p>
+  <p id="cart-feedback" role="status" aria-live="polite"></p>
+  <div id="product-detail"></div>
+  <p><a href="/products">Return to products</a> | <a href="/store#shopping-cart">Review cart and checkout</a></p>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/catalog-pages.js"></script>
 {% endblock %}
