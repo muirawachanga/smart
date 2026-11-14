@@ -3,14 +3,37 @@
 {% block title %}Order management dashboard | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page" data-page-title="Order management dashboard">
+<main class="smarto-page" data-orders-page="staff">
   <p class="smarto-eyebrow">Order workspace</p>
   <h1>Order management</h1>
-  <p>Incoming orders, fulfillment stages, assignment, and order history will be connected to the existing order workflow in Phase 6.</p>
-  <div class="smarto-state">
-    <strong>Order dashboard data is not connected on this route yet</strong>
-    <p>The existing permission-checked order tools remain available in the operations workspace.</p>
-    <a href="/store#staff-orders">Open existing order management</a>
-  </div>
+  <form id="orders-filters" class="smarto-catalog-form">
+    <label>Search orders
+      <input name="search" type="search" maxlength="100" placeholder="Order number, customer, or phone">
+    </label>
+    <label>Order status
+      <select name="status">
+        <option value="">All statuses</option>
+        <option>Pending</option><option>Confirmed</option><option>Processing</option>
+        <option>Ready for Delivery</option><option>Completed</option><option>Cancelled</option>
+      </select>
+    </label>
+    <label>Payment status
+      <select name="payment_status">
+        <option value="">All payment statuses</option>
+        <option>Unpaid</option><option>Pending</option><option>Paid</option>
+        <option>Failed</option><option>Refunded</option>
+      </select>
+    </label>
+    <button class="smarto-button" type="submit">Search</button>
+  </form>
+  <p id="orders-status" role="status" aria-live="polite">Loading orders...</p>
+  <div id="orders-list" class="smarto-cart-items"></div>
+  <nav class="smarto-pagination" aria-label="Order pages" id="orders-pagination" hidden>
+    <button id="orders-previous" class="smarto-button smarto-button-secondary" type="button">Previous</button>
+    <span id="orders-page"></span>
+    <button id="orders-next" class="smarto-button smarto-button-secondary" type="button">Next</button>
+  </nav>
+  <section id="order-detail" aria-live="polite"></section>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/order-pages.js"></script>
 {% endblock %}

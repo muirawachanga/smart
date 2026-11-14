@@ -541,6 +541,67 @@ button:focus-visible {
   margin: 0.35rem 0;
 }
 
+.smarto-inventory-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+
+.smarto-inventory-metric,
+.smarto-inventory-panel {
+  padding: 1rem;
+  border: 1px solid #dce3ed;
+  border-radius: 0.65rem;
+  background: #fff;
+}
+
+.smarto-inventory-metric {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.smarto-inventory-metric strong {
+  font-size: 1.35rem;
+}
+
+.smarto-inventory-panel {
+  margin-block: 1.5rem;
+}
+
+.smarto-inventory-panel > label {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 40rem;
+  font-weight: 650;
+}
+
+.smarto-inventory-panel select,
+.smarto-checkout-form input,
+.smarto-checkout-form select,
+.smarto-catalog-form input,
+.smarto-catalog-form select {
+  min-height: 2.75rem;
+  padding: 0.55rem;
+  border: 1px solid #aebdd0;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #172033;
+}
+
+.smarto-checkout-form {
+  display: grid;
+  gap: 0.9rem;
+  max-width: 42rem;
+  margin-block: 1rem;
+}
+
+.smarto-checkout-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 650;
+}
+
 .smarto-actions {
   display: flex;
   flex-wrap: wrap;

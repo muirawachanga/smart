@@ -3,14 +3,20 @@
 {% block title %}My account | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page" data-page-title="My account">
+<main class="smarto-page" data-orders-page="customer">
   <p class="smarto-eyebrow">Personal account</p>
   <h1>My account</h1>
-  <p>Profile, saved addresses, order history, payment history, and tracking will be connected to the signed-in Frappe user in later phases.</p>
-  <div class="smarto-state">
-    <strong>Account data is not displayed on this page yet</strong>
-    <p>The existing customer order history remains available in the storefront and is restricted to the signed-in customer.</p>
-    <a href="/store#order-history">Open existing order history</a>
-  </div>
+  <p>View your orders and payment status. Profile and address management remain in the existing workflows.</p>
+  <a id="orders-login" href="/login?redirect-to=%2Faccount" hidden>Sign in to view your orders</a>
+  <h2>My orders</h2>
+  <p id="orders-status" role="status" aria-live="polite">Loading orders...</p>
+  <div id="orders-list" class="smarto-cart-items"></div>
+  <nav class="smarto-pagination" aria-label="Order pages" id="orders-pagination" hidden>
+    <button id="orders-previous" class="smarto-button smarto-button-secondary" type="button">Previous</button>
+    <span id="orders-page"></span>
+    <button id="orders-next" class="smarto-button smarto-button-secondary" type="button">Next</button>
+  </nav>
+  <section id="order-detail" aria-live="polite"></section>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/order-pages.js"></script>
 {% endblock %}

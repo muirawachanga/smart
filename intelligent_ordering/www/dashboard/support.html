@@ -1,0 +1,41 @@
+{% extends "templates/smarto_base.html" %}
+
+{% block title %}Customer support | SmartO{% endblock %}
+
+{% block smarto_content %}
+<main class="smarto-page" data-orders-page="support">
+  <p class="smarto-eyebrow">Customer support workspace</p>
+  <h1>Customer and order enquiries</h1>
+  <p>This workspace is read-only. Payment changes and order status updates are not permitted.</p>
+  <p><a href="/app/customer-profile">View customer profiles in Frappe Desk</a></p>
+  <form id="orders-filters" class="smarto-catalog-form">
+    <label>Search orders
+      <input name="search" type="search" maxlength="100" placeholder="Order number, customer, or phone">
+    </label>
+    <label>Order status
+      <select name="status">
+        <option value="">All statuses</option>
+        <option>Pending</option><option>Confirmed</option><option>Processing</option>
+        <option>Ready for Delivery</option><option>Completed</option><option>Cancelled</option>
+      </select>
+    </label>
+    <label>Payment status
+      <select name="payment_status">
+        <option value="">All payment statuses</option>
+        <option>Unpaid</option><option>Pending</option><option>Paid</option>
+        <option>Failed</option><option>Refunded</option>
+      </select>
+    </label>
+    <button class="smarto-button" type="submit">Search</button>
+  </form>
+  <p id="orders-status" role="status" aria-live="polite">Loading orders...</p>
+  <div id="orders-list" class="smarto-cart-items"></div>
+  <nav class="smarto-pagination" aria-label="Order pages" id="orders-pagination" hidden>
+    <button id="orders-previous" class="smarto-button smarto-button-secondary" type="button">Previous</button>
+    <span id="orders-page"></span>
+    <button id="orders-next" class="smarto-button smarto-button-secondary" type="button">Next</button>
+  </nav>
+  <section id="order-detail" aria-live="polite"></section>
+</main>
+<script type="module" src="/assets/intelligent_ordering/js/order-pages.js"></script>
+{% endblock %}

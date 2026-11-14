@@ -29,7 +29,8 @@
     {"role": "Business Admin", "read": 1, "write": 1},
     {"role": "Store Manager", "read": 1, "write": 1},
     {"role": "Order Manager", "read": 1, "write": 1},
-    {"role": "Inventory Manager", "read": 1}
+    {"role": "Inventory Manager", "read": 1},
+    {"role": "Customer Support", "read": 1}
   ],
   "search_fields": "name,customer_name_snapshot,customer_phone_snapshot,status",
   "sort_field": "modified",

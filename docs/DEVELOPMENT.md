@@ -69,21 +69,20 @@ route-aware page labels.
 | `/register` | Registration information page; account creation is not implemented here |
 | `/forgot-password` | Password recovery information page |
 | `/reset-password` | Password reset information page; it accepts no credentials or tokens |
-| `/account` | Customer account page shell |
-| `/dashboard/owner` | Business owner dashboard shell |
-| `/dashboard/admin` | Administrator dashboard shell |
-| `/dashboard/sales` | Sales dashboard shell |
-| `/dashboard/orders` | Order dashboard shell |
-| `/dashboard/inventory` | Inventory dashboard shell |
-| `/dashboard/delivery` | Delivery dashboard shell |
+| `/account` | Owner-scoped order history and payment controls |
+| `/dashboard/owner` | Role-protected business workspace |
+| `/dashboard/admin` | Role-protected administration workspace |
+| `/dashboard/sales` | Role-protected sales workspace |
+| `/dashboard/orders` | Role-protected order search, details and status updates |
+| `/dashboard/inventory` | Role-protected inventory workspace |
+| `/dashboard/delivery` | Role-protected delivery workspace |
+| `/dashboard/support` | Read-only order enquiries and customer-profile access |
 | `/store` | Existing database-backed storefront and staff workflows |
 
-Unconnected page shells deliberately do not invent customer data, accept payment
-details, create accounts, or submit orders. Existing payment, order history,
-inventory, delivery, and administration workflows remain
-available at `/store` until the later page-specific phases connect them. The
-dashboard shells contain no operational data; their role-specific data and
-server-side access controls will be connected with personnel dashboards.
+Customer and staff pages reuse the existing database-backed catalog, cart,
+checkout, order, inventory, delivery, payment, and reporting APIs. The account,
+orders, inventory, and delivery workspaces use the current user's records and
+server-enforced permissions; pages do not grant API or DocType access.
 Frappe's native `/login` remains the authentication authority.
 
 After changing website templates, route rules, or public assets, rebuild app
@@ -217,9 +216,9 @@ be restored. A definitive validation rejection allows a corrected new request.
 Session storage recovery is limited to the same browser tab.
 Checkout requires a secure browser context (HTTPS or localhost) for token
 generation and fingerprinting.
-The confirmation page uses an owner-scoped endpoint even for customer accounts
-that also have staff roles. Payment remains in the existing order-history
-workflow until the dedicated payment page is connected.
+The confirmation and account pages use owner-scoped endpoints even for customer
+accounts that also have staff roles. The account page reuses the existing
+M-Pesa controls; the dedicated payment page is not yet connected.
 
 Customers can list and view only their own orders. Business Admin and Order
 Manager roles can search, filter, inspect, and update order statuses. Submitted
@@ -230,12 +229,136 @@ Completed and Cancelled are terminal. Legacy Sales Order statuses are not
 automatically remapped; an explicit migration is required before rollout if
 legacy records exist.
 
-The storefront provides checkout review, order confirmation, customer order
-history, and staff order search/status controls. M-Pesa is an optional,
+The storefront continues to provide checkout review, order confirmation,
+customer order history, and staff order controls. The dedicated `/account` and
+`/dashboard/orders` pages use the same APIs. Completion is performed through
+the delivery workflow, not through the staff order status form. M-Pesa is an optional,
 server-configured integration. New orders include the configured delivery-area
 fee in their immutable server-calculated total. Product/category-at-order
 snapshots support historical reporting; old orders without a snapshot report
 as uncategorized rather than being silently reclassified.
+
+## Personnel accounts and workspaces
+
+Provision each staff member as a separate Frappe **System User** in Desk.
+A System Manager creates the user, assigns only the required existing app
+roles, and uses Frappe's password setup and account-disable workflows. Do not
+share accounts or give staff `System Manager` solely to access SmartO.
+Role assignment and User permissions are controlled by Frappe, not by a new
+SmartO provisioning endpoint. Disable the Frappe user when access is revoked.
+
+| Workspace | Roles permitted to open it |
+| --- | --- |
+| `/dashboard/admin` | System Manager, Business Admin |
+| `/dashboard/owner` | System Manager, Business Admin, Store Manager |
+| `/dashboard/orders` | System Manager, Business Admin, Store Manager, Order Manager |
+| `/dashboard/sales` | System Manager, Business Admin, Store Manager, Finance Manager |
+| `/dashboard/inventory` | System Manager, Business Admin, Inventory Manager |
+| `/dashboard/delivery` | System Manager, Business Admin, Store Manager, Order Manager, Delivery Manager, Delivery Staff |
+| `/dashboard/support` | System Manager, Business Admin, Store Manager, Customer Support |
+
+`Administrator` retains Frappe's administrative access. These page checks do
+not grant extra DocType or API permissions; the existing endpoint and document
+checks remain authoritative. Delivery Staff access is limited to their
+assigned deliveries. Finance reconciliation is restricted to System Manager,
+Business Admin, and Finance Manager. Customer order pages use the signed-in
+customer's identity, including when that user also has a staff role.
+Avoid assigning the Customer role to personnel who update orders: the Sales
+Order controller rejects customer modifications. Test access with separate
+non-administrator accounts before deployment.
+
+### Local development test accounts
+
+No test accounts are created during installation or migration. The following
+Bench-only command creates real Frappe System Users **only on an explicitly
+confirmed local/private developer-mode site**. Never run it on production,
+an Internet-accessible site, or a local site exposed by a public tunnel.
+The built-in `Administrator` user is never changed.
+
+From your existing Bench, using its exact site name:
+
+```bash
+bench --site <local-development-site> migrate
+bench build --app intelligent_ordering
+bench --site <local-development-site> execute intelligent_ordering.utils.development_accounts.provision
+```
+
+The site must already have `developer_mode: 1` and a local/private hostname;
+the command rejects a configured public `host_name`. Do not enable developer
+mode on production to bypass this guard. At the prompt, enter
+`LOCAL-ONLY <local-development-site>`, then enter and confirm your chosen
+temporary development password. Input is hidden; do not put the password in
+command arguments, source files, environment files, or shell history.
+
+| Email | Assigned Frappe roles | Start page |
+| --- | --- | --- |
+| `admin.test@smarto.local` | System Manager, Business Admin | `/dashboard/admin` |
+| `manager.test@smarto.local` | Store Manager | `/dashboard/sales` |
+| `orders.test@smarto.local` | Order Manager | `/dashboard/orders` |
+| `inventory.test@smarto.local` | Inventory Manager | `/dashboard/inventory` |
+| `delivery.test@smarto.local` | Delivery Manager | `/dashboard/delivery` |
+| `finance.test@smarto.local` | Finance Manager | `/dashboard/sales` |
+| `support.test@smarto.local` | Customer Support | `/dashboard/support` |
+| `rider.test@smarto.local` | Delivery Staff | `/dashboard/delivery` |
+
+**Password:** for each newly created account, use the temporary password you
+entered at the hidden prompt. Keep that value in your local password manager.
+Frappe's password policy still applies. The test administrator also needs
+Business Admin because several app DocTypes grant administration through that
+role rather than System Manager; no other test account receives either role.
+Inventory Manager can create/edit Product records in Desk and perform existing
+ledger-backed stock operations, but cannot read payment transactions.
+Customer Support can read customer profiles and orders, not mutate either or
+access payment management. Customer support deliberately uses Desk's existing
+customer list rather than gaining access to administration/financial reports.
+
+Matching existing accounts are reused without changing passwords or roles.
+Conflicting roles, role profiles, disabled accounts, or non-System Users abort
+the command before creating users; review those accounts explicitly in Desk.
+New-user welcome emails are disabled. Creation errors roll back the batch
+rather than leave a partially created set. The command returns account/role
+statuses, never passwords.
+
+For independent login and permission checks against these actual accounts:
+
+```bash
+bench --site <local-development-site> execute intelligent_ordering.utils.development_accounts.verify
+```
+
+Confirm the local-only site again, enter the exact base URL printed by Bench
+(including its port), and enter each account's password when prompted. This
+checks independent HTTP logins/identity, authorized read APIs, direct dashboard
+URLs, prohibited payment-list API requests, DocType permissions, and server-side
+order/reconciliation gates under each account. It makes no payment-provider
+calls or business-record mutations.
+Denied mutation checks are direct server calls, not HTTP/CSRF tests.
+The report explicitly marks failed checks and missing delivery fixtures;
+`all_passed` is false for either. Assigned/unassigned delivery checks need real
+existing delivery fixtures. It does not replace browser/navigation or
+end-to-end workflow testing.
+
+For isolated database-backed tests (not your working or production site):
+
+```bash
+bench --site <isolated-test-site> run-tests --app intelligent_ordering --module intelligent_ordering.intelligent_ordering.tests.test_role_accounts
+```
+
+These tests create transaction-scoped, uniquely named User/Product records;
+they do not overwrite the eight development accounts. They check password
+authentication and least-privilege permissions, not browser login or CSRF.
+
+For browser testing, log out between accounts or use separate browser profiles,
+visit the local site's `/login`, and use the email and password above. Check
+that only authorized staff links appear and open a prohibited dashboard URL.
+As support, view customer profiles/order details and confirm no payment/status
+controls appear. As inventory, edit a product and record stock. As a delivery
+manager, assign a real ready delivery to the rider; as the rider, verify that
+another person's delivery is inaccessible even using its direct API URL.
+As finance, inspect real transaction/report data; do not fabricate successful
+payments. Remove or disable these accounts before any public deployment and
+do not transfer their passwords into a production database. Existing site
+custom permissions, role profiles, MFA, and login policies also need live
+verification.
 
 ## Inventory management
 
@@ -243,6 +366,7 @@ Inventory methods:
 
 - `GET /api/method/intelligent_ordering.api.inventory.get_dashboard`
 - `GET /api/method/intelligent_ordering.api.inventory.list_stock`
+- `GET /api/method/intelligent_ordering.api.inventory.list_product_options`
 - `GET /api/method/intelligent_ordering.api.inventory.list_movements`
 - `GET /api/method/intelligent_ordering.api.inventory.get_product_availability`
 - `POST /api/method/intelligent_ordering.api.inventory.adjust_stock`
@@ -268,6 +392,28 @@ movement keys to avoid duplicate reservations or dispatches. Orders remain
 Pending without affecting inventory until confirmation. Inventory screens
 provide dashboard totals, product/warehouse stock search, movements, and
 authorized receipt/adjustment controls.
+
+The `/dashboard/inventory` page connects the dashboard, balance search,
+movement history, product picker, receipts/adjustments, and dispatched-order
+returns to those APIs. The product picker includes disabled products for
+authorized inventory staff to manage their existing stock; disabled products
+remain unavailable for customer orders. Inventory API permissions remain
+authoritative.
+
+## Delivery management
+
+The `/dashboard/delivery` page uses the existing `deliveries` APIs for
+permission-scoped delivery listing/detail, manager assignment and scheduling,
+delivery-area management, and assigned-staff status updates. Only managers can
+create deliveries from ready orders or change delivery areas/assignments.
+Delivery staff see only their assigned deliveries and can confirm completion
+only for an assigned delivery after verified payment. Delivery updates do not
+deduct inventory a second time. Manager and staff API checks remain
+authoritative even when a page is accessible.
+
+Inventory, delivery, sales, and owner workspaces link to the existing
+role-checked reporting dashboard at `/store#admin-dashboard`; the analytics and
+exports continue to use real Frappe records and existing report permissions.
 
 ## M-Pesa configuration and operations
 
@@ -377,7 +523,7 @@ manually set Paid, delete payment records, or repeat the charge.
 
 ## Administration, analytics, and reporting
 
-The Administration dashboard is available at `/#admin-dashboard`. The methods
+The Administration dashboard is available at `/store#admin-dashboard`. The methods
 are exposed through
 `/api/method/intelligent_ordering.api.administration.`:
 

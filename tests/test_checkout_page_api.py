@@ -57,6 +57,14 @@ class TestCheckoutPageEndpoints(unittest.TestCase):
     def setUp(self):
         self.frappe, self.checkout, self.orders = load_modules()
 
+    def test_support_can_list_orders_but_cannot_change_status(self):
+        self.frappe.get_roles.return_value = ["Customer Support"]
+        self.frappe.get_list = Mock(return_value=[])
+        self.assertEqual(self.orders.list_orders()["orders"], [])
+        with self.assertRaises(AccessError):
+            self.orders.update_order_status("SO-1", "Confirmed")
+        self.frappe.get_doc.assert_not_called()
+
     def test_recovery_requires_valid_token_and_owned_order(self):
         token = str(uuid4())
         self.frappe.db.get_value.side_effect = [

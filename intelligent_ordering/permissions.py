@@ -31,7 +31,7 @@ def _customer_read_permission(doc, ptype, user, linked_profile=None):
 
 def customer_profile_query(user):
     user = user or frappe.session.user
-    if not _customer_only(user):
+    if not _customer_only(user) or "Customer Support" in frappe.get_roles(user):
         return ""
     return f"`tabCustomer Profile`.`user` = {frappe.db.escape(user)}"
 
@@ -70,7 +70,7 @@ def customer_address_query(user):
 
 def sales_order_query(user):
     user = user or frappe.session.user
-    if not _customer_only(user):
+    if not _customer_only(user) or "Customer Support" in frappe.get_roles(user):
         return ""
     escaped_user = frappe.db.escape(user)
     return (
@@ -91,6 +91,8 @@ def shopping_cart_query(user):
 
 def customer_profile_has_permission(doc, ptype, user=None):
     user = user or frappe.session.user
+    if ptype in {"read", "select"} and "Customer Support" in frappe.get_roles(user):
+        return None
     return _customer_read_permission(doc, ptype, user)
 
 
@@ -106,6 +108,8 @@ def customer_address_has_permission(doc, ptype, user=None):
 
 def sales_order_has_permission(doc, ptype, user=None):
     user = user or frappe.session.user
+    if ptype in {"read", "select"} and "Customer Support" in frappe.get_roles(user):
+        return None
     if doc is None or ptype not in {"read", "select"} or not _customer_only(user):
         return None
     if "Customer" not in frappe.get_roles(user):

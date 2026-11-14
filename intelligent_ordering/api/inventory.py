@@ -136,6 +136,50 @@ def list_stock(search="", warehouse="", availability="all", page=1, page_size=20
 
 
 @frappe.whitelist()
+def list_product_options(search="", page=1, page_size=100):
+    require_inventory_access()
+    if not isinstance(search, str) or len(search.strip()) > 100:
+        frappe.throw("Product search must be text no longer than 100 characters.", frappe.ValidationError)
+    try:
+        page, page_size = validate_pagination(page, page_size)
+    except ValueError as error:
+        frappe.throw(str(error), frappe.ValidationError)
+    search = search.strip()
+    filters = {}
+    or_filters = []
+    if search:
+        pattern = f"%{search}%"
+        or_filters = [
+            ["Product", "name", "like", pattern],
+            ["Product", "sku", "like", pattern],
+            ["Product", "product_name", "like", pattern],
+        ]
+    products = frappe.get_list(
+        "Product",
+        filters=filters,
+        or_filters=or_filters,
+        fields=["name", "sku", "product_name", "enabled"],
+        order_by="product_name asc, name asc",
+        limit_start=(page - 1) * page_size,
+        limit_page_length=page_size + 1,
+    )
+    warehouses = frappe.get_list(
+        "Stock Warehouse",
+        filters={"status": "Active"},
+        fields=["name", "warehouse_name"],
+        order_by="warehouse_name asc",
+        limit_page_length=0,
+    )
+    return {
+        "products": products[:page_size],
+        "warehouses": warehouses,
+        "page": page,
+        "page_size": page_size,
+        "has_more": len(products) > page_size,
+    }
+
+
+@frappe.whitelist()
 def list_movements(product="", warehouse="", transaction_type="", page=1, page_size=20):
     require_inventory_access()
     for label, value in (("Product", product), ("Warehouse", warehouse)):

@@ -9,6 +9,7 @@ APP_ROLES = {
     "Delivery Manager": True,
     "Order Manager": True,
     "Inventory Manager": True,
+    "Customer Support": True,
     "Delivery Staff": True,
 }
 

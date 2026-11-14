@@ -3,14 +3,125 @@
 {% block title %}Inventory dashboard | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page" data-page-title="Inventory dashboard">
+<main class="smarto-page" data-inventory-page>
   <p class="smarto-eyebrow">Inventory workspace</p>
-  <h1>Inventory dashboard</h1>
-  <p>Stock balances, movements, and low-stock reporting will be connected to the existing inventory APIs in Phase 8 and Phase 9.</p>
-  <div class="smarto-state">
-    <strong>Inventory data is not connected on this route yet</strong>
-    <p>No stock figures are fabricated on this page.</p>
-    <a href="/store#inventory-dashboard">Open existing inventory tools</a>
-  </div>
+  <h1>Inventory management</h1>
+  <p><a href="/app/product">Manage products in Frappe Desk</a></p>
+  <p>Stock balances and movement history come from the inventory ledger. Reservations are created when orders are confirmed; stock is dispatched when orders become Ready for Delivery. Returns must reference stock actually dispatched for that order.</p>
+  <p id="inventory-feedback" role="status" aria-live="polite"></p>
+  <h2>Stock overview</h2>
+  <div id="inventory-metrics" class="smarto-inventory-metrics"></div>
+  <h2>Stock by product and warehouse</h2>
+  <form id="inventory-stock-filters" class="smarto-catalog-form">
+    <label>Search products
+      <input name="search" type="search" maxlength="100">
+    </label>
+    <label>Warehouse
+      <select name="warehouse"><option value="">All warehouses</option></select>
+    </label>
+    <label>Availability
+      <select name="availability">
+        <option value="all">All stock</option>
+        <option value="available">Available</option>
+        <option value="low">Low stock (1–5)</option>
+        <option value="out_of_stock">Out of stock</option>
+      </select>
+    </label>
+    <button class="smarto-button" type="submit">Search stock</button>
+  </form>
+  <div id="inventory-stock-list" class="smarto-cart-items"></div>
+  <nav class="smarto-pagination" aria-label="Stock pages">
+    <button id="inventory-stock-previous" class="smarto-button smarto-button-secondary" type="button">Previous</button>
+    <span id="inventory-stock-page"></span>
+    <button id="inventory-stock-next" class="smarto-button smarto-button-secondary" type="button">Next</button>
+  </nav>
+
+  <section class="smarto-inventory-panel">
+    <h2>Find a product for stock movement</h2>
+    <form id="inventory-product-search" class="smarto-catalog-form">
+      <label>Product name, SKU, or ID
+        <input name="search" type="search" maxlength="100">
+      </label>
+      <button class="smarto-button smarto-button-secondary" type="submit">Find products</button>
+    </form>
+    <label>Matching products
+      <select id="inventory-product-options"><option value="">Search to select a product</option></select>
+    </label>
+    <button id="inventory-product-next" class="smarto-button smarto-button-secondary" type="button" disabled>More products</button>
+  </section>
+
+  <section class="smarto-inventory-panel">
+    <h2>Receive or adjust stock</h2>
+    <form id="inventory-adjustment-form" class="smarto-checkout-form">
+      <label>Stock warehouse
+        <select name="warehouse" required><option value="">Select warehouse</option></select>
+      </label>
+      <label>Movement
+        <select name="transaction_type" required>
+          <option value="Opening">Initial stock</option>
+          <option value="Receipt">Receive stock</option>
+          <option value="Adjustment">Manual adjustment</option>
+        </select>
+      </label>
+      <label>Adjustment direction
+        <select name="direction"><option value="increase">Increase</option><option value="decrease">Decrease</option></select>
+      </label>
+      <label>Quantity
+        <input name="quantity" type="number" min="1" max="2147483647" step="1" required>
+      </label>
+      <label>Remarks
+        <input name="remarks" type="text" maxlength="500">
+      </label>
+      <button class="smarto-button" type="submit">Record stock movement</button>
+    </form>
+  </section>
+
+  <section class="smarto-inventory-panel">
+    <h2>Return dispatched order stock</h2>
+    <form id="inventory-return-form" class="smarto-checkout-form">
+      <label>Order number
+        <input name="order_name" type="text" maxlength="140" required>
+      </label>
+      <label>Stock warehouse
+        <select name="warehouse" required><option value="">Select warehouse</option></select>
+      </label>
+      <label>Quantity returned
+        <input name="quantity" type="number" min="1" max="2147483647" step="1" required>
+      </label>
+      <label>Remarks
+        <input name="remarks" type="text" maxlength="500">
+      </label>
+      <button class="smarto-button" type="submit">Record order return</button>
+    </form>
+  </section>
+
+  <section class="smarto-inventory-panel">
+    <h2>Stock movement history</h2>
+    <form id="inventory-movement-filters" class="smarto-catalog-form">
+      <label>Product, SKU, or name
+        <input name="product" type="search" maxlength="140">
+      </label>
+      <label>Warehouse
+        <select name="warehouse"><option value="">All warehouses</option></select>
+      </label>
+      <label>Movement type
+        <select name="transaction_type">
+          <option value="">All movements</option>
+          <option>Opening</option><option>Receipt</option><option>Issue</option>
+          <option>Adjustment</option><option>Reservation</option><option>Release</option>
+          <option>Dispatch</option><option>Return</option>
+        </select>
+      </label>
+      <button class="smarto-button" type="submit">Filter history</button>
+    </form>
+    <div id="inventory-movements" class="smarto-cart-items"></div>
+    <nav class="smarto-pagination" aria-label="Movement history pages">
+      <button id="inventory-movements-previous" class="smarto-button smarto-button-secondary" type="button">Previous</button>
+      <span id="inventory-movements-page"></span>
+      <button id="inventory-movements-next" class="smarto-button smarto-button-secondary" type="button">Next</button>
+    </nav>
+    <p><a href="/store#admin-dashboard">Download inventory reports</a></p>
+  </section>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/inventory-page.js"></script>
 {% endblock %}

@@ -6,6 +6,7 @@ from intelligent_ordering.utils.validation import validate_pagination
 
 
 ORDER_STAFF_ROLES = {"System Manager", "Business Admin", "Store Manager", "Order Manager"}
+ORDER_READ_ROLES = ORDER_STAFF_ROLES | {"Customer Support"}
 
 
 @frappe.whitelist(allow_guest=True)
@@ -93,7 +94,7 @@ def get_my_order(order_name):
 
 @frappe.whitelist()
 def list_orders(search="", status="", payment_status="", page=1, page_size=20):
-    _require_order_staff()
+    _require_order_staff(read_only=True)
     if not isinstance(search, str):
         frappe.throw("Search must be text.", frappe.ValidationError)
     search = search.strip()
@@ -166,8 +167,9 @@ def _require_customer(user):
         frappe.throw("Customer access is required.", frappe.PermissionError)
 
 
-def _require_order_staff():
-    if not ORDER_STAFF_ROLES.intersection(frappe.get_roles(frappe.session.user)):
+def _require_order_staff(read_only=False):
+    allowed_roles = ORDER_READ_ROLES if read_only else ORDER_STAFF_ROLES
+    if not allowed_roles.intersection(frappe.get_roles(frappe.session.user)):
         frappe.throw("Order management access is required.", frappe.PermissionError)
 
 

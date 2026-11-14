@@ -20,7 +20,7 @@
     {"role": "Business Admin", "read": 1, "write": 1, "create": 1, "delete": 1},
     {"role": "Store Manager", "read": 1, "write": 1, "create": 1},
     {"role": "Order Manager", "read": 1, "write": 1, "create": 1},
-    {"role": "Inventory Manager", "read": 1},
+    {"role": "Inventory Manager", "read": 1, "write": 1, "create": 1},
     {"role": "Delivery Staff", "read": 1}
   ],
   "sort_field": "product_name",

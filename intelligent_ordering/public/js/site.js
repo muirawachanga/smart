@@ -105,6 +105,7 @@ function setupAccountNavigation(user) {
     ["#deliveries-link", ["System Manager", "Business Admin", "Store Manager", "Order Manager", "Delivery Manager", "Delivery Staff"]],
     ["#admin-dashboard-link", ["System Manager", "Business Admin", "Store Manager", "Order Manager", "Finance Manager", "Inventory Manager", "Delivery Manager"]],
     ["#inventory-dashboard-link", ["System Manager", "Business Admin", "Inventory Manager"]],
+    ["#support-dashboard-link", ["System Manager", "Business Admin", "Store Manager", "Customer Support"]],
   ];
   let hasStaffLinks = false;
   for (const [selector, allowedRoles] of staffControls) {
@@ -121,6 +122,7 @@ function setupAccountNavigation(user) {
     [["Order Manager"], "/dashboard/orders"],
     [["Inventory Manager"], "/dashboard/inventory"],
     [["Delivery Manager", "Delivery Staff"], "/dashboard/delivery"],
+    [["Customer Support"], "/dashboard/support"],
   ];
   const destination = workspaceByRole.find(([allowedRoles]) =>
     allowedRoles.some((role) => roles.has(role)));

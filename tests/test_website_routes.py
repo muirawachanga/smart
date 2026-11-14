@@ -26,6 +26,7 @@ SHELL_ROUTES = {
     "/dashboard/orders": "dashboard/orders.html",
     "/dashboard/inventory": "dashboard/inventory.html",
     "/dashboard/delivery": "dashboard/delivery.html",
+    "/dashboard/support": "dashboard/support.html",
 }
 
 
@@ -61,11 +62,36 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
             "cart.html": "cart-page.js",
             "checkout.html": "checkout-page.js",
             "order-confirmation.html": "order-confirmation.js",
+            "account.html": "order-pages.js",
+            "dashboard/orders.html": "order-pages.js",
+            "dashboard/inventory.html": "inventory-page.js",
+            "dashboard/delivery.html": "delivery-page.js",
+            "dashboard/support.html": "order-pages.js",
         }
         for template, script in expected.items():
             with self.subTest(template=template):
                 source = (WWW / template).read_text()
                 self.assertIn(f"/assets/intelligent_ordering/js/{script}", source)
+
+    def test_staff_pages_are_server_guarded(self):
+        workflows = {
+            "orders": "orders",
+            "inventory": "inventory",
+            "delivery": "delivery",
+            "admin": "admin",
+            "owner": "owner",
+            "sales": "sales",
+            "support": "support",
+        }
+        for page, controller in workflows.items():
+            with self.subTest(page=page):
+                self.assertTrue((WWW / f"dashboard/{controller}.py").is_file())
+
+    def test_reporting_is_linked_from_authorized_workspaces(self):
+        for page in ("sales", "owner", "inventory", "delivery"):
+            with self.subTest(page=page):
+                source = (WWW / f"dashboard/{page}.html").read_text()
+                self.assertIn("/store#admin-dashboard", source)
 
     def test_login_route_remains_frappe_native(self):
         self.assertFalse((WWW / "login.html").exists())

@@ -15,6 +15,7 @@ from intelligent_ordering.api.orders import (
     update_order_status,
 )
 from intelligent_ordering.api.inventory import adjust_stock
+from intelligent_ordering.utils.staff_pages import require_staff_page
 
 
 class TestCheckout(FrappeTestCase):
@@ -280,6 +281,19 @@ class TestCheckout(FrappeTestCase):
         order_doc.total = 1
         with self.assertRaises(frappe.ValidationError):
             order_doc.save()
+
+    def test_staff_workspace_requires_the_corresponding_role(self):
+        context = frappe._dict()
+        with self.assertRaises(frappe.PermissionError):
+            require_staff_page(context, "orders")
+        staff = self._make_user(
+            f"workspace-{frappe.generate_hash(length=8)}@example.test", "Order Manager"
+        )
+        frappe.set_user(staff.name)
+        require_staff_page(context, "orders")
+        self.assertFalse(context.can_manage_users)
+        with self.assertRaises(frappe.PermissionError):
+            require_staff_page(context, "admin")
 
     def _submit_order(self, token=None):
         checkout = get_checkout(delivery_area=self.delivery_area.name)

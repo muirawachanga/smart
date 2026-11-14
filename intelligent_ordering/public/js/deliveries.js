@@ -9,7 +9,7 @@ function text(tag, value) {
 function button(label, action) {
   const element = text("button", label);
   element.type = "button";
-  element.className = "secondary-button";
+  element.className = "smarto-button smarto-button-secondary";
   element.addEventListener("click", action);
   return element;
 }
@@ -68,7 +68,7 @@ export function initDeliveryDashboard() {
     readyNext.disabled = !dashboard.has_more;
     readyOrders.replaceChildren(...dashboard.ready_orders.map((order) => {
       const card = document.createElement("article");
-      card.className = "order-card";
+      card.className = "smarto-order-item";
       card.append(text("h4", order.name), text("p", order.customer_name_snapshot),
         text("p", order.delivery_address_snapshot));
       const area = document.createElement("select");
@@ -94,6 +94,7 @@ export function initDeliveryDashboard() {
     if (!dashboard.ready_orders.length) readyOrders.append(text("p", "No unassigned ready orders."));
     document.querySelector("#delivery-areas").replaceChildren(...dashboard.areas.map((area) => {
       const row = document.createElement("article");
+      row.className = "smarto-order-item";
       row.append(text("p", `${area.name}: ${area.currency} ${area.delivery_fee} (${area.enabled ? "Enabled" : "Disabled"})`));
       row.append(button("Edit area", () => {
         areaForm.elements.area_name.value = area.name;
@@ -112,7 +113,7 @@ export function initDeliveryDashboard() {
     });
     results.replaceChildren(...listing.deliveries.map((delivery) => {
       const card = document.createElement("article");
-      card.className = "order-card";
+      card.className = "smarto-order-item";
       const view = button("View delivery", () => act(view, () => showDetail(delivery.name)));
       card.append(text("h4", `${delivery.name} / ${delivery.order}`),
         text("p", `${delivery.status} - ${delivery.delivery_area}`),
@@ -141,7 +142,7 @@ export function initDeliveryDashboard() {
     );
     if (dashboard.manager && !["Dispatched", "In Transit", "Delivered", "Cancelled"].includes(delivery.status)) {
       const assignment = document.createElement("form");
-      assignment.className = "checkout-form";
+      assignment.className = "smarto-checkout-form";
       assignment.append(text("h4", "Assign / reassign delivery"));
       const person = document.createElement("select");
       person.required = true;
@@ -158,7 +159,7 @@ export function initDeliveryDashboard() {
       notes.maxLength = 1000;
       const save = text("button", "Save assignment");
       save.type = "submit";
-      save.className = "primary-button";
+      save.className = "smarto-button";
       assignment.append(save);
       assignment.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -177,7 +178,7 @@ export function initDeliveryDashboard() {
     }
     if (!["Delivered", "Cancelled"].includes(delivery.status)) {
       const update = document.createElement("form");
-      update.className = "checkout-form";
+      update.className = "smarto-checkout-form";
       const status = document.createElement("select");
       status.add(new Option(`Keep ${delivery.status} (notes only)`, delivery.status));
       for (const allowed of delivery.allowed_statuses) status.add(new Option(allowed, allowed));
@@ -193,7 +194,7 @@ export function initDeliveryDashboard() {
       });
       const save = text("button", "Save delivery update");
       save.type = "submit";
-      save.className = "primary-button";
+      save.className = "smarto-button";
       update.append(save);
       update.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -249,5 +250,7 @@ export function initDeliveryDashboard() {
   readyPrevious.addEventListener("click", () => { if (readyPage > 1) { readyPage -= 1; refresh(); } });
   readyNext.addEventListener("click", () => { readyPage += 1; refresh(); });
   document.querySelector("#deliveries-link").addEventListener("click", refresh);
-  if (window.location.hash === "#delivery-dashboard") refresh();
+  if (window.location.hash === "#delivery-dashboard" || document.querySelector("[data-delivery-page]")) {
+    refresh();
+  }
 }

@@ -24,6 +24,7 @@ export function mountOrderPayment(container, order) {
   const pay = text("button", "Pay with M-Pesa");
   pay.type = "submit";
   pay.className = "primary-button";
+  pay.disabled = true;
   const refresh = text("button", "Refresh payment status");
   refresh.type = "button";
   refresh.className = "secondary-button";

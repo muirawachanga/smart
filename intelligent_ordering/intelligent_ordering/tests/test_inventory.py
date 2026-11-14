@@ -10,6 +10,7 @@ from intelligent_ordering.api.inventory import (
     get_dashboard,
     get_product_availability,
     list_movements,
+    list_product_options,
     list_stock,
     record_order_return,
 )
@@ -100,6 +101,27 @@ class TestInventory(FrappeTestCase):
         dashboard = get_dashboard(low_stock_threshold=5)
         self.assertGreaterEqual(dashboard["summary"]["low_stock_products"], 1)
         self.assertGreaterEqual(dashboard["summary"]["total_stock"], 3)
+
+    def test_inventory_product_picker_includes_disabled_products_and_active_warehouses(self):
+        frappe.set_user("Administrator")
+        disabled = frappe.get_doc({
+            "doctype": "Product",
+            "sku": f"DISABLED-{frappe.generate_hash(8)}",
+            "product_name": "Disabled inventory product",
+            "price": 25,
+            "currency": "KES",
+            "enabled": 0,
+        }).insert(ignore_permissions=True)
+        frappe.set_user(self.inventory_user.name)
+        options = list_product_options(search="Disabled inventory")
+        self.assertIn(disabled.name, {row.name for row in options["products"]})
+        self.assertIn(self.warehouse.name, {row.name for row in options["warehouses"]})
+
+    def test_customer_cannot_list_inventory_product_picker_options(self):
+        customer = self._make_customer(f"customer-{frappe.generate_hash(8)}@example.test")
+        frappe.set_user(customer.name)
+        with self.assertRaises(frappe.PermissionError):
+            list_product_options()
 
     def test_out_of_stock_product_cannot_be_added_to_customer_cart(self):
         frappe.set_user(self.inventory_user.name)
