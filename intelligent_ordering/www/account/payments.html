@@ -1,0 +1,19 @@
+{% extends "templates/smarto_base.html" %}
+{% block title %}Payment history | SmartO{% endblock %}
+{% block smarto_content %}
+<main class="smarto-page" data-customer-page="payments">
+  <h1>Payment history</h1>
+  {% include "templates/includes/customer_navigation.html" %}
+  <p id="customer-status" role="status" aria-live="polite">Loading payment history...</p>
+  <p id="customer-feedback" role="alert"></p>
+  <a id="customer-login" href="/login?redirect-to=%2Faccount%2Fpayments" hidden>Sign in to view payments</a>
+  <button id="customer-refresh" class="smarto-button smarto-button-secondary" type="button">Refresh payments</button>
+  <div id="customer-list" class="smarto-cart-items"></div>
+  <nav id="customer-pagination" class="smarto-pagination" aria-label="Payment pages" hidden>
+    <button id="customer-previous" class="smarto-button" type="button">Previous</button>
+    <span id="customer-page"></span>
+    <button id="customer-next" class="smarto-button" type="button">Next</button>
+  </nav>
+</main>
+<script type="module" src="/assets/intelligent_ordering/js/customer-portal.js"></script>
+{% endblock %}

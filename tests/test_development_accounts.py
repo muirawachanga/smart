@@ -65,6 +65,49 @@ class TestDevelopmentAccounts(unittest.TestCase):
             self.assertEqual(doc["send_welcome_email"], 0)
         self.assertNotIn("temporary-test-secret", repr(result))
 
+    def test_customer_provisioning_uses_website_user_and_customer_only_role(self):
+        with patch("builtins.input", return_value="LOCAL-ONLY smarto.local"), patch.object(
+            self.accounts.getpass, "getpass", return_value="temporary-test-secret"
+        ):
+            result = self.accounts.provision_customer()
+        doc = self.frappe.get_doc.call_args.args[0]
+        self.assertEqual(doc["email"], "customer.test@smarto.local")
+        self.assertEqual(doc["first_name"], "SmartO Test Customer")
+        self.assertEqual(doc["user_type"], "Website User")
+        self.assertEqual(doc["roles"], [{"role": "Customer"}])
+        self.assertNotIn("temporary-test-secret", repr(result))
+
+    def test_customer_http_verification_reports_missing_fixture_without_claiming_success(self):
+        session = MagicMock()
+        session.__enter__.return_value = session
+        session.post.return_value.status_code = 200
+        email = "customer.test@smarto.local"
+
+        def get(url, **kwargs):
+            if url.endswith("current_user"):
+                return Mock(status_code=200, json=lambda: {"message": {
+                    "user": email, "roles": ["Customer", "All", "Guest"],
+                }})
+            allowed = "customers." in url or url.endswith("orders.get_my_orders")
+            return Mock(status_code=200 if allowed else 403)
+
+        session.get.side_effect = get
+        self.frappe.has_permission = Mock(return_value=False)
+        self.frappe.db.sql.return_value = []
+        pages = types.ModuleType("intelligent_ordering.utils.staff_pages")
+        pages.PAGE_ROLES = {"admin": {"System Manager"}}
+        with patch("builtins.input", side_effect=["LOCAL-ONLY smarto.local", "http://localhost:8000"]), patch.object(
+            self.accounts.getpass, "getpass", return_value="temporary-test-secret"
+        ), patch("requests.Session", return_value=session), patch.dict(
+            sys.modules, {"intelligent_ordering.utils.staff_pages": pages}
+        ):
+            result = self.accounts.verify_customer()
+        self.assertFalse(result["all_passed"])
+        self.assertTrue(all(row["status"] == "PASS" for row in result["checks"][:-1]))
+        self.assertIn("NOT TESTED", result["checks"][-1]["status"])
+        self.assertNotIn("temporary-test-secret", repr(result))
+        self.assertEqual(self.frappe.session.user, "Administrator")
+
     def test_existing_matching_accounts_are_not_modified_or_password_reset(self):
         role_by_email = {email: role for email, _, role in self.accounts.TEST_ACCOUNTS}
         self.frappe.db.exists.return_value = True

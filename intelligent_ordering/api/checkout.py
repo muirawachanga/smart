@@ -39,6 +39,11 @@ def get_checkout(delivery_area=""):
         "cart": cart,
         "cart_revision": checkout_cart_revision(cart["items"]),
         "delivery_areas": list_checkout_areas(cart["currency"]),
+        "saved_addresses": frappe.get_all(
+            "Customer Address", filters={"customer": profile.name},
+            fields=["name", "address_label", "address_line_1", "address_line_2", "city", "region", "postal_code", "is_default"],
+            order_by="is_default desc, creation desc", limit_page_length=100,
+        ) if profile else [],
     }
     if delivery_area:
         quote = get_area_quote(delivery_area, cart["currency"])
@@ -244,6 +249,7 @@ def _require_customer():
 
 
 def _save_customer_profile(user, customer_name, phone):
+    frappe.db.sql("SELECT name FROM `tabUser` WHERE name = %s FOR UPDATE", user)
     profile_name = frappe.db.get_value(
         "Customer Profile", {"user": user}, "name"
     )
@@ -293,6 +299,9 @@ def _order_summary(order_name):
 
 def _serialize_order(order):
     return {
+        "cancellation_request_status": order.get("cancellation_request_status"),
+        "cancellation_reason": order.get("cancellation_reason"),
+        "cancellation_response": order.get("cancellation_response"),
         "name": order.name,
         "order_datetime": order.order_datetime,
         "status": order.status,

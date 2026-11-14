@@ -116,6 +116,107 @@ Check the browser console and server logs for asset or API errors. An empty
 catalogue can also mean there are no enabled products in enabled categories;
 products need available stock before they can be added to the cart.
 
+## Customer portal
+
+The existing Customer role is a website-only role. `/register` creates real
+Frappe Website Users with only Customer assigned; native `/login` signup uses the
+same restricted path, ignoring configurable Portal Settings signup roles.
+Registration respects Frappe's disabled-signup setting and is rate-limited.
+Frappe sends the password setup email when email delivery is configured.
+Without an outgoing email account, registration explicitly asks the customer to
+contact the store; it does not pretend that an email was sent. Native `/login`,
+password recovery, and session logout remain the authentication authority.
+Customer's default role-homepage hook points to `/account`, without replacing
+any explicitly configured Frappe role/portal homepage.
+
+Customer pages are `/account` (orders, payments for an order, and tracking),
+`/account/profile`, `/account/addresses`, `/account/payments`, and
+`/account/notifications`. Signed-in non-customers are denied these pages.
+Guest pages show a sign-in action; backend customer methods require a Customer
+session. Customer IDs, roles, payment statuses, and order totals are not accepted
+by the portal's profile/address/cancellation forms.
+
+The customer API is `intelligent_ordering.api.customers`. It derives profiles
+from the authenticated user, validates address and order ownership before
+mutation, and exposes only selected public payment/delivery fields.
+Customers retain read-only DocType permissions; scoped workflow methods perform
+validated profile/address changes. Order totals and historical contact/address
+snapshots remain unchanged. Addresses referenced by orders cannot be deleted.
+The checkout picker copies a saved address into the existing checkout fields;
+the server still creates or reuses an address under the authenticated profile.
+
+Order details poll persisted order/payment/delivery state every 15 seconds while
+the page is visible, with an explicit refresh button. No GPS position is
+invented. New orders and subsequent order, delivery, payment, or cancellation
+updates create native Frappe Notification Log records for the owning customer.
+The notification list and mark-read operation are recipient-scoped. There is no
+SMS delivery or backfill of historical notifications in this implementation.
+
+Customers may submit a cancellation request with a reason for an open order.
+Only one pending request is allowed at a time; rejected requests may be
+resubmitted with a new reason, preserving the earlier requests and decisions in
+the immutable audit log.
+It does not immediately cancel or refund anything. Order managers review it in
+`/dashboard/orders`, supplying a response when approving or rejecting.
+Approval uses the existing cancellation transition, stock-return/reservation,
+and delivery safeguards. A blocked approval leaves the request pending.
+Closed orders cannot receive new requests. Six read-only
+cancellation fields are added to **Sales Order**; no new app DocTypes are added.
+Requests and resolutions are recorded in the existing immutable audit log.
+
+### Local test customer
+
+From your private developer-mode Bench site, with `bench start` running:
+
+```bash
+bench --site smart.localhost migrate
+bench build --app intelligent_ordering
+bench --site smart.localhost clear-cache
+bench --site smart.localhost execute intelligent_ordering.utils.development_accounts.provision_customer
+```
+
+Confirm `LOCAL-ONLY smart.localhost`. At the hidden password prompt, enter the
+temporary customer password supplied for this task. It is deliberately not
+stored in source code, command-line arguments, or the command result.
+The command creates **SmartO Test Customer**, `customer.test@smarto.local`, as a
+Website User with only Customer. It never changes Administrator or existing
+matching account passwords and aborts on conflicting roles/settings. If the
+account already exists, use its existing password or the native password reset
+flow; provisioning does not overwrite it.
+
+Hard-refresh the browser, sign out of staff sessions, and open `/login` using
+that email and the password you entered. Open `/account/profile` and save a phone
+number, add an address, then browse `/products` → `/cart` → `/checkout`.
+Keep the same site hostname throughout so cookies and guest-cart storage stay
+on the same origin. Private-IP HTTP supports checkout retry tokens, but **use
+HTTPS for production and anywhere credentials travel over untrusted networks**.
+
+Verify actual HTTP login and read-access boundaries:
+
+```bash
+bench --site smart.localhost execute intelligent_ordering.utils.development_accounts.verify_customer
+```
+
+Enter the private site base URL and password at the prompts. It checks identity,
+Customer-only roles, permitted portal APIs, denied staff APIs/dashboard URLs,
+and read denial for another customer's order/payments when a fixture exists.
+Missing fixtures are reported as NOT TESTED, never PASS. It makes no business
+writes or provider calls. Browser CRUD, registration email delivery, cancellation
+approval, and payment-provider tests must also be performed on a test site.
+
+The standalone tests exercise validation, scoped API queries, registration roles,
+forms, and retry safety. Database integration tests in `test_checkout.py` also
+cover native password checking, real address CRUD, immutable snapshots,
+cancellation, notifications, and cross-customer denial:
+
+```bash
+bench --site <private-test-site> run-tests --app intelligent_ordering \
+  --module intelligent_ordering.intelligent_ordering.tests.test_checkout
+```
+
+Only use development accounts/passwords on a private development site. Do not
+provision them on a publicly reachable or production site.
+
 ## Configuration and secrets
 
 Copy `.env.example` only as a reference for the external credentials that

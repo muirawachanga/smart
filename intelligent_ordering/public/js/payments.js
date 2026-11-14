@@ -7,9 +7,10 @@ function text(tag, value) {
 }
 
 export function mountOrderPayment(container, order) {
-  container.append(text("p", `Payment: ${order.payment_status || "Unpaid"}`));
+  const paymentStatus = text("p", `Payment: ${order.payment_status || "Unpaid"}`);
+  container.append(paymentStatus);
   if (order.payment_status === "Paid" || ["Cancelled", "Completed"].includes(order.status)) {
-    return;
+    return (current) => { paymentStatus.textContent = `Payment: ${current.payment_status}`; };
   }
   const form = document.createElement("form");
   form.className = "status-update-form";
@@ -39,7 +40,8 @@ export function mountOrderPayment(container, order) {
         (transaction.mpesa_receipt_number ? ` - ${transaction.mpesa_receipt_number}` : "") +
         (transaction.failure_description ? ` - ${transaction.failure_description}` : ""),
     )));
-    pay.disabled = transactions.some((transaction) =>
+    pay.disabled = order.payment_status === "Paid" || ["Cancelled", "Completed"].includes(order.status)
+      || transactions.some((transaction) =>
       ["Initiated", "Pending", "Successful"].includes(transaction.status),
     );
     if (transactions.some((transaction) => transaction.status === "Successful")) {
@@ -48,7 +50,7 @@ export function mountOrderPayment(container, order) {
   }
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!form.reportValidity()) return;
+    if (pay.disabled || !form.reportValidity()) return;
     pay.disabled = true;
     try {
       const transaction = await post("payments.initiate_payment", {
@@ -82,6 +84,14 @@ export function mountOrderPayment(container, order) {
   form.append(label, pay, refresh);
   container.append(form, feedback, history);
   load().catch((error) => { feedback.textContent = error.message; });
+  return (current) => {
+    order.status = current.status;
+    order.payment_status = current.payment_status;
+    paymentStatus.textContent = `Payment: ${order.payment_status}`;
+    const closed = order.payment_status === "Paid" || ["Cancelled", "Completed"].includes(order.status);
+    form.hidden = closed;
+    if (closed) pay.disabled = true;
+  };
 }
 
 export function initPaymentDashboard() {

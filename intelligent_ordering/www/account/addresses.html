@@ -1,0 +1,29 @@
+{% extends "templates/smarto_base.html" %}
+{% block title %}Delivery addresses | SmartO{% endblock %}
+{% block smarto_content %}
+<main class="smarto-page" data-customer-page="addresses">
+  <h1>Delivery addresses</h1>
+  {% include "templates/includes/customer_navigation.html" %}
+  <p>Save your profile first. Addresses used by past orders cannot be deleted; editing an address never changes an order's saved delivery details.</p>
+  <p id="customer-status" role="status" aria-live="polite">Loading addresses...</p>
+  <p id="customer-feedback" role="alert"></p>
+  <a id="customer-login" href="/login?redirect-to=%2Faccount%2Faddresses" hidden>Sign in to manage addresses</a>
+  <div id="customer-list" class="smarto-cart-items"></div>
+  <form id="customer-form" class="smarto-checkout-form" hidden>
+    <h2 id="address-form-title">Add an address</h2>
+    <input name="address_name" type="hidden">
+    <label>Label <input name="address_label" maxlength="140" placeholder="Home or work"></label>
+    <label>Address line 1 <input name="address_line_1" maxlength="140" autocomplete="address-line1" required></label>
+    <label>Address line 2 <input name="address_line_2" maxlength="140" autocomplete="address-line2"></label>
+    <label>City <input name="city" maxlength="140" autocomplete="address-level2" required></label>
+    <label>Region <input name="region" maxlength="140" autocomplete="address-level1"></label>
+    <label>Postal code <input name="postal_code" maxlength="40" autocomplete="postal-code"></label>
+    <label><input name="is_default" type="checkbox" value="1"> Default address</label>
+    <div class="smarto-actions">
+      <button class="smarto-button" type="submit">Save address</button>
+      <button id="address-new" class="smarto-button smarto-button-secondary" type="button">New address</button>
+    </div>
+  </form>
+</main>
+<script type="module" src="/assets/intelligent_ordering/js/customer-portal.js"></script>
+{% endblock %}

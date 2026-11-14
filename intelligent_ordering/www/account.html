@@ -6,7 +6,8 @@
 <main class="smarto-page" data-orders-page="customer">
   <p class="smarto-eyebrow">Personal account</p>
   <h1>My account</h1>
-  <p>View your orders and payment status.</p>
+  <p>View orders, refresh delivery progress, make payments, and request cancellations.</p>
+  {% include "templates/includes/customer_navigation.html" %}
   <a id="orders-login" href="/login?redirect-to=%2Faccount" hidden>Sign in to view your orders</a>
   <h2>My orders</h2>
   <p id="orders-status" role="status" aria-live="polite">Loading orders...</p>

@@ -13,22 +13,32 @@ website_route_rules = [
 after_install = "intelligent_ordering.install.after_install"
 after_migrate = "intelligent_ordering.install.after_migrate"
 
+override_whitelisted_methods = {
+    "frappe.core.doctype.user.user.sign_up": "intelligent_ordering.api.customers.sign_up",
+}
+role_home_page = {"Customer": "account"}
+
 doc_events = {
     "Sales Order": {
         "on_update": [
             "intelligent_ordering.utils.inventory.handle_order_status_change",
             "intelligent_ordering.utils.fulfillment_notifications.handle_order_status_change",
             "intelligent_ordering.utils.audit.audit_order_status",
+            "intelligent_ordering.utils.customer_notifications.on_update",
         ],
     },
     "Product": {"after_insert": "intelligent_ordering.utils.audit.audit_product",
                 "on_update": "intelligent_ordering.utils.audit.audit_product"},
     "Product Category": {"after_insert": "intelligent_ordering.utils.audit.audit_category",
                          "on_update": "intelligent_ordering.utils.audit.audit_category"},
-    "Payment Transaction": {"on_update": "intelligent_ordering.utils.audit.audit_payment_status"},
+    "Payment Transaction": {"on_update": [
+        "intelligent_ordering.utils.audit.audit_payment_status",
+        "intelligent_ordering.utils.customer_notifications.on_update",
+    ]},
     "Stock Ledger Entry": {"after_insert": "intelligent_ordering.utils.audit.audit_stock_movement"},
     "Delivery": {"after_insert": "intelligent_ordering.utils.audit.audit_delivery",
-                 "on_update": "intelligent_ordering.utils.audit.audit_delivery"},
+                 "on_update": ["intelligent_ordering.utils.audit.audit_delivery",
+                               "intelligent_ordering.utils.customer_notifications.on_update"]},
     "User": {
         "after_insert": "intelligent_ordering.utils.audit.audit_user_roles",
         "on_update": "intelligent_ordering.utils.audit.audit_user_roles",

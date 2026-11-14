@@ -36,7 +36,7 @@ function install(t, mode) {
       ? { dataset: { ordersPage: mode } } : nodes.get(selector),
     createElement: () => new Element(),
   });
-  setGlobal("window", { frappe: {} });
+  setGlobal("window", { frappe: {}, setInterval: () => 1, clearInterval() {}, confirm: () => true });
   setGlobal("Option", class extends Element {
     constructor(label, value) { super(); this.textContent = label; this.value = value; }
   });
@@ -67,6 +67,7 @@ test("customer history uses owner-only detail and shows payment status", async (
     if (url.includes("orders.get_my_orders")) return response({ orders: [order], has_more: false });
     if (url.includes("orders.get_my_order")) return response(order);
     if (url.includes("payments.get_order_payments")) return response([]);
+    if (url.includes("customers.track_order")) return response({ order_status: "Pending", payment_status: "Unpaid", timeline: [] });
     throw new Error(`Unexpected request: ${url}`);
   });
   await import(`../../intelligent_ordering/public/js/order-pages.js?customer=${Date.now()}`);
@@ -93,6 +94,7 @@ test("payment button stays disabled until payment history is loaded", async (t) 
   t.mock.method(globalThis, "fetch", async (url) => {
     if (url.includes("orders.get_my_orders")) return response({ orders: [order], has_more: false });
     if (url.includes("orders.get_my_order")) return response(order);
+    if (url.includes("customers.track_order")) return response({ order_status: "Pending", payment_status: "Unpaid", timeline: [] });
     if (url.includes("payments.get_order_payments")) {
       return new Promise((resolve) => { resolvePayments = resolve; });
     }
@@ -155,6 +157,7 @@ test("support uses staff read APIs without status or payment controls", async (t
     if (url.includes("orders.get_order")) return response(order);
     throw new Error(`Unexpected request: ${url}`);
   });
+
   await import(`../../intelligent_ordering/public/js/order-pages.js?support=${Date.now()}`);
   await tick();
   await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
@@ -163,4 +166,45 @@ test("support uses staff read APIs without status or payment controls", async (t
   assert.ok(card.children.some((node) => node.textContent === "Read-only customer support view."));
   assert.ok(!card.children.some((node) =>
     node.className === "smarto-catalog-form" || node.className === "status-update-form"));
+});
+
+test("customer live tracking refreshes persisted status and requests cancellation without changing totals", async (t) => {
+  const nodes = install(t, "customer");
+  const calls = [];
+  let requested = false;
+  let paid = false;
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes("orders.get_my_orders")) return response({ orders: [order], has_more: false });
+    if (url.includes("orders.get_my_order")) return response(order);
+    if (url.includes("payments.get_order_payments")) return response([]);
+    if (url.includes("request_cancellation")) requested = true;
+    return response({
+      order_status: "Confirmed", payment_status: paid ? "Paid" : "Unpaid", delivery: { status: "Assigned" },
+      timeline: [{ activity_datetime: "Today", from_status: "Awaiting Assignment", to_status: "Assigned" }],
+      cancellation_request_status: requested ? "Requested" : null,
+    });
+  });
+  await import(`../../intelligent_ordering/public/js/order-pages.js?tracking=${Date.now()}`);
+  await tick();
+  await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
+  await tick();
+  const tracking = nodes.get("#order-detail").children[0].children.at(-1);
+  assert.match(tracking.children[1].textContent, /Order: Confirmed.*Delivery: Assigned/);
+  const form = tracking.children[4];
+  assert.equal(form.hidden, false);
+  form.children[0].children[0].value = "Please cancel";
+  await form.listeners.submit({ preventDefault() {} });
+  const call = calls.find((call) => call.url.includes("request_cancellation"));
+  assert.equal(call.options.body.get("reason"), "Please cancel");
+  assert.equal(call.options.body.has("status"), false);
+  assert.equal(form.hidden, true);
+  assert.match(tracking.children.at(-1).textContent, /Staff must approve/);
+  paid = true;
+  await tracking.children[2].listeners.click();
+  const card = nodes.get("#order-detail").children[0];
+  assert.equal(card.children[2].textContent, "Payment status: Paid");
+  const paymentForm = card.children.find((child) => child.className === "status-update-form");
+  assert.equal(paymentForm.hidden, true);
+  assert.equal(paymentForm.children[1].disabled, true);
 });

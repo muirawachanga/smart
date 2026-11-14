@@ -5,7 +5,7 @@
   "autoname": "naming_series:",
   "naming_rule": "By \"Naming Series\" field",
   "engine": "InnoDB",
-  "field_order": ["naming_series", "order_datetime", "customer", "customer_name_snapshot", "customer_phone_snapshot", "delivery_address", "delivery_address_snapshot", "delivery_area", "delivery_fee", "status", "payment_status", "currency", "subtotal", "items", "total", "checkout_token"],
+  "field_order": ["naming_series", "order_datetime", "customer", "customer_name_snapshot", "customer_phone_snapshot", "delivery_address", "delivery_address_snapshot", "delivery_area", "delivery_fee", "status", "payment_status", "currency", "subtotal", "items", "total", "checkout_token", "cancellation_request_status", "cancellation_reason", "cancellation_requested_at", "cancellation_resolved_at", "cancellation_resolved_by", "cancellation_response"],
   "fields": [
     {"default": "SO-.YYYY.-.#####", "fieldname": "naming_series", "fieldtype": "Select", "label": "Naming Series", "options": "SO-.YYYY.-.#####", "reqd": 1},
     {"fieldname": "order_datetime", "fieldtype": "Datetime", "label": "Order Date and Time", "read_only": 1, "in_list_view": 1},
@@ -22,7 +22,13 @@
     {"fieldname": "subtotal", "fieldtype": "Currency", "label": "Subtotal", "options": "currency", "reqd": 1, "default": "0", "read_only": 1},
     {"fieldname": "items", "fieldtype": "Table", "label": "Items", "options": "Sales Order Item", "reqd": 1, "read_only": 1},
     {"fieldname": "total", "fieldtype": "Currency", "label": "Total", "options": "currency", "reqd": 1, "default": "0", "read_only": 1},
-    {"fieldname": "checkout_token", "fieldtype": "Data", "label": "Checkout Request Token", "unique": 1, "hidden": 1, "read_only": 1}
+    {"fieldname": "checkout_token", "fieldtype": "Data", "label": "Checkout Request Token", "unique": 1, "hidden": 1, "read_only": 1},
+    {"fieldname": "cancellation_request_status", "fieldtype": "Select", "label": "Cancellation Request", "options": "\nRequested\nApproved\nRejected", "read_only": 1},
+    {"fieldname": "cancellation_reason", "fieldtype": "Small Text", "label": "Cancellation Reason", "read_only": 1},
+    {"fieldname": "cancellation_requested_at", "fieldtype": "Datetime", "label": "Cancellation Requested At", "read_only": 1},
+    {"fieldname": "cancellation_resolved_at", "fieldtype": "Datetime", "label": "Cancellation Resolved At", "read_only": 1},
+    {"fieldname": "cancellation_resolved_by", "fieldtype": "Link", "options": "User", "label": "Cancellation Resolved By", "read_only": 1},
+    {"fieldname": "cancellation_response", "fieldtype": "Small Text", "label": "Cancellation Response", "read_only": 1}
   ],
   "permissions": [
     {"role": "Customer", "read": 1},

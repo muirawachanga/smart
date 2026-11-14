@@ -31,7 +31,7 @@ function install(t) {
     "cart-status", "cart-feedback", "cart-items", "cart-total", "clear-cart",
     "clear-guest-cart", "checkout-link", "checkout-status", "checkout-feedback",
     "checkout-login", "checkout-form", "checkout-area", "refresh-quote",
-    "checkout-submit", "checkout-review", "checkout-totals", "checkout-subtotal",
+    "checkout-submit", "checkout-review", "checkout-totals", "checkout-subtotal", "checkout-address",
     "checkout-delivery-fee", "checkout-total", "order-status", "order-detail", "order-login",
   ];
   const nodes = new Map(ids.map((id) => [`#${id}`, new Element()]));
@@ -40,6 +40,8 @@ function install(t) {
   form.elements = {
     customer_name: new Element(),
     phone: new Element(),
+    address_line_1: new Element(), address_line_2: new Element(),
+    city: new Element(), region: new Element(), postal_code: new Element(),
   };
   const session = new Map();
   const local = new Map();
@@ -292,4 +294,45 @@ test("confirmation does not show details when the owner-scoped request fails", a
   await tick();
   assert.equal(nodes.get("#order-detail").children.length, 0);
   assert.match(nodes.get("#order-status").textContent, /unavailable/);
+});
+
+test("checkout fills a default saved address without submitting its owner", async (t) => {
+  const { nodes } = install(t);
+  t.mock.method(globalThis, "fetch", async (url) => response(url.includes("cart.get_cart") ? cart : {
+    ...checkout, saved_addresses: [{
+      name: "ADDR-1", address_label: "Home", address_line_1: "Saved Road", city: "Nairobi", is_default: 1,
+    }],
+  }));
+  await import(`../../intelligent_ordering/public/js/checkout-page.js?address=${Date.now()}`);
+  await tick();
+  assert.equal(nodes.get("#checkout-address").value, "ADDR-1");
+  assert.equal(nodes.get("#checkout-form").elements.address_line_1.value, "Saved Road");
+});
+
+test("private HTTP checkout uses secure random tokens and preserves same-submission retry checks", async (t) => {
+  const { nodes } = install(t);
+  crypto.randomUUID = undefined;
+  crypto.subtle = undefined;
+  crypto.getRandomValues = (bytes) => webcrypto.getRandomValues(bytes);
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (url.includes("cart.get_cart")) return response(cart);
+    if (url.includes("checkout.create_order")) {
+      calls.push(options.body);
+      return failed("Connection interrupted");
+    }
+    return response({ ...checkout, delivery_fee: 10, currency: "KES", total: 110, delivery_quote: "quote-1" });
+  });
+  await import(`../../intelligent_ordering/public/js/checkout-page.js?http=${Date.now()}`);
+  await tick();
+  nodes.get("#checkout-area").value = "Central";
+  await nodes.get("#checkout-area").listeners.change();
+  await nodes.get("#checkout-form").listeners.submit({ preventDefault() {} });
+  assert.match(calls[0].get("request_token"), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  await nodes.get("#checkout-form").listeners.submit({ preventDefault() {} });
+  assert.equal(calls[0].get("request_token"), calls[1].get("request_token"));
+  nodes.get("#checkout-form").elements.phone.value = "+254711111111";
+  await nodes.get("#checkout-form").listeners.submit({ preventDefault() {} });
+  assert.equal(calls.length, 2);
+  assert.match(nodes.get("#checkout-feedback").textContent, /different details/);
 });

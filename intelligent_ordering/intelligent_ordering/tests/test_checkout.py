@@ -16,6 +16,7 @@ from intelligent_ordering.api.orders import (
 )
 from intelligent_ordering.api.inventory import adjust_stock
 from intelligent_ordering.utils.staff_pages import require_staff_page
+from intelligent_ordering.api import customers
 
 
 class TestCheckout(FrappeTestCase):
@@ -294,6 +295,104 @@ class TestCheckout(FrappeTestCase):
         self.assertFalse(context.can_manage_users)
         with self.assertRaises(frappe.PermissionError):
             require_staff_page(context, "admin")
+
+    def test_customer_profile_addresses_and_historical_snapshots(self):
+        result = self._submit_order()["order"]
+        customers.save_profile("Updated Customer", "+254711111111")
+        self.assertEqual(customers.get_profile()["full_name"], "Updated Customer")
+        addresses = customers.list_addresses()
+        old_address = addresses[0]
+        customers.save_address(
+            address_name=old_address.name, address_line_1="New Road", city="Mombasa",
+            address_label="Home", is_default=1,
+        )
+        self.assertEqual(customers.list_addresses()[0].address_line_1, "New Road")
+        self.assertEqual(get_my_order(result["name"])["delivery_address"], result["delivery_address"])
+        self.assertEqual(get_my_order(result["name"])["customer_name"], "Test Customer")
+        with self.assertRaises(frappe.ValidationError):
+            customers.delete_address(old_address.name)
+        added = customers.save_address(address_line_1="Office Road", city="Nairobi", is_default=1)
+        office = next(row for row in added if row.address_line_1 == "Office Road")
+        self.assertEqual(sum(row.is_default for row in added), 1)
+        customers.delete_address(office.name)
+        self.assertEqual(customers.list_addresses()[0].is_default, 1)
+
+    def test_customer_password_uses_native_frappe_authentication(self):
+        from frappe.utils.password import check_password
+        frappe.set_user("Administrator")
+        password = f"Customer-{frappe.generate_hash(length=24)}!9"
+        user = frappe.get_doc("User", self.customer.name)
+        user.new_password = password
+        user.save()
+        self.assertEqual(check_password(user.name, password), user.name)
+        frappe.set_user(user.name)
+        self.assertEqual(set(frappe.get_roles()) - {"All", "Guest"}, {"Customer"})
+        self.assertFalse(frappe.has_permission("User", "create"))
+        self.assertFalse(frappe.has_permission("Sales Order", "write"))
+
+    def test_cancellation_is_requested_then_staff_approved_without_payment_changes(self):
+        order = self._submit_order()["order"]
+        result = customers.request_cancellation(order["name"], "No longer needed")
+        self.assertEqual(result["order_status"], "Pending")
+        self.assertEqual(result["cancellation_request_status"], "Requested")
+        with self.assertRaises(frappe.PermissionError):
+            customers.resolve_cancellation(order["name"], "Approved", "Approve")
+        with self.assertRaises(frappe.ValidationError):
+            customers.request_cancellation(order["name"], "Duplicate request")
+        manager = self._make_user(f"cancel-{frappe.generate_hash(length=8)}@example.test", "Order Manager")
+        frappe.set_user(manager.name)
+        approved = customers.resolve_cancellation(order["name"], "Approved", "Approved before processing")
+        self.assertEqual(approved["status"], "Cancelled")
+        self.assertEqual(approved["payment_status"], "Unpaid")
+        self.assertEqual(approved["total"], order["total"])
+        frappe.set_user(self.customer.name)
+        notices = customers.notifications()["notifications"]
+        self.assertTrue(any(row.document_name == order["name"] for row in notices))
+        customers.read_notification(notices[0].name)
+        self.assertEqual(frappe.db.get_value("Notification Log", notices[0].name, "read"), 1)
+
+    def test_customer_portal_denies_other_customer_records_and_admin_dashboards(self):
+        order = self._submit_order()["order"]
+        address = customers.list_addresses()[0]
+        other = self._make_user(f"portal-other-{frappe.generate_hash(length=8)}@example.test", "Customer")
+        frappe.set_user(other.name)
+        customers.save_profile("Other Customer", "+254722222222")
+        for operation in (
+            lambda: customers.track_order(order["name"]),
+            lambda: customers.request_cancellation(order["name"], "Not mine"),
+            lambda: customers.delete_address(address.name),
+            lambda: customers.save_address(address_name=address.name, address_line_1="Other", city="Other"),
+        ):
+            with self.assertRaises(frappe.PermissionError):
+                operation()
+        self.assertEqual(customers.list_addresses(), [])
+        self.assertEqual(customers.payment_history()["transactions"], [])
+        from intelligent_ordering.utils.staff_pages import PAGE_ROLES
+        for page in PAGE_ROLES:
+            with self.assertRaises(frappe.PermissionError):
+                require_staff_page(frappe._dict(), page)
+
+    def test_rejected_cancellation_can_be_resubmitted_with_audited_history(self):
+        order = self._submit_order()["order"]
+        customers.request_cancellation(order["name"], "First reason")
+        manager = self._make_user(f"reject-{frappe.generate_hash(length=8)}@example.test", "Order Manager")
+        frappe.set_user(manager.name)
+        rejected = customers.resolve_cancellation(order["name"], "Rejected", "Please explain the issue")
+        self.assertEqual(rejected["status"], "Pending")
+        frappe.set_user(self.customer.name)
+        result = customers.request_cancellation(order["name"], "New reason")
+        self.assertEqual(result["cancellation_request_status"], "Requested")
+        self.assertFalse(result["cancellation_response"])
+        self.assertEqual(result["order_status"], "Pending")
+        frappe.set_user("Administrator")
+        events = frappe.get_all(
+            "Admin Audit Log",
+            filters={"reference_doctype": "Sales Order", "reference_name": order["name"],
+                     "event_type": ["like", "Cancellation request %"]},
+            fields=["details"],
+        )
+        self.assertTrue(any(row.details == "First reason" for row in events))
+        self.assertTrue(any(row.details == "New reason" for row in events))
 
     def _submit_order(self, token=None):
         checkout = get_checkout(delivery_area=self.delivery_area.name)

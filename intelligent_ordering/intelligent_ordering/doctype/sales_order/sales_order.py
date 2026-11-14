@@ -21,9 +21,26 @@ class SalesOrder(Document):
         original = self.get_doc_before_save()
         if not original:
             frappe.throw("The original order could not be loaded.", frappe.ValidationError)
+        cancellation_workflow = getattr(frappe.flags, "processing_customer_cancellation", False)
+        cancellation_fields = (
+            "cancellation_request_status", "cancellation_reason", "cancellation_requested_at",
+            "cancellation_resolved_at", "cancellation_resolved_by", "cancellation_response",
+        )
+        if any(self.get(field) != original.get(field) for field in cancellation_fields) and not cancellation_workflow:
+            frappe.throw("Use the cancellation request workflow.", frappe.PermissionError)
+        customer_request = cancellation_workflow and "Customer" in frappe.get_roles(frappe.session.user)
+        if customer_request and (
+            self.status != original.status or original.get("cancellation_request_status") not in (None, "", "Rejected")
+            or self.get("cancellation_request_status") != "Requested"
+            or any(self.get(field) for field in (
+                "cancellation_resolved_at", "cancellation_resolved_by", "cancellation_response",
+            ))
+        ):
+            frappe.throw("Customers can only request cancellation, not approve it.", frappe.PermissionError)
         if (
             "Customer" in frappe.get_roles(frappe.session.user)
             and not getattr(frappe.flags, "processing_delivery", False)
+            and not customer_request
         ):
             frappe.throw(
                 "Customers cannot modify submitted orders.",
@@ -44,6 +61,11 @@ class SalesOrder(Document):
         if self.status == "Cancelled" and original.status != "Cancelled":
             if frappe.db.exists("Delivery", {"order": self.name, "status": ["!=", "Cancelled"]}):
                 frappe.throw("Cancel the delivery before cancelling its order.", frappe.ValidationError)
+        if self.status in {"Completed", "Cancelled"} and self.get("cancellation_request_status") == "Requested":
+            self.cancellation_request_status = "Approved" if self.status == "Cancelled" else "Rejected"
+            self.cancellation_resolved_at = now_datetime()
+            self.cancellation_resolved_by = frappe.session.user
+            self.cancellation_response = f"Order {self.status.lower()} through the fulfillment workflow."
 
     def _validate_new_order(self):
         if not getattr(frappe.flags, "creating_checkout_order", False):

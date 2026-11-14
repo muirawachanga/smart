@@ -3,14 +3,18 @@
 {% block title %}Register | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page" data-page-title="Create an account">
+<main class="smarto-page" data-page-title="Create an account" data-customer-page="register">
   <p class="smarto-eyebrow">Customer account</p>
   <h1>Create an account</h1>
-  <p>Customer accounts are managed through Frappe.</p>
-  <div class="smarto-state">
-    <strong>Create or access your account</strong>
-    <p>Visit the login page to sign in or register if registration is enabled. Otherwise, ask the site administrator for an account.</p>
-    <a href="/login">Go to login</a>
-  </div>
+  <p>Create a customer account. Frappe will send a password setup email when email delivery is configured.</p>
+  <p id="customer-status" role="status" aria-live="polite"></p>
+  <p id="customer-feedback" role="alert"></p>
+  <form id="customer-form" class="smarto-checkout-form">
+    <label>Full name <input name="full_name" maxlength="140" autocomplete="name" required></label>
+    <label>Email <input name="email" type="email" maxlength="140" autocomplete="email" required></label>
+    <button class="smarto-button" type="submit">Create customer account</button>
+  </form>
+  <p><a href="/login?redirect-to=%2Faccount">Already registered? Sign in</a></p>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/customer-portal.js"></script>
 {% endblock %}

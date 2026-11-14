@@ -1,13 +1,14 @@
 import { ApiError, get, post } from "./api.js";
 import { loadCart } from "./cart-service.js";
 import { formatPrice, orderConfirmationUrl, renderOrderItems } from "./components/order-display.js";
-import { FINGERPRINT_KEY, ORDER_KEY, TOKEN_KEY } from "./checkout-recovery.js";
+import { checkoutFingerprint, createCheckoutToken, FINGERPRINT_KEY, ORDER_KEY, TOKEN_KEY } from "./checkout-recovery.js";
 
 const status = document.querySelector("#checkout-status");
 const feedback = document.querySelector("#checkout-feedback");
 const login = document.querySelector("#checkout-login");
 const form = document.querySelector("#checkout-form");
 const area = document.querySelector("#checkout-area");
+const savedAddress = document.querySelector("#checkout-address");
 const refreshButton = document.querySelector("#refresh-quote");
 const submit = document.querySelector("#checkout-submit");
 const review = document.querySelector("#checkout-review");
@@ -74,6 +75,24 @@ async function initialize() {
     revision = checkout.cart_revision;
     form.elements.customer_name.value = checkout.customer_name || "";
     form.elements.phone.value = checkout.phone || "";
+    const addresses = checkout.saved_addresses || [];
+    savedAddress.replaceChildren(new Option("Enter a new address", ""));
+    for (const entry of addresses) {
+      savedAddress.add(new Option(entry.address_label || `${entry.address_line_1}, ${entry.city}`, entry.name));
+    }
+    function fillSavedAddress() {
+      const selected = addresses.find((entry) => entry.name === savedAddress.value);
+      if (!selected) return;
+      for (const field of ["address_line_1", "address_line_2", "city", "region", "postal_code"]) {
+        form.elements[field].value = selected[field] || "";
+      }
+    }
+    savedAddress.addEventListener("change", fillSavedAddress);
+    const defaultAddress = addresses.find((entry) => entry.is_default);
+    if (defaultAddress) {
+      savedAddress.value = defaultAddress.name;
+      fillSavedAddress();
+    }
     area.replaceChildren(new Option("Select delivery area", ""));
     for (const entry of checkout.delivery_areas) {
       area.add(new Option(`${entry.name} - ${formatPrice(entry.delivery_fee, entry.currency)}`, entry.name));
@@ -142,16 +161,15 @@ async function submitOrder(event) {
       cart_revision: revision,
       delivery_quote: quote,
     };
-    const bytes = new TextEncoder().encode(JSON.stringify(submission));
-    const digest = await crypto.subtle.digest("SHA-256", bytes);
-    const fingerprint = Array.from(new Uint8Array(digest), (byte) =>
-      byte.toString(16).padStart(2, "0")).join("");
+    const fingerprint = await checkoutFingerprint(
+      submission, requestToken ? sessionStorage.getItem(FINGERPRINT_KEY) : null,
+    );
     if (requestToken) {
       if (sessionStorage.getItem(FINGERPRINT_KEY) !== fingerprint) {
         throw new Error("This pending checkout has different details. Retry the original details or contact the store before placing another order.");
       }
     } else {
-      requestToken = crypto.randomUUID();
+      requestToken = createCheckoutToken();
       sessionStorage.setItem(FINGERPRINT_KEY, fingerprint);
       sessionStorage.setItem(TOKEN_KEY, requestToken);
     }

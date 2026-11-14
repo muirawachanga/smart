@@ -54,10 +54,21 @@ def _require_local_development():
 
 def provision():
     """Create local test users through Bench only; never expose as an API."""
+    return _provision(TEST_ACCOUNTS, "System User")
+
+
+def provision_customer():
+    """Create the requested Website User using a hidden password prompt."""
+    return _provision(
+        (("customer.test@smarto.local", "SmartO Test Customer", "Customer"),), "Website User"
+    )
+
+
+def _provision(accounts, user_type):
     _require_local_development()
     pending = []
     result = []
-    for email, full_name, role in TEST_ACCOUNTS:
+    for email, full_name, role in accounts:
         expected_roles = _account_roles(role)
         for expected_role in expected_roles:
             if not frappe.db.exists("Role", expected_role):
@@ -65,7 +76,7 @@ def provision():
         if frappe.db.exists("User", email):
             user = frappe.get_doc("User", email)
             roles = {row.role for row in user.roles}
-            if not user.enabled or user.user_type != "System User" or roles != set(expected_roles) or user.role_profile_name:
+            if not user.enabled or user.user_type != user_type or roles != set(expected_roles) or user.role_profile_name:
                 frappe.throw(
                     f"Existing test user {email} has conflicting roles or account settings; review it in Desk.",
                     frappe.ValidationError,
@@ -89,7 +100,7 @@ def provision():
                 "email": email,
                 "first_name": full_name,
                 "enabled": 1,
-                "user_type": "System User",
+                "user_type": user_type,
                 "send_welcome_email": 0,
                 "new_password": password,
                 "roles": [{"role": value} for value in _account_roles(role)],
@@ -99,6 +110,92 @@ def provision():
         frappe.db.rollback(save_point=savepoint)
         raise
     return result
+
+
+def verify_customer():
+    """Verify the local customer's actual HTTP login and read-access boundaries."""
+    import requests
+
+    _require_local_development()
+    base_url = input("Exact local site base URL (including the Bench port): ").rstrip("/")
+    url = urlsplit(base_url)
+    if (
+        url.scheme not in {"http", "https"} or not _local_host(base_url)
+        or url.username or url.password or url.path or url.query or url.fragment
+    ):
+        frappe.throw("Use a local/private HTTP(S) site base URL.", frappe.ValidationError)
+    email = "customer.test@smarto.local"
+    checks = []
+
+    def record(label, passed):
+        checks.append({"check": label, "status": "PASS" if passed else "FAIL"})
+
+    original_user = frappe.session.user
+    try:
+        with requests.Session() as session:
+            session.trust_env = False
+            password = getpass.getpass(f"Local password for {email}: ")
+            login = session.post(
+                f"{base_url}/api/method/login", data={"usr": email, "pwd": password},
+                timeout=30, allow_redirects=False,
+            )
+            identity = session.get(
+                f"{base_url}/api/method/intelligent_ordering.api.v1.current_user",
+                timeout=30, allow_redirects=False,
+            )
+            identity.raise_for_status()
+            payload = identity.json().get("message", {})
+            authenticated = login.status_code == 200 and payload.get("user") == email
+            record("Actual independent Frappe HTTP login", authenticated)
+            if not authenticated:
+                return {"all_passed": False, "checks": checks}
+            record("Customer-only roles",
+                   set(payload.get("roles", [])) - {"All", "Guest"} == {"Customer"})
+            for endpoint in (
+                "customers.get_profile", "customers.list_addresses", "customers.payment_history",
+                "customers.notifications", "orders.get_my_orders",
+            ):
+                response = session.get(
+                    f"{base_url}/api/method/intelligent_ordering.api.{endpoint}",
+                    timeout=30, allow_redirects=False,
+                )
+                record(f"HTTP {endpoint}", response.status_code == 200)
+            for endpoint in ("orders.list_orders", "payments.list_transactions", "inventory.get_dashboard",
+                             "deliveries.list_deliveries", "administration.sales_analytics"):
+                response = session.get(
+                    f"{base_url}/api/method/intelligent_ordering.api.{endpoint}",
+                    timeout=30, allow_redirects=False,
+                )
+                record(f"HTTP {endpoint} denied", response.status_code == 403)
+            from intelligent_ordering.utils.staff_pages import PAGE_ROLES
+            for page in PAGE_ROLES:
+                response = session.get(
+                    f"{base_url}/dashboard/{page}", timeout=30, allow_redirects=False,
+                )
+                record(f"HTTP dashboard/{page} denied", response.status_code == 403)
+            frappe.set_user(email)
+            record("User creation denied", not frappe.has_permission("User", "create"))
+            for doctype in ("Role", "Sales Order", "Payment Transaction"):
+                record(f"{doctype} mutation denied", not frappe.has_permission(doctype, "write"))
+            other_orders = frappe.db.sql(
+                """SELECT o.name FROM `tabSales Order` o
+                   INNER JOIN `tabCustomer Profile` c ON c.name = o.customer
+                   WHERE c.user != %s LIMIT 1""", email, as_dict=True,
+            )
+            if other_orders:
+                for endpoint in ("orders.get_my_order", "customers.track_order", "payments.get_order_payments"):
+                    response = session.get(
+                        f"{base_url}/api/method/intelligent_ordering.api.{endpoint}",
+                        params={"order_name": other_orders[0].name},
+                        timeout=30, allow_redirects=False,
+                    )
+                    record(f"HTTP other customer {endpoint} denied", response.status_code == 403)
+            else:
+                checks.append({"check": "Other-customer order/payment HTTP denial",
+                               "status": "NOT TESTED: requires an existing other-customer order"})
+    finally:
+        frappe.set_user(original_user)
+    return {"all_passed": all(row["status"] == "PASS" for row in checks), "checks": checks}
 
 
 def verify():
