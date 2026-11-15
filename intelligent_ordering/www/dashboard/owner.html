@@ -3,14 +3,58 @@
 {% block title %}Business owner dashboard | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page" data-page-title="Business owner dashboard">
-  <p class="smarto-eyebrow">Business workspace</p>
-  <h1>Business owner dashboard</h1>
-  <p>Review live business performance and operational reporting from real orders, verified payments, inventory, and delivery records.</p>
-  <div class="smarto-state">
-    <strong>Role-checked business reports</strong>
-    <p>Report access is enforced by server-side role checks; the reports use verified records.</p>
-    <a class="smarto-button" href="/store#admin-dashboard">Open business analytics and reports</a>
-  </div>
+<main class="smarto-page smarto-admin-page" data-role-dashboard="owner">
+  <header class="smarto-admin-heading">
+    <div>
+      <p class="smarto-eyebrow">Business workspace</p>
+      <h1>Business overview.</h1>
+      <p>Monitor verified sales, customer demand, and order activity from SmartO records.</p>
+    </div>
+    <button id="role-dashboard-refresh" class="smarto-button smarto-button-secondary" type="button">Refresh dashboard</button>
+  </header>
+  <nav class="smarto-admin-shortcuts" aria-label="Business workspace">
+    <a href="/store#admin-dashboard">Business reports</a>
+    <a href="/store#payment-dashboard">Payment reports</a>
+    <a href="/dashboard/sales">Sales workspace</a>
+    <a href="/dashboard/orders">Order management</a>
+  </nav>
+  <p id="role-dashboard-status" class="smarto-inline-status" role="status" aria-live="polite">Loading live business data...</p>
+  <p id="role-dashboard-error" role="alert"></p>
+
+  <section class="smarto-admin-section" aria-labelledby="owner-metrics-heading">
+    <div class="smarto-section-heading">
+      <div>
+        <p class="smarto-eyebrow">Business at a glance</p>
+        <h2 id="owner-metrics-heading">Key metrics</h2>
+      </div>
+    </div>
+    <div id="role-dashboard-metrics" class="smarto-admin-metrics"></div>
+  </section>
+
+  <section class="smarto-admin-section" aria-labelledby="owner-sales-heading">
+    <div class="smarto-section-heading">
+      <div>
+        <p class="smarto-eyebrow">Verified M-Pesa payments</p>
+        <h2 id="owner-sales-heading">Sales performance</h2>
+      </div>
+      <a class="smarto-text-link" href="/store#admin-dashboard">Open detailed reports <span aria-hidden="true">→</span></a>
+    </div>
+    <p class="smarto-dashboard-note">Sales reflect successful payments, not order placement.</p>
+    <div class="smarto-admin-chart-grid">
+      <article class="smarto-admin-chart">
+        <h3>Daily sales</h3>
+        <div id="role-dashboard-daily" class="smarto-bar-chart" role="list" aria-label="Daily verified sales"></div>
+      </article>
+      <article class="smarto-admin-chart">
+        <h3>Monthly sales</h3>
+        <div id="role-dashboard-monthly" class="smarto-bar-chart" role="list" aria-label="Monthly verified sales"></div>
+      </article>
+      <article class="smarto-admin-chart">
+        <h3>Top products</h3>
+        <div id="role-dashboard-products" class="smarto-bar-chart" role="list" aria-label="Top products by verified sales"></div>
+      </article>
+    </div>
+  </section>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/role-dashboard.js"></script>
 {% endblock %}

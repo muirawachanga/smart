@@ -1,0 +1,25 @@
+{% extends "templates/auth.html" %}
+{% block title %}Sign in | SmartO{% endblock %}
+{% block auth_kind %}login{% endblock %}
+{% block auth_heading %}Welcome Back{% endblock %}
+{% block auth_form %}
+<h2>Sign in to SmartO</h2>
+<form id="auth-form" class="smarto-checkout-form">
+  <label>Email address or Administrator username
+    <input name="email" autocomplete="username" maxlength="140" required>
+  </label>
+  <label>Password
+    <input id="auth-password" name="password" type="password" autocomplete="current-password" maxlength="128" required>
+  </label>
+  <button class="smarto-button smarto-button-secondary" type="button" data-toggle-password="auth-password" aria-pressed="false">Show password</button>
+  <p>Your session duration follows the store's security settings.</p>
+  <a href="/forgot-password">Forgot password?</a>
+  <button class="smarto-button" type="submit">Sign in</button>
+</form>
+<form id="auth-otp-form" class="smarto-checkout-form" hidden>
+  <p id="auth-otp-prompt">Enter your verification code.</p>
+  <label>Verification code <input name="otp" autocomplete="one-time-code" maxlength="128" required></label>
+  <button class="smarto-button" type="submit">Verify and sign in</button>
+</form>
+<p><a href="/register">Create a customer account</a></p>
+{% endblock %}

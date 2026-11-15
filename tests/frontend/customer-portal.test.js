@@ -10,6 +10,7 @@ class Element {
     this.hidden = true;
     this.disabled = false;
     this.checked = false;
+    this.dataset = {};
   }
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
@@ -55,22 +56,6 @@ function install(t, kind) {
 
 const response = (message) => ({ ok: true, json: async () => ({ message }) });
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-test("registration submits identity fields without granting roles from the browser", async (t) => {
-  const { form, nodes } = install(t, "register");
-  const calls = [];
-  t.mock.method(globalThis, "fetch", async (url, options) => {
-    calls.push({ url, options });
-    return response({ email_sent: true, message: "Check your email to set your password." });
-  });
-  await import(`../../intelligent_ordering/public/js/customer-portal.js?register=${Date.now()}`);
-  form.elements.full_name.value = "Test Customer";
-  form.elements.email.value = "customer@example.test";
-  await form.listeners.submit({ preventDefault() {} });
-  assert.match(calls[0].url, /customers.register$/);
-  assert.deepEqual([...calls[0].options.body.keys()], ["full_name", "email"]);
-  assert.match(nodes.get("#customer-status").textContent, /Check your email/);
-});
 
 test("profile form uses actual profile data and saves validated fields through API", async (t) => {
   const { nodes, form } = install(t, "profile");
@@ -125,7 +110,8 @@ test("notifications mark a real record read and refresh the list", async (t) => 
   await import(`../../intelligent_ordering/public/js/customer-portal.js?notifications=${Date.now()}`);
   await tick();
   const card = nodes.get("#customer-list").children[0];
-  assert.equal(card.children[0].textContent, "<Order confirmed>");
+  assert.equal(card.children[0].children[0].textContent, "<Order confirmed>");
+  assert.equal(card.children[0].children[1].dataset.status, "unread");
   await card.children.at(-1).listeners.click();
   assert.equal(calls.find((call) => call.url.includes("read_notification")).options.body.get("name"), "NOTICE-1");
   assert.equal(nodes.get("#customer-list").children[0].children.length, 3);

@@ -78,6 +78,12 @@ function updateRouteChrome() {
     else link.removeAttribute("aria-current");
   }
 
+  for (const link of document.querySelectorAll("[data-account-path]")) {
+    const target = link.dataset.accountPath;
+    if (path === target) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  }
+
   const routeReferenceElement = document.querySelector("[data-route-reference]");
   if (routeReferenceElement && path.startsWith("/products/")) {
     routeReferenceElement.textContent = decodeRouteReference(path, "/products/");
@@ -118,7 +124,8 @@ function setupAccountNavigation(user) {
   const workspace = document.querySelector("#smarto-workspace-link");
   const workspaceByRole = [
     [["System Manager", "Business Admin"], "/dashboard/admin"],
-    [["Store Manager", "Finance Manager"], "/dashboard/sales"],
+    [["Store Manager"], "/dashboard/owner"],
+    [["Finance Manager"], "/dashboard/sales"],
     [["Order Manager"], "/dashboard/orders"],
     [["Inventory Manager"], "/dashboard/inventory"],
     [["Delivery Manager", "Delivery Staff"], "/dashboard/delivery"],
@@ -175,7 +182,7 @@ async function signOut(event) {
       headers: { "X-Frappe-CSRF-Token": window.frappe?.csrf_token || "" },
     });
     if (!response.ok) throw new Error("SmartO could not end this session. Try again.");
-    window.location.assign("/");
+    window.location.assign("/logged-out");
   } catch (error) {
     pageStatus.textContent = error.message;
     link.removeAttribute("aria-disabled");

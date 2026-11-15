@@ -8,11 +8,13 @@ CATALOG_SORTS = {
     "name_desc": "p.product_name DESC, p.name ASC",
     "price_asc": "p.price ASC, p.name ASC",
     "price_desc": "p.price DESC, p.name ASC",
+    "best_selling": "sales.units_sold DESC, p.product_name ASC, p.name ASC",
 }
 
 PRODUCT_SELECT = """
     SELECT
-        p.name, p.sku, p.product_name, c.category_name AS category,
+        p.name, p.sku, p.product_name, p.category AS category_id,
+        c.category_name AS category,
         p.description, p.image, p.price, p.currency,
         COALESCE(stock.available_quantity, 0) AS available_quantity,
         CASE WHEN COALESCE(stock.available_quantity, 0) > 0
@@ -69,12 +71,28 @@ def get_catalog(search="", category="", page=1, page_size=20, sort="name_asc"):
         values.extend([f"%{escaped_search}%"] * 3)
 
     where_clause = " AND ".join(conditions)
+    sales_join = ""
+    if sort == "best_selling":
+        sales_join = """
+        INNER JOIN (
+            SELECT item.product, SUM(item.quantity) AS units_sold
+            FROM `tabSales Order Item` AS item
+            INNER JOIN `tabSales Order` AS sales_order
+                ON sales_order.name = item.parent
+            WHERE item.parenttype = 'Sales Order'
+                AND item.parentfield = 'items'
+                AND sales_order.status = 'Completed'
+            GROUP BY item.product
+        ) AS sales ON sales.product = p.name
+        """
+
     count_rows = frappe.db.sql(
         f"""
         SELECT COUNT(*)
         FROM `tabProduct` p
         LEFT JOIN `tabProduct Category` c
             ON c.name = p.category AND c.enabled = 1
+        {sales_join}
         WHERE {where_clause}
         """,
         values,
@@ -84,6 +102,7 @@ def get_catalog(search="", category="", page=1, page_size=20, sort="name_asc"):
     rows = frappe.db.sql(
         f"""
         {PRODUCT_SELECT}
+        {sales_join}
         WHERE {where_clause}
         ORDER BY {CATALOG_SORTS[sort]}
         LIMIT %s OFFSET %s

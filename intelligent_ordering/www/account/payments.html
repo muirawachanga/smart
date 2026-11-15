@@ -2,11 +2,17 @@
 {% block title %}Payment history | SmartO{% endblock %}
 {% block smarto_content %}
 <main class="smarto-page" data-customer-page="payments">
-  <h1>Payment history</h1>
+  <header class="smarto-page-heading">
+    <div>
+      <p class="smarto-eyebrow">M-Pesa transactions</p>
+      <h1>Payment history.</h1>
+      <p>Review payment status and receipts for your orders.</p>
+    </div>
+  </header>
   {% include "templates/includes/customer_navigation.html" %}
-  <p id="customer-status" role="status" aria-live="polite">Loading payment history...</p>
+  <p id="customer-status" class="smarto-inline-status" role="status" aria-live="polite">Loading payment history...</p>
   <p id="customer-feedback" role="alert"></p>
-  <a id="customer-login" href="/login?redirect-to=%2Faccount%2Fpayments" hidden>Sign in to view payments</a>
+  <a id="customer-login" class="smarto-button" href="/login?redirect-to=%2Faccount%2Fpayments" hidden>Sign in to view payments</a>
   <button id="customer-refresh" class="smarto-button smarto-button-secondary" type="button">Refresh payments</button>
   <div id="customer-list" class="smarto-cart-items"></div>
   <nav id="customer-pagination" class="smarto-pagination" aria-label="Payment pages" hidden>

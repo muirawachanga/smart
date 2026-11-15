@@ -4,65 +4,85 @@
 
 {% block smarto_content %}
 <main class="smarto-page">
-  <p class="smarto-eyebrow">Review your order</p>
-  <h1>Checkout</h1>
+  <header class="smarto-page-heading">
+    <div>
+      <p class="smarto-eyebrow">Almost there</p>
+      <h1>Checkout.</h1>
+      <p>Confirm your delivery details and review your order total.</p>
+    </div>
+    <a class="smarto-button smarto-button-secondary" href="/cart">Back to cart</a>
+  </header>
   <nav class="smarto-actions" aria-label="Order navigation">
     <a class="smarto-button smarto-button-secondary" href="/account">Order history</a>
     <a class="smarto-button" href="/checkout" aria-current="page">Checkout</a>
   </nav>
-  <p id="checkout-status" role="status" aria-live="polite">Loading checkout...</p>
+  <nav class="smarto-checkout-steps" aria-label="Checkout progress">
+    <a href="/cart"><span>1</span> Cart</a>
+    <span aria-hidden="true">—</span>
+    <span aria-current="step"><span>2</span> Delivery</span>
+    <span aria-hidden="true">—</span>
+    <span><span>3</span> M-Pesa payment</span>
+  </nav>
+  <p id="checkout-status" class="smarto-inline-status" role="status" aria-live="polite">Loading checkout...</p>
   <p id="checkout-feedback" role="alert"></p>
-  <a id="checkout-login" href="/login?redirect-to=%2Fcheckout" hidden>Sign in to continue</a>
-  <div id="checkout-review" class="smarto-cart-items"></div>
-  <div id="checkout-totals" hidden>
-    <p>Subtotal: <strong id="checkout-subtotal"></strong></p>
-    <p>Delivery: <strong id="checkout-delivery-fee">Select a delivery area</strong></p>
-    <p>Total: <strong id="checkout-total">Select a delivery area</strong></p>
+  <a id="checkout-login" class="smarto-button" href="/login?redirect-to=%2Fcheckout" hidden>Sign in to continue</a>
+  <div class="smarto-checkout-layout">
+    <form id="checkout-form" class="smarto-checkout-form" hidden>
+      <fieldset>
+        <legend>Customer details</legend>
+        <label>Full name
+          <input name="customer_name" maxlength="140" autocomplete="name" required>
+        </label>
+        <label>Phone number
+          <input name="phone" type="tel" maxlength="20" autocomplete="tel" required>
+        </label>
+      </fieldset>
+      <fieldset>
+        <legend>Delivery address</legend>
+        <label>Saved address
+          <select id="checkout-address">
+            <option value="">Enter a new address</option>
+          </select>
+        </label>
+        <p id="saved-address-help" role="status">Saved addresses will appear here after checkout loads.</p>
+        <p><a href="/account/addresses">Manage saved addresses</a></p>
+        <label>Delivery area
+          <select id="checkout-area" name="delivery_area" required>
+            <option value="">Select delivery area</option>
+          </select>
+        </label>
+        <p id="delivery-area-help" role="status"></p>
+        <button id="refresh-quote" class="smarto-button smarto-button-secondary" type="button">Refresh delivery quote</button>
+        <label>Address line 1
+          <input name="address_line_1" maxlength="140" autocomplete="address-line1" required>
+        </label>
+        <label>Address line 2
+          <input name="address_line_2" maxlength="140" autocomplete="address-line2">
+        </label>
+        <label>City
+          <input name="city" maxlength="140" autocomplete="address-level2" required>
+        </label>
+        <label>Region
+          <input name="region" maxlength="140" autocomplete="address-level1">
+        </label>
+        <label>Postal code
+          <input name="postal_code" maxlength="40" autocomplete="postal-code">
+        </label>
+      </fieldset>
+      <button id="checkout-submit" class="smarto-button" type="submit" disabled>Place order</button>
+    </form>
+    <aside class="smarto-checkout-summary" aria-labelledby="checkout-summary-heading">
+      <h2 id="checkout-summary-heading">Order summary</h2>
+      <div id="checkout-review" class="smarto-cart-items"></div>
+      <div id="checkout-totals" class="smarto-checkout-totals" hidden>
+        <p>Subtotal <strong id="checkout-subtotal"></strong></p>
+        <p>Delivery <strong id="checkout-delivery-fee">Select a delivery area</strong></p>
+        <p class="smarto-total-row">Total <strong id="checkout-total">Select a delivery area</strong></p>
+      </div>
+      <p class="smarto-summary-note">After your order is placed, you will be prompted to pay securely with M-Pesa.</p>
+      <p><a href="/refund-policy">Refund Policy</a> &middot; <a href="/delivery-policy">Delivery Policy</a></p>
+    </aside>
   </div>
-  <form id="checkout-form" class="smarto-checkout-form" hidden>
-    <fieldset>
-      <legend>Customer details</legend>
-      <label>Full name
-        <input name="customer_name" maxlength="140" autocomplete="name" required>
-      </label>
-      <label>Phone number
-        <input name="phone" type="tel" maxlength="20" autocomplete="tel" required>
-      </label>
-    </fieldset>
-    <fieldset>
-      <legend>Delivery address</legend>
-      <label>Saved address
-        <select id="checkout-address">
-          <option value="">Enter a new address</option>
-        </select>
-      </label>
-      <p id="saved-address-help" role="status">Saved addresses will appear here after checkout loads.</p>
-      <p><a href="/account/addresses">Manage saved addresses</a></p>
-      <label>Delivery area
-        <select id="checkout-area" name="delivery_area" required>
-          <option value="">Select delivery area</option>
-        </select>
-      </label>
-      <p id="delivery-area-help" role="status"></p>
-      <button id="refresh-quote" class="smarto-button smarto-button-secondary" type="button">Refresh delivery quote</button>
-      <label>Address line 1
-        <input name="address_line_1" maxlength="140" autocomplete="address-line1" required>
-      </label>
-      <label>Address line 2
-        <input name="address_line_2" maxlength="140" autocomplete="address-line2">
-      </label>
-      <label>City
-        <input name="city" maxlength="140" autocomplete="address-level2" required>
-      </label>
-      <label>Region
-        <input name="region" maxlength="140" autocomplete="address-level1">
-      </label>
-      <label>Postal code
-        <input name="postal_code" maxlength="40" autocomplete="postal-code">
-      </label>
-    </fieldset>
-    <button id="checkout-submit" class="smarto-button" type="submit" disabled>Place order</button>
-  </form>
   <p><a href="/cart">Return to cart</a></p>
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/checkout-page.js"></script>

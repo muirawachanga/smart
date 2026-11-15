@@ -2,18 +2,32 @@
 {% block title %}My profile | SmartO{% endblock %}
 {% block smarto_content %}
 <main class="smarto-page" data-customer-page="profile">
-  <h1>My profile</h1>
+  <header class="smarto-page-heading">
+    <div>
+      <p class="smarto-eyebrow">Account settings</p>
+      <h1>My profile.</h1>
+      <p>Keep your contact details up to date for orders and delivery.</p>
+    </div>
+  </header>
   {% include "templates/includes/customer_navigation.html" %}
-  <p id="customer-status" role="status" aria-live="polite">Loading profile...</p>
+  <p id="customer-status" class="smarto-inline-status" role="status" aria-live="polite">Loading profile...</p>
   <p id="customer-feedback" role="alert"></p>
-  <a id="customer-login" href="/login?redirect-to=%2Faccount%2Fprofile" hidden>Sign in to manage your profile</a>
-  <form id="customer-form" class="smarto-checkout-form" hidden>
-    <p id="customer-email"></p>
-    <label>Full name <input name="full_name" maxlength="140" autocomplete="name" required></label>
-    <label>Phone <input name="phone" type="tel" maxlength="20" autocomplete="tel" required></label>
-    <button class="smarto-button" type="submit">Save profile</button>
-  </form>
-  <p><a href="/forgot-password">Password recovery</a></p>
+  <a id="customer-login" class="smarto-button" href="/login?redirect-to=%2Faccount%2Fprofile" hidden>Sign in to manage your profile</a>
+  <div class="smarto-account-form-card">
+    <form id="customer-form" class="smarto-checkout-form" hidden>
+      <p class="smarto-account-email"><span>Email address</span><strong id="customer-email"></strong></p>
+      <label>Full name <input name="full_name" maxlength="140" autocomplete="name" required></label>
+      <label>Phone <input name="phone" type="tel" maxlength="20" autocomplete="tel" required></label>
+      <button class="smarto-button" type="submit">Save changes</button>
+    </form>
+  </div>
+  <section class="smarto-account-section smarto-password-card">
+    <div>
+      <h2>Password and security</h2>
+      <p>Use Frappe's secure password recovery flow to change a forgotten password.</p>
+    </div>
+    <a class="smarto-button smarto-button-secondary" href="/forgot-password">Password help</a>
+  </section>
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/customer-portal.js"></script>
 {% endblock %}

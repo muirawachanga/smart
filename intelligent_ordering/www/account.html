@@ -4,20 +4,32 @@
 
 {% block smarto_content %}
 <main class="smarto-page" data-orders-page="customer">
-  <p class="smarto-eyebrow">Personal account</p>
-  <h1>My account</h1>
-  <p>View orders, refresh delivery progress, make payments, and request cancellations.</p>
+  <header class="smarto-page-heading">
+    <div>
+      <p class="smarto-eyebrow">Your SmartO account</p>
+      <h1>Orders and tracking.</h1>
+      <p>See your orders, check delivery progress, review payments, or request a cancellation.</p>
+    </div>
+    <a class="smarto-button smarto-button-secondary" href="/products">Continue shopping</a>
+  </header>
   {% include "templates/includes/customer_navigation.html" %}
-  <a id="orders-login" href="/login?redirect-to=%2Faccount" hidden>Sign in to view your orders</a>
-  <h2>My orders</h2>
-  <p id="orders-status" role="status" aria-live="polite">Loading orders...</p>
-  <div id="orders-list" class="smarto-cart-items"></div>
+  <a id="orders-login" class="smarto-button" href="/login?redirect-to=%2Faccount" hidden>Sign in to view your orders</a>
+  <section class="smarto-account-section" aria-labelledby="account-orders-heading">
+    <div class="smarto-section-heading">
+      <div>
+        <p class="smarto-eyebrow">Your activity</p>
+        <h2 id="account-orders-heading">Order history</h2>
+      </div>
+    </div>
+    <p id="orders-status" class="smarto-inline-status" role="status" aria-live="polite">Loading orders...</p>
+    <div id="orders-list" class="smarto-cart-items"></div>
+  </section>
   <nav class="smarto-pagination" aria-label="Order pages" id="orders-pagination" hidden>
     <button id="orders-previous" class="smarto-button smarto-button-secondary" type="button">Previous</button>
     <span id="orders-page"></span>
     <button id="orders-next" class="smarto-button smarto-button-secondary" type="button">Next</button>
   </nav>
-  <section id="order-detail" aria-live="polite"></section>
+  <section id="order-detail" class="smarto-order-detail" aria-live="polite"></section>
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/order-pages.js"></script>
 {% endblock %}

@@ -8,6 +8,7 @@ class Node {
     this.listeners = {};
     this.value = "";
     this.textContent = "";
+    this.dataset = {};
     this.hidden = false;
     this.disabled = false;
   }
@@ -32,7 +33,9 @@ function installPage(t, kind, search = "", pathname = "/products") {
   for (const id of [
     "catalog-form", "catalog-status", "catalog-products", "catalog-pagination",
     "catalog-previous", "catalog-next", "catalog-page", "cart-feedback",
-    "product-status", "product-detail",
+    "product-status", "product-detail", "home-products-status", "home-products",
+    "categories-status", "categories-list", "related-products-status",
+    "related-products-section", "related-products",
   ]) nodes.set(`#${id}`, new Node());
   const form = nodes.get("#catalog-form");
   form.elements = { search: new Node(), category: new Node(), sort: new Node() };
@@ -103,6 +106,30 @@ test("catalog loads filters and adds a real product to the persisted guest cart"
   assert.equal(nextStep.textContent, "View cart and continue to checkout");
 });
 
+test("homepage shows completed-order best sellers and supports adding one to cart", async (t) => {
+  const { nodes, events } = installPage(t, "home");
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (url.includes("catalog.get_catalog")) return response({
+      products: [product], categories: [{ name: "Drinks", category_name: "Drinks" }],
+      page: 1, page_size: 4, total: 1, has_more: false,
+    });
+    if (url.includes("cart.get_cart")) return response({ items: [], item_count: 0, is_guest: true });
+    if (url.includes("cart.add_item")) return response({
+      items: [{ product: "SKU/1", quantity: 1 }], item_count: 1, is_guest: true,
+    });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/catalog-pages.js?home=${Date.now()}`);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(calls.find((call) => call.url.includes("catalog.get_catalog")).url, /sort=best_selling/);
+  assert.equal(nodes.get("#home-products").children.length, 1);
+  await nodes.get("#home-products").children[0].children.at(-1).listeners.click();
+  assert.equal(calls.find((call) => call.url.includes("cart.add_item")).options.body.get("product"), "SKU/1");
+  assert.equal(events.at(-1).detail, 1);
+});
+
 test("detail page reports an unavailable product without fabricating data", async (t) => {
   const { nodes } = installPage(t, "detail", "", "/products/missing");
   t.mock.method(globalThis, "fetch", async (url) => {
@@ -146,6 +173,27 @@ test("customer cart merges saved guest items before adding a product", async (t)
   assert.equal(calls.find((call) => call.url.includes("cart.add_item")).options.body.get("quantity"), "2");
   assert.equal(events.at(-1).detail, 4);
   assert.equal(nodes.get("#cart-feedback").children.at(-1).href, "/cart");
+});
+
+test("product details load related products from the same real category", async (t) => {
+  const { nodes } = installPage(t, "detail", "", "/products/SKU-1");
+  const related = { ...product, name: "SKU-2", product_name: "Tea" };
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    calls.push(String(url));
+    if (url.includes("catalog.get_product")) return response({ ...product, name: "SKU-1", category_id: "CAT-1" });
+    if (url.includes("cart.get_cart")) return response({ items: [], item_count: 0, is_guest: true });
+    if (url.includes("catalog.get_catalog")) return response({
+      products: [{ ...product, name: "SKU-1" }, related], categories: [],
+    });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/catalog-pages.js?related=${Date.now()}`);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(nodes.get("#related-products-section").hidden, false);
+  assert.equal(nodes.get("#related-products").children.length, 1);
+  assert.equal(nodes.get("#related-products").children[0].children[1].children[0].textContent, "Tea");
+  assert.ok(calls.some((url) => url.includes("category=CAT-1")));
 });
 
 test("out of stock products cannot be added and cart failures are shown", async (t) => {

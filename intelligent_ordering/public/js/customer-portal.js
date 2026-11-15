@@ -73,8 +73,12 @@ function resetAddress() {
 function renderPayments(transactions) {
   list.replaceChildren(...transactions.map((payment) => {
     const card = text("article", "", "smarto-order-item");
+    const heading = text("div", "", "smarto-order-item-heading");
+    const badge = text("span", payment.status, "smarto-status-badge");
+    badge.dataset.status = payment.status.toLowerCase();
+    heading.append(text("h2", payment.order), badge);
     card.append(
-      text("h2", payment.order),
+      heading,
       text("p", `${payment.payment_method} · ${payment.status} · ${formatPrice(payment.amount, payment.currency)}`),
       text("p", `${payment.transaction_date || payment.creation || ""} · Receipt: ${payment.mpesa_receipt_number || "Not available"}`),
     );
@@ -84,8 +88,15 @@ function renderPayments(transactions) {
 
 function renderNotifications(notifications) {
   list.replaceChildren(...notifications.map((notification) => {
-    const card = text("article", "", "smarto-order-item");
-    card.append(text("h2", notification.subject), text("p", notification.creation));
+    const card = text("article", "", `smarto-order-item smarto-notification${notification.read ? " is-read" : ""}`);
+    const heading = text("div", "", "smarto-order-item-heading");
+    heading.append(text("h2", notification.subject));
+    if (!notification.read) {
+      const badge = text("span", "New", "smarto-status-badge");
+      badge.dataset.status = "unread";
+      heading.append(badge);
+    }
+    card.append(heading, text("p", notification.creation));
     const order = text("a", "View my orders");
     order.href = "/account";
     card.append(order);
@@ -169,9 +180,6 @@ if (form) form.addEventListener("submit", async (event) => {
     } else if (kind === "profile") {
       await post("customers.save_profile", values);
       status.textContent = "Profile saved.";
-    } else {
-      const result = await post("customers.register", values);
-      status.textContent = result.message;
     }
   } catch (error) {
     status.textContent = "Could not save.";
@@ -191,4 +199,4 @@ if (pagination) {
 }
 const refresh = document.querySelector("#customer-refresh");
 if (refresh) refresh.addEventListener("click", load);
-if (kind !== "register") load();
+load();

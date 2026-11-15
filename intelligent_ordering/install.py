@@ -16,11 +16,29 @@ APP_ROLES = {
 
 def after_install():
     ensure_roles()
+    ensure_policy_indexes()
+    ensure_policy_drafts()
 
 
 def after_migrate():
     ensure_roles()
     ensure_inventory_indexes()
+    ensure_policy_indexes()
+    ensure_policy_drafts()
+
+
+def ensure_policy_drafts():
+    from intelligent_ordering.api.policies import ensure_policy_drafts as create_drafts
+
+    create_drafts()
+
+
+def ensure_policy_indexes():
+    if not frappe.db.table_exists("SmartO Policy Version"):
+        return
+    index_name = "uniq_smarto_policy_kind_version"
+    if not frappe.db.sql("SHOW INDEX FROM `tabSmartO Policy Version` WHERE Key_name = %s", index_name):
+        frappe.db.add_unique("SmartO Policy Version", ["policy_type", "version"], index_name)
 
 
 def ensure_roles():

@@ -5,6 +5,15 @@ app_description = "SmartO ordering, inventory, and fulfillment management"
 app_email = "noreply@example.com"
 app_license = "MIT"
 
+web_include_css = [
+    "/assets/intelligent_ordering/css/design-tokens.css",
+    "/assets/intelligent_ordering/css/site.css",
+]
+app_include_css = [
+    "/assets/intelligent_ordering/css/design-tokens.css",
+    "/assets/intelligent_ordering/css/app.css",
+]
+
 website_route_rules = [
     {"from_route": "/products/<product_id>", "to_route": "product-details"},
     {"from_route": "/order-confirmation/<order_id>", "to_route": "order-confirmation"},

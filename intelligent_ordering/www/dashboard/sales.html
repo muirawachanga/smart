@@ -1,16 +1,59 @@
 {% extends "templates/smarto_base.html" %}
 
-{% block title %}Sales dashboard | SmartO{% endblock %}
+{% block title %}Sales and finance dashboard | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page" data-page-title="Sales dashboard">
-  <p class="smarto-eyebrow">Sales workspace</p>
-  <h1>Sales dashboard</h1>
-  <p>Use the role-checked analytics workspace for verified sales trends, customer activity, product performance, and reports.</p>
-  <div class="smarto-state">
-    <strong>Verified sales and operational reports</strong>
-    <p>Sales are based on verified successful payments, not order placement.</p>
-    <a class="smarto-button" href="/store#admin-dashboard">Open role-checked analytics and reports</a>
-  </div>
+<main class="smarto-page smarto-admin-page" data-role-dashboard="sales">
+  <header class="smarto-admin-heading">
+    <div>
+      <p class="smarto-eyebrow">Sales and finance workspace</p>
+      <h1>Sales performance.</h1>
+      <p>Review payment-verified revenue trends and product performance.</p>
+    </div>
+    <button id="role-dashboard-refresh" class="smarto-button smarto-button-secondary" type="button">Refresh dashboard</button>
+  </header>
+  <nav class="smarto-admin-shortcuts" aria-label="Sales and finance workspace">
+    <a href="/store#admin-dashboard">Sales reports</a>
+    <a href="/store#payment-dashboard">Payment transactions</a>
+    <a href="/products">Open storefront</a>
+  </nav>
+  <p id="role-dashboard-status" class="smarto-inline-status" role="status" aria-live="polite">Loading verified sales data...</p>
+  <p id="role-dashboard-error" role="alert"></p>
+
+  <section class="smarto-admin-section" aria-labelledby="sales-metrics-heading">
+    <div class="smarto-section-heading">
+      <div>
+        <p class="smarto-eyebrow">Verified business activity</p>
+        <h2 id="sales-metrics-heading">Payment and order summary</h2>
+      </div>
+    </div>
+    <div id="role-dashboard-metrics" class="smarto-admin-metrics"></div>
+  </section>
+
+  <section class="smarto-admin-section" aria-labelledby="sales-trends-heading">
+    <div class="smarto-section-heading">
+      <div>
+        <p class="smarto-eyebrow">Verified M-Pesa payments</p>
+        <h2 id="sales-trends-heading">Sales trends</h2>
+      </div>
+      <a class="smarto-text-link" href="/store#payment-dashboard">Review transactions <span aria-hidden="true">→</span></a>
+    </div>
+    <p class="smarto-dashboard-note">Revenue is grouped by successful payment date. Pending payments are not counted as sales.</p>
+    <div class="smarto-admin-chart-grid">
+      <article class="smarto-admin-chart">
+        <h3>Daily sales</h3>
+        <div id="role-dashboard-daily" class="smarto-bar-chart" role="list" aria-label="Daily verified sales"></div>
+      </article>
+      <article class="smarto-admin-chart">
+        <h3>Monthly sales</h3>
+        <div id="role-dashboard-monthly" class="smarto-bar-chart" role="list" aria-label="Monthly verified sales"></div>
+      </article>
+      <article class="smarto-admin-chart">
+        <h3>Top products</h3>
+        <div id="role-dashboard-products" class="smarto-bar-chart" role="list" aria-label="Top products by verified sales"></div>
+      </article>
+    </div>
+  </section>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/role-dashboard.js"></script>
 {% endblock %}

@@ -6,6 +6,20 @@ function text(tag, value) {
   return element;
 }
 
+function formatKsh(value) {
+  const amount = Number(value || 0);
+  return `KES ${Number.isFinite(amount) ? amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  }) : "0.00"}`;
+}
+
+function statusBadge(value) {
+  const badge = text("span", value || "Unknown");
+  badge.className = "smarto-status-badge";
+  badge.dataset.status = String(value || "").toLowerCase().replaceAll(" ", "-");
+  return badge;
+}
+
 export function mountOrderPayment(container, order) {
   const paymentStatus = text("p", `Payment: ${order.payment_status || "Unpaid"}`);
   container.append(paymentStatus);
@@ -112,15 +126,28 @@ export function initPaymentDashboard() {
         get("payments.list_transactions", { ...values, page: String(page) }),
         get("payments.payment_summary"),
       ]);
-      summary.replaceChildren(...totals.map((row) => text(
-        "p", `${row.environment} - ${row.status}: ${row.transactions} transactions, KES ${row.amount}`,
-      )));
+      summary.replaceChildren(...totals.map((row) => {
+        const card = document.createElement("article");
+        card.className = "admin-metric";
+        card.append(
+          text("span", `${row.environment} · ${row.status}`),
+          text("strong", `${row.transactions} transactions`),
+          text("strong", formatKsh(row.amount)),
+        );
+        return card;
+      }));
       results.replaceChildren(...listing.transactions.map((transaction) => {
         const card = document.createElement("article");
         card.className = "order-card";
-        card.append(text("h3", transaction.order), text(
-          "p", `${transaction.status} - KES ${transaction.amount} - ${transaction.mpesa_receipt_number || "No receipt"}`,
-        ));
+        const heading = document.createElement("div");
+        heading.className = "section-heading";
+        heading.append(text("h3", transaction.order), statusBadge(transaction.status));
+        card.append(
+          heading,
+          text("p", `${formatKsh(transaction.amount)} · ${transaction.phone_number || "No phone number"}`),
+          text("p", `Receipt: ${transaction.mpesa_receipt_number || "Not received"} · ` +
+            `${transaction.transaction_date || "No transaction date"}`),
+        );
         const view = text("button", "View payment");
         view.type = "button";
         view.className = "secondary-button";
@@ -139,7 +166,36 @@ export function initPaymentDashboard() {
   async function showDetail(name) {
     try {
       const transaction = await get("payments.get_transaction", { payment_name: name });
-      const output = text("pre", JSON.stringify(transaction, null, 2));
+      const output = document.createElement("article");
+      output.className = "order-card payment-detail-card";
+      const heading = document.createElement("div");
+      heading.className = "section-heading";
+      heading.append(text("h3", transaction.order), statusBadge(transaction.status));
+      output.append(
+        heading,
+        text("p", `Amount: ${formatKsh(transaction.amount)}`),
+        text("p", `Method: ${transaction.payment_method || "M-Pesa"} · Phone: ${transaction.phone_number || "Not recorded"}`),
+        text("p", `Receipt: ${transaction.mpesa_receipt_number || "Not received"} · ` +
+          `Transaction date: ${transaction.transaction_date || "Not recorded"}`),
+        text("p", `Created: ${transaction.creation || "Not recorded"}`),
+      );
+      if (transaction.failure_description) {
+        output.append(text("p", `Failure details: ${transaction.failure_description}`));
+      }
+      const diagnosticFields = [
+        "merchant_request_id", "checkout_request_id", "callback_response", "query_response",
+      ];
+      if (diagnosticFields.some((field) => transaction[field])) {
+        const diagnostics = document.createElement("details");
+        diagnostics.append(
+          text("summary", "Technical transaction data"),
+          text("pre", JSON.stringify(Object.fromEntries(
+            diagnosticFields.filter((field) => transaction[field])
+              .map((field) => [field, transaction[field]]),
+          ), null, 2)),
+        );
+        output.append(diagnostics);
+      }
       const reconcile = text("button", "Check with Safaricom");
       reconcile.className = "primary-button";
       reconcile.type = "button";

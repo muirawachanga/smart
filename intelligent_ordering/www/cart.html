@@ -4,18 +4,26 @@
 
 {% block smarto_content %}
 <main class="smarto-page">
-  <p class="smarto-eyebrow">Your order</p>
-  <h1>Shopping cart</h1>
-  <p>Review your items and quantities before checkout.</p>
-  <p id="cart-status" role="status" aria-live="polite">Loading cart...</p>
-  <p id="cart-feedback" role="alert"></p>
-  <div id="cart-items" class="smarto-cart-items"></div>
-  <p id="cart-total"></p>
-  <div class="smarto-actions">
+  <header class="smarto-page-heading">
+    <div>
+      <p class="smarto-eyebrow">Your selection</p>
+      <h1>Your shopping cart.</h1>
+      <p>Review items and quantities before continuing to checkout.</p>
+    </div>
     <a class="smarto-button smarto-button-secondary" href="/products">Continue shopping</a>
-    <a id="checkout-link" class="smarto-button" href="/checkout" hidden>Proceed to checkout</a>
-    <button id="clear-cart" class="smarto-button smarto-button-secondary" type="button" hidden>Clear cart</button>
-    <button id="clear-guest-cart" class="smarto-button smarto-button-secondary" type="button" hidden>Clear browser-saved guest cart</button>
+  </header>
+  <p id="cart-status" class="smarto-inline-status" role="status" aria-live="polite">Loading cart...</p>
+  <p id="cart-feedback" role="alert"></p>
+  <div class="smarto-cart-layout">
+    <div id="cart-items" class="smarto-cart-items"></div>
+    <aside class="smarto-cart-summary" aria-labelledby="cart-summary-heading">
+      <h2 id="cart-summary-heading">Order summary</h2>
+      <p id="cart-total"></p>
+      <p class="smarto-summary-note">Delivery is calculated at checkout after you choose an area.</p>
+      <a id="checkout-link" class="smarto-button" href="/checkout" hidden>Proceed to checkout</a>
+      <button id="clear-cart" class="smarto-button smarto-button-secondary" type="button" hidden>Clear cart</button>
+      <button id="clear-guest-cart" class="smarto-button smarto-button-secondary" type="button" hidden>Clear saved guest cart</button>
+    </aside>
   </div>
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/cart-page.js"></script>

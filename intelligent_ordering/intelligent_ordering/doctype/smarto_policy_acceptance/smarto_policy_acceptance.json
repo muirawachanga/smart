@@ -1,0 +1,22 @@
+{
+  "doctype": "DocType",
+  "name": "SmartO Policy Acceptance",
+  "module": "Intelligent Ordering",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "field_order": ["user", "customer", "terms_version", "privacy_version", "accepted_at", "marketing_consent"],
+  "fields": [
+    {"fieldname": "user", "label": "User", "fieldtype": "Link", "options": "User", "reqd": 1, "read_only": 1, "in_list_view": 1},
+    {"fieldname": "customer", "label": "Customer", "fieldtype": "Link", "options": "Customer Profile", "reqd": 1, "read_only": 1},
+    {"fieldname": "terms_version", "label": "Accepted Terms version", "fieldtype": "Link", "options": "SmartO Policy Version", "reqd": 1, "read_only": 1},
+    {"fieldname": "privacy_version", "label": "Acknowledged Privacy version", "fieldtype": "Link", "options": "SmartO Policy Version", "reqd": 1, "read_only": 1},
+    {"fieldname": "accepted_at", "label": "Accepted at", "fieldtype": "Datetime", "reqd": 1, "read_only": 1, "in_list_view": 1},
+    {"fieldname": "marketing_consent", "label": "Optional marketing consent", "fieldtype": "Check", "read_only": 1}
+  ],
+  "permissions": [
+    {"role": "System Manager", "read": 1},
+    {"role": "Business Admin", "read": 1}
+  ],
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

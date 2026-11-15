@@ -49,7 +49,7 @@ async function request(url, options) {
   return payload.message;
 }
 
-function serverErrorMessage(payload) {
+export function serverErrorMessage(payload) {
   if (typeof payload?.message === "string" && payload.message) {
     return payload.message;
   }

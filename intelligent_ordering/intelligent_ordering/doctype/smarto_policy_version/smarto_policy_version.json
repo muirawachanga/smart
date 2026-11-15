@@ -1,0 +1,24 @@
+{
+  "doctype": "DocType",
+  "name": "SmartO Policy Version",
+  "module": "Intelligent Ordering",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "title_field": "title",
+  "field_order": ["policy_type", "title", "version", "status", "content", "published_at"],
+  "fields": [
+    {"fieldname": "policy_type", "label": "Policy", "fieldtype": "Select", "options": "Terms and Conditions\nPrivacy Policy\nRefund Policy\nDelivery Policy", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "title", "label": "Title", "fieldtype": "Data", "reqd": 1},
+    {"fieldname": "version", "label": "Version", "fieldtype": "Data", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "status", "label": "Status", "fieldtype": "Select", "options": "Draft\nPublished", "default": "Draft", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "content", "label": "Policy content (plain text)", "fieldtype": "Long Text", "reqd": 1},
+    {"fieldname": "published_at", "label": "Published at", "fieldtype": "Datetime", "read_only": 1}
+  ],
+  "permissions": [
+    {"role": "System Manager", "read": 1, "write": 1, "create": 1},
+    {"role": "Business Admin", "read": 1, "write": 1, "create": 1}
+  ],
+  "track_changes": 1,
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

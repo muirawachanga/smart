@@ -10,6 +10,7 @@ let cartReady = false;
 let cartBusy = false;
 let cart = null;
 let products = [];
+let relatedProducts = [];
 
 function productUrl(id) {
   if (id.includes("/") || id === "." || id === "..") {
@@ -29,24 +30,34 @@ function element(tag, text, className) {
   return node;
 }
 
-function productCard(product, withCart) {
+function productCard(product, withCart, detailed = false) {
   const card = element("article", null, "smarto-product-card");
-  card.append(productImage(product.image, product.product_name));
+  card.append(productImage(
+    product.image,
+    product.product_name,
+    detailed ? "smarto-product-image smarto-product-image-detail" : "smarto-product-image",
+  ));
 
-  const heading = element("h2", null);
+  const heading = element("h2", null, "smarto-product-heading");
   const link = element("a", product.product_name);
   link.href = productUrl(product.name);
   heading.append(link);
-  card.append(heading, element("p", `SKU: ${product.sku}`));
-  if (product.category) card.append(element("p", product.category));
-  if (kind === "detail" && product.description) card.append(element("p", product.description));
+  card.append(heading, element("p", `SKU: ${product.sku}`, "smarto-product-sku"));
+  if (product.category) card.append(element("p", product.category, "smarto-product-category"));
+  if (detailed && product.description) card.append(element("p", product.description, "smarto-product-description"));
   card.append(element("p", formatPrice(product.price, product.currency), "smarto-product-price"));
   const available = Number(product.available_quantity);
-  card.append(element("p", available > 0 ? `${available} available` : "Out of stock"));
+  const stock = element(
+    "p",
+    available > 0 ? `${available} available` : "Out of stock",
+    "smarto-stock-status",
+  );
+  stock.dataset.available = String(available > 0);
+  card.append(stock);
 
   if (withCart) {
     let quantity;
-    if (kind === "detail") {
+    if (detailed) {
       const label = element("label", "Quantity ", "smarto-product-quantity");
       quantity = document.createElement("input");
       quantity.type = "number";
@@ -72,8 +83,21 @@ function productCard(product, withCart) {
 }
 
 function renderProducts() {
-  const target = document.querySelector(kind === "detail" ? "#product-detail" : "#catalog-products");
-  target.replaceChildren(...products.map((product) => productCard(product, true)));
+  const selector = kind === "detail"
+    ? "#product-detail"
+    : kind === "home"
+      ? "#home-products"
+      : "#catalog-products";
+  const target = document.querySelector(selector);
+  if (target) target.replaceChildren(...products.map((product) =>
+    productCard(product, true, kind === "detail")));
+  renderRelatedProducts();
+}
+
+function renderRelatedProducts() {
+  const target = document.querySelector("#related-products");
+  if (!target) return;
+  target.replaceChildren(...relatedProducts.map((product) => productCard(product, true)));
 }
 
 async function initializeCart() {
@@ -129,14 +153,17 @@ function renderCategories(categories) {
 
 async function loadHomeOrCategories() {
   try {
-    const result = await get("catalog.get_catalog", { page_size: "4" });
+    const result = await get("catalog.get_catalog", {
+      page_size: "4",
+      ...(kind === "home" ? { sort: "best_selling" } : {}),
+    });
     renderCategories(result.categories);
     if (kind === "home") {
-      document.querySelector("#home-products").replaceChildren(
-        ...result.products.map((product) => productCard(product, false)),
-      );
-      document.querySelector("#home-products-status").textContent =
-        result.products.length ? "" : "No products are available.";
+      products = result.products;
+      renderProducts();
+      document.querySelector("#home-products-status").textContent = result.products.length
+        ? ""
+        : "Best-selling products will appear here after completed orders are recorded.";
     }
   } catch (error) {
     document.querySelector("#categories-status").textContent = `Categories could not be loaded: ${error.message}`;
@@ -157,10 +184,30 @@ async function loadDetail() {
     products = [await get("catalog.get_product", { product: id })];
     renderProducts();
     status.textContent = "";
+    await loadRelatedProducts(products[0]);
   } catch (error) {
     products = [];
     renderProducts();
     status.textContent = `Product could not be loaded: ${error.message}`;
+  }
+}
+
+async function loadRelatedProducts(product) {
+  const status = document.querySelector("#related-products-status");
+  const section = document.querySelector("#related-products-section");
+  if (!status || !section || !product.category_id) return;
+  section.hidden = false;
+  status.textContent = "Loading related products...";
+  try {
+    const result = await get("catalog.get_catalog", {
+      category: product.category_id,
+      page_size: "5",
+    });
+    relatedProducts = result.products.filter((item) => item.name !== product.name);
+    renderRelatedProducts();
+    status.textContent = relatedProducts.length ? "" : "No related products are available.";
+  } catch (error) {
+    status.textContent = `Related products could not be loaded: ${error.message}`;
   }
 }
 
@@ -234,6 +281,7 @@ function setupProductListing() {
 
 if (kind === "home" || kind === "categories") {
   loadHomeOrCategories();
+  if (kind === "home") initializeCart();
 } else if (kind === "detail") {
   loadDetail();
   initializeCart();

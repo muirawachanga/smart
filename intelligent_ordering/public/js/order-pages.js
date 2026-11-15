@@ -57,7 +57,11 @@ async function loadOrders() {
 
 function orderCard(order) {
   const card = text("article", "", "smarto-order-item");
-  card.append(text("h2", order.name));
+  const heading = text("div", "", "smarto-order-item-heading");
+  const badge = text("span", order.status, "smarto-status-badge");
+  badge.dataset.status = order.status.toLowerCase().replaceAll(" ", "-");
+  heading.append(text("h2", order.name), badge);
+  card.append(heading);
   if (staff) card.append(text("p", `${order.customer_name_snapshot} · ${order.customer_phone_snapshot}`));
   card.append(text("p", `${order.status} · ${order.order_datetime || ""} · ${formatPrice(order.total, order.currency)}`));
   const button = text("button", "View details", "smarto-button smarto-button-secondary");

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="510" height="122" viewBox="0 0 510 122" role="img" aria-labelledby="title description">
+  <title id="title">SmartO</title>
+  <desc id="description">Smart Shopping. Simple Ordering.</desc>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="8">
+    <path d="M12 37h39M5 56h45M15 75h34" stroke="#16a34a"/>
+    <path d="M53 20h26l14 65h56l23-48H83" stroke="#123b70"/>
+    <path d="M99 48h49M104 65h35" stroke="#123b70"/>
+  </g>
+  <circle cx="105" cy="101" r="10" fill="#123b70"/>
+  <circle cx="145" cy="101" r="10" fill="#123b70"/>
+  <text x="192" y="71" fill="#123b70" font-family="Inter, Manrope, Arial, sans-serif" font-size="65" font-weight="800" letter-spacing="-3">Smart</text>
+  <text x="382" y="71" fill="#16a34a" font-family="Inter, Manrope, Arial, sans-serif" font-size="65" font-weight="800" letter-spacing="-3">O</text>
+  <text x="195" y="105" fill="#193866" font-family="Inter, Manrope, Arial, sans-serif" font-size="18" font-style="italic" font-weight="600" letter-spacing=".5">Smart Shopping. Simple Ordering.</text>
+</svg>

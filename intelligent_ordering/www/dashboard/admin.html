@@ -3,17 +3,96 @@
 {% block title %}Administrator dashboard | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page" data-page-title="Administrator dashboard">
-  <p class="smarto-eyebrow">System workspace</p>
-  <h1>Administrator dashboard</h1>
-  <p>Staff access is managed through individual Frappe users and roles. Operational access remains subject to each endpoint's permission checks.</p>
-  {% if can_manage_users %}
-  <p><a class="smarto-button smarto-button-secondary" href="/app/user">Manage Frappe users</a></p>
-  {% endif %}
-  <div class="smarto-state">
-    <strong>Business reports</strong>
-    <p>Use the existing permission-checked operations workspace for reports.</p>
-    <a href="/store#admin-dashboard">Open existing business reports</a>
+<main class="smarto-page smarto-admin-page" data-admin-dashboard>
+  <header class="smarto-admin-heading">
+    <div>
+      <p class="smarto-eyebrow">System workspace</p>
+      <h1>Administrator dashboard.</h1>
+      <p>Live business activity across orders, payments, stock, and delivery.</p>
+    </div>
+    <button id="admin-dashboard-refresh" class="smarto-button smarto-button-secondary" type="button">Refresh dashboard</button>
+  </header>
+  <nav class="smarto-admin-shortcuts" aria-label="Administration shortcuts">
+    <a href="/store#admin-dashboard">Business reports</a>
+    <a href="/store#payment-dashboard">Payments</a>
+    <a href="/dashboard/orders">Order management</a>
+    <a href="/dashboard/inventory">Inventory</a>
+    <a href="/dashboard/delivery">Deliveries</a>
+    <a href="/app/product">Products</a>
+    <a href="/app/product-category">Categories</a>
+    {% if can_manage_users %}<a href="/app/user">User access</a>{% endif %}
+  </nav>
+  <p id="admin-dashboard-status" class="smarto-inline-status" role="status" aria-live="polite">Loading live dashboard data...</p>
+  <p id="admin-dashboard-error" role="alert"></p>
+
+  <section class="smarto-admin-section" aria-labelledby="admin-overview-heading">
+    <div class="smarto-section-heading">
+      <div>
+        <p class="smarto-eyebrow">Business at a glance</p>
+        <h2 id="admin-overview-heading">Key metrics</h2>
+      </div>
+    </div>
+    <div id="admin-dashboard-metrics" class="smarto-admin-metrics"></div>
+  </section>
+
+  <section class="smarto-admin-section" aria-labelledby="admin-sales-heading">
+    <div class="smarto-section-heading">
+      <div>
+        <p class="smarto-eyebrow">Verified M-Pesa payments</p>
+        <h2 id="admin-sales-heading">Sales trends</h2>
+      </div>
+      <a class="smarto-text-link" href="/store#admin-dashboard">Open detailed reports <span aria-hidden="true">→</span></a>
+    </div>
+    <p class="smarto-dashboard-note">Sales are based on successful payment records, not order placement.</p>
+    <div class="smarto-admin-chart-grid">
+      <article class="smarto-admin-chart">
+        <h3>Daily sales</h3>
+        <div id="admin-dashboard-daily" class="smarto-bar-chart" role="list" aria-label="Daily verified sales"></div>
+      </article>
+      <article class="smarto-admin-chart">
+        <h3>Monthly sales</h3>
+        <div id="admin-dashboard-monthly" class="smarto-bar-chart" role="list" aria-label="Monthly verified sales"></div>
+      </article>
+      <article class="smarto-admin-chart">
+        <h3>Top products</h3>
+        <div id="admin-dashboard-products" class="smarto-bar-chart" role="list" aria-label="Top products by verified sales"></div>
+      </article>
+    </div>
+  </section>
+
+  <div class="smarto-admin-grid">
+    <section class="smarto-admin-section" aria-labelledby="admin-orders-heading">
+      <div class="smarto-section-heading">
+        <div>
+          <p class="smarto-eyebrow">Latest activity</p>
+          <h2 id="admin-orders-heading">Recent orders</h2>
+        </div>
+        <a class="smarto-text-link" href="/dashboard/orders">View all <span aria-hidden="true">→</span></a>
+      </div>
+      <div id="admin-dashboard-orders" class="smarto-admin-table-wrap"></div>
+    </section>
+    <section class="smarto-admin-section" aria-labelledby="admin-payments-heading">
+      <div class="smarto-section-heading">
+        <div>
+          <p class="smarto-eyebrow">Transactions</p>
+          <h2 id="admin-payments-heading">Recent payments</h2>
+        </div>
+        <a class="smarto-text-link" href="/store#payment-dashboard">View payments <span aria-hidden="true">→</span></a>
+      </div>
+      <div id="admin-dashboard-payments" class="smarto-admin-table-wrap"></div>
+    </section>
   </div>
+
+  <section class="smarto-admin-section" aria-labelledby="admin-stock-heading">
+    <div class="smarto-section-heading">
+      <div>
+        <p class="smarto-eyebrow">Inventory health</p>
+        <h2 id="admin-stock-heading">Stock alerts</h2>
+      </div>
+      <a class="smarto-text-link" href="/dashboard/inventory">Manage inventory <span aria-hidden="true">→</span></a>
+    </div>
+    <div id="admin-dashboard-stock" class="smarto-stock-alerts"></div>
+  </section>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/admin-dashboard.js"></script>
 {% endblock %}

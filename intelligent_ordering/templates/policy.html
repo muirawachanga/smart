@@ -1,0 +1,14 @@
+{% extends "templates/smarto_base.html" %}
+{% block title %}{{ policy_title }} | SmartO{% endblock %}
+{% block smarto_content %}
+<main class="smarto-page">
+  <p class="smarto-eyebrow">SmartO policies</p>
+  <h1>{{ policy_title }}</h1>
+  {% if policy %}
+    <p>Version {{ policy.version }} &middot; Last updated {{ policy.published_at }}</p>
+    <div class="smarto-policy-content">{{ policy.content | e }}</div>
+  {% else %}
+    <p role="status">This policy has not been published. Please check back before creating an account.</p>
+  {% endif %}
+</main>
+{% endblock %}

@@ -4,16 +4,25 @@
 
 {% block smarto_content %}
 <main class="smarto-page" data-catalog-page="detail">
-  <p class="smarto-eyebrow">Product</p>
-  <h1>Product details</h1>
-  <div class="smarto-actions">
-    <a class="smarto-button smarto-button-secondary" href="/products">Continue shopping</a>
-    <a class="smarto-button" href="/cart">View shopping cart</a>
-  </div>
-  <p id="product-status" role="status" aria-live="polite">Loading product...</p>
+  <nav class="smarto-breadcrumb-inline" aria-label="Product navigation">
+    <a href="/products">Products</a>
+    <span aria-hidden="true">/</span>
+    <span>Product details</span>
+  </nav>
+  <p id="product-status" class="smarto-inline-status" role="status" aria-live="polite">Loading product...</p>
   <p id="cart-feedback" role="status" aria-live="polite"></p>
   <div id="product-detail"></div>
-  <p><a href="/products">Return to products</a> | <a href="/cart">Review your cart</a></p>
+  <section id="related-products-section" class="smarto-home-section" aria-labelledby="related-products-heading" hidden>
+    <div class="smarto-section-heading">
+      <div>
+        <p class="smarto-eyebrow">Keep exploring</p>
+        <h2 id="related-products-heading">More in this category</h2>
+      </div>
+      <a class="smarto-text-link" href="/products">Browse all products <span aria-hidden="true">→</span></a>
+    </div>
+    <p id="related-products-status" class="smarto-inline-status" role="status" aria-live="polite"></p>
+    <div id="related-products" class="smarto-product-grid"></div>
+  </section>
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/catalog-pages.js"></script>
 {% endblock %}

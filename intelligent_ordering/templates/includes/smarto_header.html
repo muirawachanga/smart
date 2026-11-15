@@ -1,8 +1,7 @@
 <header class="smarto-header">
   <div class="smarto-header-inner">
     <a class="smarto-brand" href="/" aria-label="SmartO home">
-      <span class="smarto-brand-mark" aria-hidden="true">S</span>
-      <span>SmartO</span>
+      {% include "templates/includes/smarto_logo.html" %}
     </a>
     <button class="smarto-menu-toggle" id="smarto-menu-toggle" type="button"
       aria-controls="smarto-primary-navigation" aria-expanded="false">
@@ -30,7 +29,7 @@
       <a id="staff-orders-link" href="/dashboard/orders" hidden>Orders</a>
       <a id="payments-link" href="/store#payment-dashboard" hidden>Payments</a>
       <a id="deliveries-link" href="/dashboard/delivery" hidden>Deliveries</a>
-      <a id="admin-dashboard-link" href="/store#admin-dashboard" hidden>Reports</a>
+      <a id="admin-dashboard-link" href="/store#admin-dashboard" hidden>Dashboard</a>
       <a id="inventory-dashboard-link" href="/dashboard/inventory" hidden>Inventory</a>
       <a id="support-dashboard-link" href="/dashboard/support" hidden>Support</a>
       <a id="smarto-workspace-link" href="/account" hidden>Workspace</a>

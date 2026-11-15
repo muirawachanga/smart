@@ -9,6 +9,7 @@ class Element {
     this.value = "";
     this.disabled = false;
     this.hidden = false;
+    this.dataset = {};
   }
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
@@ -74,6 +75,8 @@ test("customer history uses owner-only detail and shows payment status", async (
   await tick();
   await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
   await tick();
+  const orderCard = nodes.get("#orders-list").children[0];
+  assert.equal(orderCard.children[0].children[1].dataset.status, "pending");
   assert.ok(calls.some((url) => url.includes("orders.get_my_order?")));
   const card = nodes.get("#order-detail").children[0];
   assert.ok(card.children.some((node) => node.textContent === "Payment status: Unpaid"));

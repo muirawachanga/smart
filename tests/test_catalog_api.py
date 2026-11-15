@@ -39,6 +39,20 @@ class TestCatalogApi(unittest.TestCase):
         self.assertEqual(result["products"], [{"name": "A"}])
         self.assertTrue(result["has_more"])
 
+    def test_best_selling_uses_completed_order_items_and_returns_category_reference(self):
+        self.frappe.db.sql.side_effect = [[(1,)], [{"name": "A", "category_id": "CAT-1"}]]
+        result = self.catalog.get_catalog(page_size=1, sort="best_selling")
+        query, values = self.frappe.db.sql.call_args.args
+        self.assertIn("INNER JOIN `tabSales Order` AS sales_order", query)
+        self.assertIn("sales_order.status = 'Completed'", query)
+        self.assertIn("SUM(item.quantity) AS units_sold", query)
+        self.assertIn("sales.units_sold DESC", query)
+        self.assertIn("p.category AS category_id", query)
+        self.assertEqual(values, [2, 0])
+        self.assertEqual(result["products"][0]["category_id"], "CAT-1")
+        count_query = self.frappe.db.sql.call_args_list[0].args[0]
+        self.assertIn("sales_order.status = 'Completed'", count_query)
+
     def test_rejects_untrusted_sort_before_sql(self):
         for value in ("p.price DESC; DROP TABLE `tabProduct`", ["name_asc"]):
             with self.subTest(value=value), self.assertRaises(CatalogError):

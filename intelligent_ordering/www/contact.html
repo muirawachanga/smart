@@ -4,12 +4,26 @@
 
 {% block smarto_content %}
 <main class="smarto-page" data-page-title="Contact">
-  <p class="smarto-eyebrow">Contact</p>
-  <h1>Contact SmartO</h1>
-  <p>Customer support details and business location have not been configured in the project.</p>
-  <div class="smarto-state">
-    <strong>Contact form not yet available</strong>
-    <p>This page does not accept or discard messages. Support contact channels can be added when the business details are provided.</p>
+  <header class="smarto-page-heading">
+    <div>
+      <p class="smarto-eyebrow">Customer care</p>
+      <h1>How can we help?</h1>
+      <p>Manage your order and account using the connected SmartO customer pages.</p>
+    </div>
+    <a class="smarto-button" href="/account">Go to my account</a>
+  </header>
+  <div class="smarto-card-grid">
+    <a class="smarto-info-card" href="/track-order">
+      <h2>Order or delivery update</h2>
+      <p>Sign in to view your order status, delivery progress, and order history.</p>
+      <span class="smarto-card-link">Track an order <span aria-hidden="true">→</span></span>
+    </a>
+    <a class="smarto-info-card" href="/account/payments">
+      <h2>Payment history</h2>
+      <p>Review M-Pesa payment transactions associated with your account.</p>
+      <span class="smarto-card-link">View payments <span aria-hidden="true">→</span></span>
+    </a>
   </div>
+  <p class="smarto-contact-note">A direct support email or phone number has not been configured. SmartO will not accept or discard messages through an inactive contact form.</p>
 </main>
 {% endblock %}

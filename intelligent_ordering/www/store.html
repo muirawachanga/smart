@@ -272,10 +272,11 @@
       <div id="inventory-movements" class="inventory-list"></div>
     </section>
   </section>
-
   <section id="payment-dashboard" class="orders-section" aria-labelledby="payments-heading">
-    <h2 id="payments-heading">Payments</h2>
-    <div id="payment-summary"></div>
+    <p class="eyebrow">Finance workspace</p>
+    <h2 id="payments-heading">Payment transactions</h2>
+    <p class="intro">Search M-Pesa attempts, review payment status, and reconcile uncertain transactions.</p>
+    <div id="payment-summary" class="payment-summary" aria-label="Payment totals by environment and status"></div>
     <form id="payment-filters" class="order-filters">
       <label>Order number or M-Pesa receipt
         <input name="search" type="search" maxlength="140">
@@ -360,7 +361,20 @@
     <div id="delivery-detail" class="order-detail" hidden></div>
   </section>
   <section id="admin-dashboard" class="orders-section" aria-labelledby="admin-heading">
-    <h2 id="admin-heading">Admin dashboard</h2>
+    <p class="eyebrow">SmartO operations</p>
+    <h2 id="admin-heading">Management and reports</h2>
+    <p class="intro">Use the tools available to your role. All records and report totals come from SmartO.</p>
+    <nav id="admin-section-navigation" class="admin-section-navigation" aria-label="Management sections">
+      <a href="#business-metrics-heading" data-admin-access="store finance">Overview</a>
+      <a href="#sales-analytics-heading" data-admin-access="finance">Sales</a>
+      <a href="#admin-orders-heading" data-admin-access="store">Orders</a>
+      <a href="#admin-customers-heading" data-admin-access="store">Customers</a>
+      <a href="#admin-products-heading" data-admin-access="store">Products</a>
+      <a href="#inventory-metrics-heading" data-admin-access="inventory">Inventory</a>
+      <a href="#delivery-metrics-heading" data-admin-access="delivery">Deliveries</a>
+      <a href="#report-export-heading" data-admin-access="store finance payment_export inventory delivery">Reports</a>
+      <a href="#audit-heading" data-admin-access="audit">Audit log</a>
+    </nav>
     <p id="admin-feedback" class="catalog-status" role="status" aria-live="polite"></p>
     <section class="admin-panel" aria-labelledby="business-metrics-heading">
       <h3 id="business-metrics-heading">Business overview</h3>

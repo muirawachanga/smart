@@ -186,12 +186,18 @@ export function initAdministrationDashboard() {
   async function loadDashboard() {
     const result = await get("administration.dashboard");
     access = result.access || {};
+    for (const link of document.querySelectorAll("[data-admin-access]")) {
+      const groups = link.dataset.adminAccess.split(/\s+/);
+      link.hidden = !groups.some((group) => access[group]);
+    }
     for (const [selector, allowed] of [
       ["#business-metrics-heading", access.store || access.finance],
       ["#sales-analytics-filters", access.finance],
       ["#admin-orders-heading", access.store],
       ["#admin-customers-heading", access.store],
       ["#admin-products-heading", access.store],
+      ["#report-export-heading", access.store || access.finance || access.payment_export
+        || access.inventory || access.delivery],
       ["#admin-audit-search", access.audit],
       ["#inventory-metrics-heading", access.inventory],
       ["#delivery-metrics-heading", access.delivery],

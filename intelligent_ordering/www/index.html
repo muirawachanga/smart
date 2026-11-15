@@ -5,78 +5,81 @@
 {% block smarto_content %}
 <main class="smarto-home" data-catalog-page="home">
   <section class="smarto-hero" aria-labelledby="home-heading">
-    <p class="smarto-eyebrow">SmartO ordering platform</p>
-    <h1 id="home-heading">Ordering and fulfillment, connected.</h1>
-    <p>SmartO brings product ordering, inventory, payments, and delivery workflows together in one platform for customers and business teams.</p>
+    <div class="smarto-hero-content">
+      <p class="smarto-eyebrow">Smart shopping. Simple ordering.</p>
+      <h1 id="home-heading">A better way to shop and order.</h1>
+      <p>Browse the live catalogue, place your order in a few clear steps, and follow its progress from your account.</p>
+    </div>
     <div class="smarto-hero-actions">
-      <a class="smarto-button" href="/products">Browse products</a>
-      <a class="smarto-button smarto-button-secondary" href="/categories">Shop by category</a>
-      <a class="smarto-text-link" href="/about">Learn more</a>
-      <a class="smarto-text-link" href="/contact">Contact us</a>
+      <a class="smarto-button" href="/products">Shop now</a>
+      <a class="smarto-button smarto-button-secondary" href="/categories">Explore categories</a>
+      <a class="smarto-text-link" href="/cart">View cart</a>
+      <a class="smarto-text-link" href="/account">Track your orders</a>
     </div>
   </section>
 
-  <section class="smarto-card-grid" aria-label="SmartO services">
+  <section class="smarto-card-grid smarto-benefits" aria-label="Shopping with SmartO">
     <article class="smarto-info-card">
-      <h2>Customer ordering</h2>
-      <p>Browse a business catalogue and move through a clear ordering journey.</p>
-      <a href="/products">Visit products</a>
+      <span class="smarto-card-step" aria-hidden="true">01</span>
+      <h2>Find what you need</h2>
+      <p>Search products, browse categories, and check availability before you order.</p>
     </article>
     <article class="smarto-info-card">
-      <h2>Business operations</h2>
-      <p>Connect order processing with stock, payment, and delivery workflows.</p>
-      <a href="/dashboard/orders">Explore staff workspaces</a>
+      <span class="smarto-card-step" aria-hidden="true">02</span>
+      <h2>Checkout with confidence</h2>
+      <p>Choose your delivery area and review the full order total before placing an order.</p>
     </article>
     <article class="smarto-info-card">
-      <h2>Business insight</h2>
-      <p>Build from real operational records toward useful reporting and analysis.</p>
-      <a href="/dashboard/owner">View owner workspace</a>
+      <span class="smarto-card-step" aria-hidden="true">03</span>
+      <h2>Stay up to date</h2>
+      <p>Check order and payment progress from your personal account.</p>
     </article>
   </section>
 
   <section class="smarto-home-section" aria-labelledby="featured-products-heading">
-    <p class="smarto-eyebrow">From the catalogue</p>
-    <h2 id="featured-products-heading">Explore products</h2>
-    <p id="home-products-status" role="status" aria-live="polite">Loading products...</p>
+    <div class="smarto-section-heading">
+      <div>
+        <p class="smarto-eyebrow">Customer favourites</p>
+        <h2 id="featured-products-heading">Best-selling products</h2>
+      </div>
+      <a class="smarto-text-link" href="/products">Browse all products <span aria-hidden="true">→</span></a>
+    </div>
+    <p id="home-products-status" class="smarto-inline-status" role="status" aria-live="polite">Loading best-selling products...</p>
+    <p id="cart-feedback" role="status" aria-live="polite"></p>
     <div id="home-products" class="smarto-product-grid"></div>
-    <p><a href="/products">Browse all products</a></p>
   </section>
 
   <section class="smarto-home-section" aria-labelledby="home-categories-heading">
-    <p class="smarto-eyebrow">Explore</p>
-    <h2 id="home-categories-heading">Shop by category</h2>
-    <p id="categories-status" role="status" aria-live="polite">Loading categories...</p>
+    <div class="smarto-section-heading">
+      <div>
+        <p class="smarto-eyebrow">Find your next favourite</p>
+        <h2 id="home-categories-heading">Shop by category</h2>
+      </div>
+      <a class="smarto-text-link" href="/categories">View all categories <span aria-hidden="true">→</span></a>
+    </div>
+    <p id="categories-status" class="smarto-inline-status" role="status" aria-live="polite">Loading categories...</p>
     <div id="categories-list" class="smarto-category-list"></div>
-    <a class="smarto-button smarto-button-secondary" href="/categories">View categories</a>
   </section>
 
-  <section class="smarto-home-section" aria-labelledby="home-steps-heading">
-    <p class="smarto-eyebrow">A connected journey</p>
-    <h2 id="home-steps-heading">From browsing to fulfillment</h2>
+  <section class="smarto-home-section smarto-home-steps" aria-labelledby="home-steps-heading">
+    <div>
+      <p class="smarto-eyebrow">Simple from start to finish</p>
+      <h2 id="home-steps-heading">Your order, made easy</h2>
+      <p>Browse, place your order, and check updates whenever you need them.</p>
+    </div>
     <ol class="smarto-steps">
       <li><strong>Browse</strong><span>Find products and categories.</span></li>
-      <li><strong>Order</strong><span>Review a cart and submit an order.</span></li>
-      <li><strong>Fulfill</strong><span>Process, prepare, and deliver orders.</span></li>
+      <li><strong>Checkout</strong><span>Review your items and delivery details.</span></li>
+      <li><strong>Track</strong><span>Follow order and payment updates.</span></li>
     </ol>
   </section>
 
-  <section class="smarto-home-section" aria-labelledby="why-smarto-heading">
-    <p class="smarto-eyebrow">Why SmartO</p>
-    <h2 id="why-smarto-heading">Designed around the complete order journey</h2>
-    <p>SmartO connects customer orders with stock, payments, and delivery operations.</p>
-  </section>
-
-  <section class="smarto-home-section" aria-labelledby="testimonials-heading">
-    <p class="smarto-eyebrow">Customer stories</p>
-    <h2 id="testimonials-heading">Real experiences, when available</h2>
-    <p>There are no verified customer testimonials in the project yet, so none are displayed.</p>
-  </section>
-
-  <section class="smarto-state">
-    <strong>Ready to order?</strong>
-    <p>Find products, review your cart, and complete your order at checkout.</p>
-    <a href="/products">Browse products</a>
-    <a href="/cart">View shopping cart</a>
+  <section class="smarto-home-cta" aria-labelledby="home-cta-heading">
+    <div>
+      <p class="smarto-eyebrow">Ready when you are</p>
+      <h2 id="home-cta-heading">Start with the catalogue.</h2>
+    </div>
+    <a class="smarto-button" href="/products">Shop products <span aria-hidden="true">→</span></a>
   </section>
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/catalog-pages.js"></script>

@@ -4,14 +4,18 @@
 
 {% block smarto_content %}
 <main class="smarto-page" data-catalog-page="products">
-  <p class="smarto-eyebrow">Shop SmartO</p>
-  <h1>Products</h1>
-  <p>Search products or choose a category to find what you need.</p>
+  <header class="smarto-page-heading">
+    <div>
+      <p class="smarto-eyebrow">Shop SmartO</p>
+      <h1>Find your next favourite.</h1>
+      <p>Search the catalogue, filter by category, or sort to find what you need.</p>
+    </div>
+    <a class="smarto-button smarto-button-secondary" href="/cart">View cart</a>
+  </header>
   <div class="smarto-actions">
-    <a class="smarto-button smarto-button-secondary" href="/categories">Shop by category</a>
-    <a class="smarto-button" href="/cart">View shopping cart</a>
+    <a class="smarto-text-link" href="/categories">Browse all categories <span aria-hidden="true">→</span></a>
   </div>
-  <form id="catalog-form" class="smarto-catalog-form">
+  <form id="catalog-form" class="smarto-catalog-form" aria-label="Filter products">
     <label>Search products
       <input name="search" type="search" maxlength="100" placeholder="Name, SKU, or description">
     </label>
@@ -20,6 +24,7 @@
     </label>
     <label>Sort by
       <select name="sort">
+        <option value="best_selling">Best selling</option>
         <option value="name_asc">Name: A to Z</option>
         <option value="name_desc">Name: Z to A</option>
         <option value="price_asc">Price: low to high</option>
@@ -28,8 +33,7 @@
     </label>
     <button class="smarto-button" type="submit">Apply</button>
   </form>
-  <p class="smarto-catalog-note">Price sorting compares numeric prices without currency conversion.</p>
-  <p id="catalog-status" role="status" aria-live="polite">Loading products...</p>
+  <p id="catalog-status" class="smarto-inline-status" role="status" aria-live="polite">Loading products...</p>
   <p id="cart-feedback" role="status" aria-live="polite"></p>
   <div id="catalog-products" class="smarto-product-grid"></div>
   <nav id="catalog-pagination" class="smarto-pagination" aria-label="Product pages" hidden>
@@ -37,7 +41,6 @@
     <span id="catalog-page"></span>
     <button id="catalog-next" class="smarto-button smarto-button-secondary" type="button">Next</button>
   </nav>
-  <p>After adding products, open your shopping cart to review quantities and continue to checkout.</p>
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/catalog-pages.js"></script>
 {% endblock %}

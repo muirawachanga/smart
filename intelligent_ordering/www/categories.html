@@ -4,10 +4,15 @@
 
 {% block smarto_content %}
 <main class="smarto-page" data-catalog-page="categories">
-  <p class="smarto-eyebrow">Shop by category</p>
-  <h1>Product categories</h1>
-  <p>Choose a category to browse its products.</p>
-  <p id="categories-status" role="status" aria-live="polite">Loading categories...</p>
+  <header class="smarto-page-heading">
+    <div>
+      <p class="smarto-eyebrow">Explore SmartO</p>
+      <h1>Shop by category.</h1>
+      <p>Choose a category to see its available products.</p>
+    </div>
+    <a class="smarto-button smarto-button-secondary" href="/products">All products</a>
+  </header>
+  <p id="categories-status" class="smarto-inline-status" role="status" aria-live="polite">Loading categories...</p>
   <div id="categories-list" class="smarto-category-list"></div>
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/catalog-pages.js"></script>

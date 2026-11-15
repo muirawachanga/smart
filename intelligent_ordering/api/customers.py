@@ -1,5 +1,3 @@
-import secrets
-
 import frappe
 from frappe.rate_limiter import rate_limit
 from frappe.utils import escape_html, now_datetime, validate_email_address
@@ -25,9 +23,13 @@ CANCELLATION_FIELDS = (
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=5, seconds=3600)
-def register(email, full_name):
-    """Use Frappe User/password setup, with no configurable signup role."""
+def register(email, full_name, phone="", password="", confirm_password="",
+             terms_version="", privacy_version="", accept_terms=0, acknowledge_privacy=0,
+             marketing_consent=0):
+    """Create a Customer-only Frappe account and an immutable consent record."""
     from frappe.core.doctype.user.user import is_signup_disabled
+    from intelligent_ordering.api.policies import require_acceptance
+    from intelligent_ordering.utils.authentication import validate_new_password
 
     if frappe.session.user != "Guest":
         frappe.throw("Sign out before registering a customer account.", frappe.PermissionError)
@@ -35,32 +37,38 @@ def register(email, full_name):
         frappe.throw("Customer registration is disabled. Contact the store.", frappe.ValidationError)
     try:
         full_name = validate_customer_name(full_name)
+        phone = validate_phone(phone)
     except ValueError as error:
         frappe.throw(str(error), frappe.ValidationError)
     if not isinstance(email, str) or len(email) > 140:
         frappe.throw("Enter a valid email address.", frappe.ValidationError)
     email = validate_email_address(email.strip().lower(), throw=True)
+    require_acceptance(terms_version, privacy_version, accept_terms, acknowledge_privacy)
+    if marketing_consent not in (0, 1, "0", "1"):
+        frappe.throw("Invalid marketing consent.", frappe.ValidationError)
+    validate_new_password(password, confirm_password, (full_name, email, phone))
     if frappe.db.exists("User", email):
-        return {"email_sent": False, "message": "Use login or password recovery for an existing account."}
+        frappe.throw("An account already uses this email. Sign in or reset your password.", frappe.ValidationError)
     user = frappe.get_doc({
         "doctype": "User", "email": email, "first_name": escape_html(full_name),
-        "enabled": 1, "user_type": "Website User", "send_welcome_email": 1,
-        "new_password": secrets.token_urlsafe(32),
+        "enabled": 1, "user_type": "Website User", "send_welcome_email": 0,
+        "new_password": password, "mobile_no": phone,
         "roles": [{"role": "Customer"}],
     })
     user.insert(ignore_permissions=True)
-    return {
-        "email_sent": bool(user.flags.email_sent),
-        "message": "Check your email to set your password." if user.flags.email_sent else
-                   "Your account was created, but no setup email was sent. Contact the store to set your password.",
-    }
+    profile = _save_customer_profile(email, full_name, phone)
+    frappe.get_doc({
+        "doctype": "SmartO Policy Acceptance", "user": email, "customer": profile.name,
+        "terms_version": terms_version, "privacy_version": privacy_version,
+        "marketing_consent": int(marketing_consent),
+    }).insert(ignore_permissions=True)
+    return {"message": "Account created. Sign in to start shopping."}
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 def sign_up(email, full_name, redirect_to=""):
-    """Keep native /login signup on the same Customer-only registration path."""
-    result = register(email, full_name)
-    return (1 if result["email_sent"] else 2, result["message"])
+    """Do not allow alternate signup to bypass policy consent."""
+    frappe.throw("Create your SmartO customer account at /register.", frappe.ValidationError)
 
 
 def _profile(lock=False):

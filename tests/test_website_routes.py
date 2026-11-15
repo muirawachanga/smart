@@ -1,7 +1,11 @@
 import unittest
 from pathlib import Path
 
-from intelligent_ordering.hooks import website_route_rules
+from intelligent_ordering.hooks import (
+    app_include_css,
+    website_route_rules,
+    web_include_css,
+)
 
 
 APP_ROOT = Path(__file__).resolve().parents[1] / "intelligent_ordering"
@@ -35,10 +39,23 @@ SHELL_ROUTES = {
 
 
 class TestSmartOWebsiteRoutes(unittest.TestCase):
+    def test_smart_design_assets_are_registered_and_logo_is_shared(self):
+        logo_path = "/assets/intelligent_ordering/images/smarto-logo.svg"
+        self.assertIn("/assets/intelligent_ordering/css/design-tokens.css", web_include_css)
+        self.assertIn("/assets/intelligent_ordering/css/site.css", web_include_css)
+        self.assertIn("/assets/intelligent_ordering/css/design-tokens.css", app_include_css)
+        self.assertIn("/assets/intelligent_ordering/css/app.css", app_include_css)
+        self.assertTrue((APP_ROOT / "public/images/smarto-logo.svg").is_file())
+        self.assertIn(logo_path, (APP_ROOT / "templates/includes/smarto_logo.html").read_text())
+        for name in ("smarto_header", "smarto_footer"):
+            self.assertIn("smarto_logo.html", (APP_ROOT / f"templates/includes/{name}.html").read_text())
+
     def test_static_pages_use_the_shared_smarto_layout(self):
         for route, template in SHELL_ROUTES.items():
             with self.subTest(route=route):
                 source = (WWW / template).read_text()
+                if route in {"/register", "/forgot-password", "/reset-password"}:
+                    source += (APP_ROOT / "templates/auth.html").read_text()
                 self.assertIn(
                     '{% extends "templates/smarto_base.html" %}',
                     source,
@@ -72,7 +89,9 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
             "account/addresses.html": "customer-portal.js",
             "account/payments.html": "customer-portal.js",
             "account/notifications.html": "customer-portal.js",
-            "register.html": "customer-portal.js",
+            "track-order.html": "order-pages.js",
+            "dashboard/owner.html": "role-dashboard.js",
+            "dashboard/sales.html": "role-dashboard.js",
             "dashboard/orders.html": "order-pages.js",
             "dashboard/inventory.html": "inventory-page.js",
             "dashboard/delivery.html": "delivery-page.js",
@@ -135,8 +154,75 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
                 source = (WWW / f"dashboard/{page}.html").read_text()
                 self.assertIn("/store#admin-dashboard", source)
 
-    def test_login_route_remains_frappe_native(self):
-        self.assertFalse((WWW / "login.html").exists())
+    def test_admin_dashboard_uses_real_data_and_preserves_native_management_routes(self):
+        source = (WWW / "dashboard/admin.html").read_text()
+        script = (APP_ROOT / "public/js/admin-dashboard.js").read_text()
+        controller = (WWW / "dashboard/admin.py").read_text()
+        self.assertIn("/assets/intelligent_ordering/js/admin-dashboard.js", source)
+        self.assertIn('href="/app/product"', source)
+        self.assertIn('href="/app/product-category"', source)
+        self.assertIn('href="/app/user"', source)
+        for endpoint in (
+            "administration.dashboard", "administration.sales_analytics",
+            "orders.list_orders", "payments.list_transactions", "inventory.list_stock",
+        ):
+            with self.subTest(endpoint=endpoint):
+                self.assertIn(endpoint, script)
+        self.assertIn('require_staff_page(context, "admin")', controller)
+
+    def test_owner_and_sales_dashboards_use_live_role_scoped_analytics(self):
+        source = (APP_ROOT / "public/js/role-dashboard.js").read_text()
+        for role, controller, heading in (
+            ("owner", "owner", "Business overview."),
+            ("sales", "sales", "Sales performance."),
+        ):
+            with self.subTest(role=role):
+                page = (WWW / f"dashboard/{role}.html").read_text()
+                self.assertIn(f'data-role-dashboard="{role}"', page)
+                self.assertIn(heading, page)
+                self.assertIn("role-dashboard.js", page)
+                self.assertIn(f'require_staff_page(context, "{controller}")',
+                              (WWW / f"dashboard/{controller}.py").read_text())
+        self.assertIn("administration.dashboard", source)
+        self.assertIn("administration.sales_analytics", source)
+        self.assertIn("Successful payments", source)
+
+    def test_management_workspace_uses_role_filtered_navigation_and_shared_styles(self):
+        source = (WWW / "store.html").read_text()
+        script = (APP_ROOT / "public/js/administration.js").read_text()
+        payments = (APP_ROOT / "public/js/payments.js").read_text()
+        self.assertIn('/assets/intelligent_ordering/css/app.css', source)
+        self.assertIn('id="admin-section-navigation"', source)
+        self.assertIn('data-admin-access="finance"', source)
+        self.assertIn('data-admin-access="inventory"', source)
+        self.assertIn('data-admin-access="delivery"', source)
+        self.assertIn('link.hidden = !groups.some((group) => access[group])', script)
+        self.assertIn("Technical transaction data", payments)
+        self.assertIn('get("payments.payment_summary")', payments)
+
+    def test_responsive_styles_include_reduced_motion_and_mobile_management_layouts(self):
+        tokens = (APP_ROOT / "public/css/design-tokens.css").read_text()
+        site_styles = (APP_ROOT / "public/css/site.css").read_text()
+        app_styles = (APP_ROOT / "public/css/app.css").read_text()
+        self.assertIn(":focus-visible", tokens)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", tokens)
+        self.assertIn("@media (max-width: 42rem)", site_styles)
+        self.assertIn("@media (max-width: 40rem)", app_styles)
+        self.assertIn('.ordering-shell[data-store-view="admin"]', app_styles)
+        self.assertIn("overflow-x: auto", app_styles)
+
+    def test_customer_order_tracking_uses_owner_scoped_order_page(self):
+        source = (WWW / "track-order.html").read_text()
+        self.assertIn('data-orders-page="customer"', source)
+        self.assertIn('href="/login?redirect-to=%2Ftrack-order"', source)
+        self.assertIn('id="order-detail"', source)
+
+    def test_authentication_pages_share_branded_forms_instead_of_native_login(self):
+        self.assertTrue((WWW / "login.html").exists())
+        for page in ("login", "register", "forgot-password", "reset-password"):
+            self.assertIn('extends "templates/auth.html"', (WWW / f"{page}.html").read_text())
+        self.assertIn("authentication.js", (APP_ROOT / "templates/auth.html").read_text())
+        self.assertIn("www/reset-password.html", (WWW / "update-password.html").read_text())
         header = (APP_ROOT / "templates/includes/smarto_header.html").read_text()
         self.assertIn('href="/login"', header)
 

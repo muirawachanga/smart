@@ -1,6 +1,9 @@
 {% extends "templates/web.html" %}
 
 {% block title %}SmartO{% endblock %}
+{% block favicon %}
+<link rel="icon" type="image/svg+xml" href="/assets/intelligent_ordering/images/smarto-logo.svg">
+{% endblock %}
 
 {% block page_content %}
 {% include "templates/includes/smarto_header.html" %}
@@ -15,6 +18,5 @@
 </div>
 {% include "templates/includes/smarto_footer.html" %}
 <p id="smarto-nav-status" class="smarto-visually-hidden" role="status" aria-live="polite"></p>
-<link rel="stylesheet" href="/assets/intelligent_ordering/css/site.css">
 <script type="module" src="/assets/intelligent_ordering/js/site.js"></script>
 {% endblock %}

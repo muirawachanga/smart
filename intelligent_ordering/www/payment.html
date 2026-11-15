@@ -4,12 +4,16 @@
 
 {% block smarto_content %}
 <main class="smarto-page" data-page-title="Payment">
-  <p class="smarto-eyebrow">Secure payment</p>
-  <h1>M-Pesa payment</h1>
-  <p>Payment method: M-Pesa only. Confirm your mobile number and approve the STK prompt on your phone. Never enter your M-Pesa PIN on this website.</p>
-  <p id="order-status" role="status" aria-live="polite">Loading order for payment...</p>
-  <a id="order-login" hidden>Sign in to pay for your order</a>
-  <div id="order-detail"></div>
+  <header class="smarto-page-heading">
+    <div>
+      <p class="smarto-eyebrow">Secure payment</p>
+      <h1>Pay with M-Pesa.</h1>
+      <p>Confirm your mobile number and approve the STK prompt on your phone. Never enter your M-Pesa PIN on this website.</p>
+    </div>
+    <a id="order-login" class="smarto-button" hidden>Sign in to pay for your order</a>
+  </header>
+  <p id="order-status" class="smarto-inline-status" role="status" aria-live="polite">Loading order for payment...</p>
+  <div id="order-detail" class="smarto-order-detail"></div>
   <nav class="smarto-actions" aria-label="Order navigation">
     <a class="smarto-button smarto-button-secondary" href="/account">Order history</a>
     <a class="smarto-button" href="/checkout">Checkout</a>

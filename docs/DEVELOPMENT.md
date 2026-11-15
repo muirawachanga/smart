@@ -65,10 +65,11 @@ route-aware page labels.
 | `/order-confirmation?order=<order_id>` | Confirmation for identifiers that cannot be used as a path segment |
 | `/track-order` | Tracking page shell |
 | `/contact` | Contact page shell; business contact data is not configured |
-| `/login` | Frappe's native login page; it is not replaced |
-| `/register` | Registration information page; account creation is not implemented here |
-| `/forgot-password` | Password recovery information page |
-| `/reset-password` | Password reset information page; it accepts no credentials or tokens |
+| `/login` | SmartO login using Frappe authentication, sessions, and verification challenges |
+| `/register` | Customer-only registration with published Terms and Privacy acceptance |
+| `/forgot-password` | Generic-response password recovery through Frappe |
+| `/reset-password`, `/update-password` | SmartO password reset using Frappe reset keys |
+| `/terms`, `/privacy`, `/refund-policy`, `/delivery-policy` | Current published policy versions |
 | `/account` | Owner-scoped order history and payment controls |
 | `/dashboard/owner` | Role-protected business workspace |
 | `/dashboard/admin` | Role-protected administration workspace |
@@ -111,7 +112,56 @@ Customer and staff pages reuse the existing database-backed catalog, cart,
 checkout, order, inventory, delivery, payment, and reporting APIs. The account,
 orders, inventory, and delivery workspaces use the current user's records and
 server-enforced permissions; pages do not grant API or DocType access.
-Frappe's native `/login` remains the authentication authority.
+Frappe remains the authentication authority; `/login` and password recovery
+are rendered by SmartO without displaying the default Frappe login interface.
+
+### Authentication and policy setup
+
+Run `bench --site <site-name> migrate` and rebuild assets after deploying these
+changes. Authentication adapters use the Frappe v15 login, two-factor challenge,
+password-strength, and password-reset contracts. Verify compatibility with the
+installed Frappe release before deploying to production.
+
+In Desk, System Manager or Business Admin can open **SmartO Policy Version**.
+Migration creates four **unpublished** review drafts; they are not legally
+approved policies. Replace each review brief with approved plain-text content,
+choose a distinct version (not `review-draft`), and set Status to Published.
+Registration remains blocked until both Terms and Conditions and Privacy Policy
+are published. Drafts are never displayed publicly. Publication time is assigned
+by the server, and public pages show the latest published version.
+
+Published versions cannot be edited or deleted. To update a policy, create a
+new draft with a different version and publish it after review. **SmartO Policy
+Acceptance** records retain the user, customer, exact Terms/Privacy references,
+server-assigned acceptance time, and separate optional marketing consent.
+These records are read-only, including for administrators. Existing customer
+accounts are not retrospectively assigned consent; this change records acceptance
+for new registrations and does not authorize marketing to existing customers.
+
+Registration uses Frappe User password handling and creates a Customer Profile
+in the same request transaction. Public signup cannot assign staff roles or
+bypass the policy gate. Passwords require at least 12 characters, a strength
+score of 3, and any additional configured Frappe password policy. Staff accounts
+are created in Desk by authorized administrators.
+
+Configure outgoing email for password recovery, enable the site's login
+attempt limits/password policy/reset-link expiry, and serve production traffic
+over HTTPS for secure session cookies. Session duration remains governed by
+Frappe System Settings; SmartO does not add a persistent "remember me" token.
+After reset, other sessions are revoked and the reset session is signed out.
+Login destinations are selected server-side from existing workspace permissions.
+Native Desk access remains subject to Frappe authorization.
+
+Offline regression suites do not establish actual session/email behavior.
+On a dedicated development site, run the Frappe integration tests:
+
+```bash
+bench --site <test-site> run-tests --app intelligent_ordering --module intelligent_ordering.intelligent_ordering.tests.test_authentication
+```
+
+Also verify `/login`, `/register`, guest/unauthorized dashboard redirects,
+logout, a real reset email link, token expiry/reuse, and enabled two-factor
+authentication using that site's accounts before production deployment.
 
 After changing website templates, route rules, or public assets, rebuild app
 assets and restart the Bench site:

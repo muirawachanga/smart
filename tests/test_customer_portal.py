@@ -38,10 +38,16 @@ def load_customers():
     audit.record_admin_event = Mock()
     user = types.ModuleType("frappe.core.doctype.user.user")
     user.is_signup_disabled = Mock(return_value=False)
+    policy = types.ModuleType("intelligent_ordering.api.policies")
+    policy.require_acceptance = Mock()
+    authentication = types.ModuleType("intelligent_ordering.utils.authentication")
+    authentication.validate_new_password = Mock()
     modules = {
         "frappe": frappe, "frappe.utils": utils, "frappe.rate_limiter": limiter,
         "intelligent_ordering.api.checkout": checkout, "intelligent_ordering.api.orders": orders,
         "intelligent_ordering.utils.audit": audit, "frappe.core.doctype.user.user": user,
+        "intelligent_ordering.api.policies": policy,
+        "intelligent_ordering.utils.authentication": authentication,
     }
     path = Path(__file__).parents[1] / "intelligent_ordering/api/customers.py"
     spec = importlib.util.spec_from_file_location("customers_under_test", path)
@@ -60,13 +66,21 @@ class TestCustomerPortal(unittest.TestCase):
         self.frappe.db.exists.return_value = False
         self.frappe.get_doc.return_value.flags.email_sent = True
         with patch.dict(sys.modules, self.modules):
-            result = self.api.register("Customer@Example.test", " Test Customer ")
-        doc = self.frappe.get_doc.call_args.args[0]
+            result = self.api.register(
+                "Customer@Example.test", " Test Customer ", "+254700000000",
+                "a strong unique passphrase", "a strong unique passphrase",
+                "TERMS-1", "PRIVACY-1", "1", "1",
+            )
+        doc = self.frappe.get_doc.call_args_list[0].args[0]
         self.assertEqual(doc["roles"], [{"role": "Customer"}])
         self.assertEqual(doc["user_type"], "Website User")
         self.assertEqual(doc["email"], "customer@example.test")
         self.assertEqual(doc["first_name"], "Test Customer")
-        self.assertTrue(result["email_sent"])
+        self.assertIn("Account created", result["message"])
+        consent = self.frappe.get_doc.call_args_list[1].args[0]
+        self.assertEqual(consent["terms_version"], "TERMS-1")
+        self.assertEqual(consent["privacy_version"], "PRIVACY-1")
+        self.assertEqual(consent["marketing_consent"], 0)
         self.assertNotIn(doc["new_password"], repr(result))
 
     def test_disabled_registration_and_existing_accounts_do_not_mutate_users(self):
@@ -74,12 +88,23 @@ class TestCustomerPortal(unittest.TestCase):
         signup = self.modules["frappe.core.doctype.user.user"]
         signup.is_signup_disabled.return_value = True
         with patch.dict(sys.modules, self.modules), self.assertRaises(AccessError):
-            self.api.register("customer@example.test", "Customer")
+            self.api.register("customer@example.test", "Customer", "+254700000000")
         signup.is_signup_disabled.return_value = False
         self.frappe.db.exists.return_value = True
-        with patch.dict(sys.modules, self.modules):
-            self.api.register("customer@example.test", "Customer")
+        with patch.dict(sys.modules, self.modules), self.assertRaises(AccessError):
+            self.api.register("customer@example.test", "Customer", "+254700000000")
         self.frappe.get_doc.assert_not_called()
+
+    def test_registration_with_missing_acceptance_does_not_create_a_user(self):
+        self.frappe.session.user = "Guest"
+        self.modules["intelligent_ordering.api.policies"].require_acceptance.side_effect = AccessError("Accept policies")
+        with patch.dict(sys.modules, self.modules), self.assertRaises(AccessError):
+            self.api.register("customer@example.test", "Customer", "+254700000000")
+        self.frappe.get_doc.assert_not_called()
+
+    def test_alternate_signup_cannot_bypass_customer_policy_consent(self):
+        with self.assertRaises(AccessError):
+            self.api.sign_up("customer@example.test", "Customer")
 
     def test_address_mutations_reject_other_customer_before_loading_address(self):
         profile = types.SimpleNamespace(name="OWN-PROFILE")

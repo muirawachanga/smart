@@ -1,0 +1,25 @@
+{% extends "templates/smarto_base.html" %}
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
+{% block head_include %}
+{{ super() }}
+<meta name="referrer" content="no-referrer">
+{% endblock %}
+{% block smarto_content %}
+<main class="smarto-page" data-auth-page="{% block auth_kind %}{% endblock %}" data-auth-csrf="{{ auth_csrf_token | e }}">
+  <div class="smarto-auth-layout">
+    <aside class="smarto-auth-aside">
+      {% with smarto_logo_class="smarto-auth-logo" %}{% include "templates/includes/smarto_logo.html" %}{% endwith %}
+      <p class="smarto-eyebrow">Smart Shopping. Simple Ordering.</p>
+      <h1>{% block auth_heading %}Welcome to SmartO{% endblock %}</h1>
+      <p>Shop, order, and track deliveries with your SmartO account.</p>
+    </aside>
+    <section class="smarto-auth-panel">
+      {% block auth_form %}{% endblock %}
+      <p id="auth-status" role="status" aria-live="polite"></p>
+      <p id="auth-error" role="alert"></p>
+    </section>
+  </div>
+</main>
+<script type="module" src="/assets/intelligent_ordering/js/authentication.js"></script>
+{% endblock %}
