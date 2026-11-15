@@ -20,6 +20,11 @@ body {
   margin: 4rem auto;
 }
 
+.ordering-shell[data-store-view="admin"] > section:not(#admin-dashboard),
+.ordering-shell[data-store-view="payments"] > section:not(#payment-dashboard) {
+  display: none;
+}
+
 .ordering-header,
 .catalog,
 .shopping-cart,

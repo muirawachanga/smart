@@ -526,6 +526,11 @@ export function initAdministrationDashboard() {
       );
     });
   }
-  document.querySelector("#admin-dashboard-link").addEventListener("click", refresh);
+  document.querySelector("#admin-dashboard-link").addEventListener("click", () => {
+    if (window.location.hash === "#admin-dashboard") refresh();
+  });
+  window.addEventListener("hashchange", () => {
+    if (window.location.hash === "#admin-dashboard") refresh();
+  });
   if (window.location.hash === "#admin-dashboard") refresh();
 }

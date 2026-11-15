@@ -274,7 +274,7 @@
   </section>
 
   <section id="payment-dashboard" class="orders-section" aria-labelledby="payments-heading">
-    <h2 id="payments-heading">Payment management</h2>
+    <h2 id="payments-heading">Payments</h2>
     <div id="payment-summary"></div>
     <form id="payment-filters" class="order-filters">
       <label>Order number or M-Pesa receipt
@@ -360,23 +360,23 @@
     <div id="delivery-detail" class="order-detail" hidden></div>
   </section>
   <section id="admin-dashboard" class="orders-section" aria-labelledby="admin-heading">
-    <h2 id="admin-heading">Administration, analytics &amp; reports</h2>
+    <h2 id="admin-heading">Admin dashboard</h2>
     <p id="admin-feedback" class="catalog-status" role="status" aria-live="polite"></p>
     <section class="admin-panel" aria-labelledby="business-metrics-heading">
-      <h3 id="business-metrics-heading">Business statistics</h3>
+      <h3 id="business-metrics-heading">Business overview</h3>
       <div id="admin-business-metrics" class="admin-metrics"></div>
     </section>
     <section class="admin-panel" aria-labelledby="inventory-metrics-heading">
-      <h3 id="inventory-metrics-heading">Inventory statistics</h3>
+      <h3 id="inventory-metrics-heading">Inventory</h3>
       <div id="admin-inventory-metrics" class="admin-metrics"></div>
     </section>
     <section class="admin-panel" aria-labelledby="delivery-metrics-heading">
-      <h3 id="delivery-metrics-heading">Delivery statistics</h3>
+      <h3 id="delivery-metrics-heading">Deliveries</h3>
       <div id="admin-delivery-metrics" class="admin-metrics"></div>
     </section>
     <section class="admin-panel" aria-labelledby="sales-analytics-heading">
-      <h3 id="sales-analytics-heading">Verified sales analytics</h3>
-      <p>Sales are verified successful M-Pesa payments grouped by transaction date. Product/category totals are item values from paid orders, classified using category snapshots captured when each order was placed.</p>
+      <h3 id="sales-analytics-heading">Sales</h3>
+      <p>Verified payments by transaction date. Product and category totals exclude delivery fees.</p>
       <form id="sales-analytics-filters" class="order-filters">
         <label>From
           <input name="start_date" type="date">
@@ -399,7 +399,7 @@
         </label>
         <label>Payment status
           <select name="payment_status">
-            <option value="">Successful payments (sales basis)</option>
+            <option value="">Successful payments</option>
             <option>Initiated</option><option>Successful</option><option>Pending</option><option>Failed</option>
             <option>Cancelled</option><option>Reversed</option>
           </select>
@@ -417,7 +417,7 @@
       </div>
     </section>
     <section class="admin-panel" aria-labelledby="admin-orders-heading">
-      <h3 id="admin-orders-heading">Order administration</h3>
+      <h3 id="admin-orders-heading">Orders</h3>
       <form id="admin-order-filters" class="order-filters">
         <label>Search orders
           <input name="search" type="search" maxlength="100">
@@ -444,7 +444,7 @@
       <div id="admin-order-detail" class="order-detail" hidden></div>
     </section>
     <section class="admin-panel" aria-labelledby="admin-customers-heading">
-      <h3 id="admin-customers-heading">Customer activity</h3>
+      <h3 id="admin-customers-heading">Customers</h3>
       <form id="admin-customer-search" class="order-filters">
         <label>Search customers
           <input name="search" type="search" maxlength="100">
@@ -459,8 +459,8 @@
       <div id="admin-customer-detail" class="order-detail" hidden></div>
     </section>
     <section class="admin-panel" aria-labelledby="admin-products-heading">
-      <h3 id="admin-products-heading">Product performance and catalog administration</h3>
-      <p>Product and category editing uses Frappe Desk permissions; products referenced by orders or stock history cannot be deleted.</p>
+      <h3 id="admin-products-heading">Products</h3>
+      <p>Products with order or stock history cannot be deleted.</p>
       <a class="secondary-button" href="/app/product">Manage products</a>
       <a class="secondary-button" href="/app/product-category">Manage categories</a>
       <form id="admin-product-search" class="order-filters">
@@ -480,7 +480,7 @@
     </section>
     <section class="admin-panel" aria-labelledby="report-export-heading">
       <h3 id="report-export-heading">Download reports</h3>
-      <p>Exports are permission checked and formula-injection guarded. Large reports are limited to 50,000 rows; inventory exports are current snapshots.</p>
+      <p>Up to 50,000 rows per export. Inventory reports show current stock.</p>
       <form id="admin-report-filters" class="order-filters">
         <label>From
           <input name="start_date" type="date">
@@ -523,7 +523,7 @@
       </div>
     </section>
     <section class="admin-panel" aria-labelledby="audit-heading">
-      <h3 id="audit-heading">Administrative audit log</h3>
+      <h3 id="audit-heading">Audit log</h3>
       <form id="admin-audit-search" class="order-filters">
         <label>Search audit history
           <input name="search" type="search" maxlength="140">

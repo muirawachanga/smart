@@ -8,6 +8,9 @@ import { showFeedback } from "./components/feedback.js";
 import { initPaymentDashboard, mountOrderPayment } from "./payments.js";
 import { initDeliveryDashboard } from "./deliveries.js";
 import { initAdministrationDashboard } from "./administration.js";
+import { initStoreNavigation } from "./store-navigation.js";
+
+initStoreNavigation();
 
 const form = document.querySelector("#catalog-filters");
 const searchInput = document.querySelector("#catalog-search");

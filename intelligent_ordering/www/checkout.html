@@ -6,6 +6,10 @@
 <main class="smarto-page">
   <p class="smarto-eyebrow">Review your order</p>
   <h1>Checkout</h1>
+  <nav class="smarto-actions" aria-label="Order navigation">
+    <a class="smarto-button smarto-button-secondary" href="/account">Order history</a>
+    <a class="smarto-button" href="/checkout" aria-current="page">Checkout</a>
+  </nav>
   <p id="checkout-status" role="status" aria-live="polite">Loading checkout...</p>
   <p id="checkout-feedback" role="alert"></p>
   <a id="checkout-login" href="/login?redirect-to=%2Fcheckout" hidden>Sign in to continue</a>

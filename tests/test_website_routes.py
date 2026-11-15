@@ -107,6 +107,14 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
                 self.assertNotIn("open the current catalogue", source)
                 self.assertNotIn("open the existing storefront", source)
 
+    def test_checkout_and_payment_navigation_avoids_the_combined_storefront(self):
+        for page in ("checkout.html", "order-confirmation.html", "payment.html"):
+            with self.subTest(page=page):
+                source = (WWW / page).read_text()
+                self.assertIn('href="/account">Order history</a>', source)
+                self.assertRegex(source, r'href="/checkout"[^>]*>Checkout</a>')
+                self.assertNotIn("/store", source)
+
     def test_staff_pages_are_server_guarded(self):
         workflows = {
             "orders": "orders",

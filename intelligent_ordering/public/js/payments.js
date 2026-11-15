@@ -121,7 +121,7 @@ export function initPaymentDashboard() {
         card.append(text("h3", transaction.order), text(
           "p", `${transaction.status} - KES ${transaction.amount} - ${transaction.mpesa_receipt_number || "No receipt"}`,
         ));
-        const view = text("button", "View and reconcile");
+        const view = text("button", "View payment");
         view.type = "button";
         view.className = "secondary-button";
         view.addEventListener("click", () => showDetail(transaction.name));
@@ -140,7 +140,7 @@ export function initPaymentDashboard() {
     try {
       const transaction = await get("payments.get_transaction", { payment_name: name });
       const output = text("pre", JSON.stringify(transaction, null, 2));
-      const reconcile = text("button", "Query Safaricom and reconcile");
+      const reconcile = text("button", "Check with Safaricom");
       reconcile.className = "primary-button";
       reconcile.type = "button";
       reconcile.addEventListener("click", async () => {
@@ -166,5 +166,11 @@ export function initPaymentDashboard() {
   });
   previous.addEventListener("click", () => { if (page > 1) { page -= 1; load(); } });
   next.addEventListener("click", () => { if (hasMore) { page += 1; load(); } });
-  document.querySelector("#payments-link").addEventListener("click", () => load());
+  document.querySelector("#payments-link").addEventListener("click", () => {
+    if (window.location.hash === "#payment-dashboard") load();
+  });
+  window.addEventListener("hashchange", () => {
+    if (window.location.hash === "#payment-dashboard") load();
+  });
+  if (window.location.hash === "#payment-dashboard") load();
 }

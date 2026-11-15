@@ -83,6 +83,13 @@ Adding a product keeps the customer on the catalogue so they can continue
 shopping. A successful addition displays **View cart and continue to checkout**
 beside its confirmation; catalogue and detail pages also have a prominent cart
 link. The cart reviews quantities before `/checkout`, where guests must sign in.
+Checkout, confirmation, and payment pages provide **Order history** (`/account`)
+and **Checkout** (`/checkout`) buttons. Customer order-history navigation does
+not send users to the combined `/store#order-history` operations page.
+The existing `/store#admin-dashboard` and `/store#payment-dashboard` links show
+only the selected dashboard, without unrelated store sections. Hash navigation
+and browser back/forward update the view and refresh its data. This presentation
+filter does not change backend role checks or grant access to either dashboard.
 
 ### Checkout address and delivery-area choices
 

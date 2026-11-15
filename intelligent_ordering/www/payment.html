@@ -10,7 +10,10 @@
   <p id="order-status" role="status" aria-live="polite">Loading order for payment...</p>
   <a id="order-login" hidden>Sign in to pay for your order</a>
   <div id="order-detail"></div>
-  <p><a href="/account">View my orders and tracking</a></p>
+  <nav class="smarto-actions" aria-label="Order navigation">
+    <a class="smarto-button smarto-button-secondary" href="/account">Order history</a>
+    <a class="smarto-button" href="/checkout">Checkout</a>
+  </nav>
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/order-confirmation.js"></script>
 {% endblock %}
