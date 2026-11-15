@@ -66,6 +66,7 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
             "cart.html": "cart-page.js",
             "checkout.html": "checkout-page.js",
             "order-confirmation.html": "order-confirmation.js",
+            "payment.html": "order-confirmation.js",
             "account.html": "order-pages.js",
             "account/profile.html": "customer-portal.js",
             "account/addresses.html": "customer-portal.js",

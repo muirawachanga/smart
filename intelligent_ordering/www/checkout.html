@@ -32,12 +32,14 @@
           <option value="">Enter a new address</option>
         </select>
       </label>
+      <p id="saved-address-help" role="status">Saved addresses will appear here after checkout loads.</p>
       <p><a href="/account/addresses">Manage saved addresses</a></p>
       <label>Delivery area
         <select id="checkout-area" name="delivery_area" required>
           <option value="">Select delivery area</option>
         </select>
       </label>
+      <p id="delivery-area-help" role="status"></p>
       <button id="refresh-quote" class="smarto-button smarto-button-secondary" type="button">Refresh delivery quote</button>
       <label>Address line 1
         <input name="address_line_1" maxlength="140" autocomplete="address-line1" required>

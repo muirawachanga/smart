@@ -1,6 +1,6 @@
 import { ApiError, get, post } from "./api.js";
 import { loadCart } from "./cart-service.js";
-import { formatPrice, orderConfirmationUrl, renderOrderItems } from "./components/order-display.js";
+import { formatPrice, orderPaymentUrl, renderOrderItems } from "./components/order-display.js";
 import { checkoutFingerprint, createCheckoutToken, FINGERPRINT_KEY, ORDER_KEY, TOKEN_KEY } from "./checkout-recovery.js";
 
 const status = document.querySelector("#checkout-status");
@@ -9,6 +9,8 @@ const login = document.querySelector("#checkout-login");
 const form = document.querySelector("#checkout-form");
 const area = document.querySelector("#checkout-area");
 const savedAddress = document.querySelector("#checkout-address");
+const savedAddressHelp = document.querySelector("#saved-address-help");
+const deliveryAreaHelp = document.querySelector("#delivery-area-help");
 const refreshButton = document.querySelector("#refresh-quote");
 const submit = document.querySelector("#checkout-submit");
 const review = document.querySelector("#checkout-review");
@@ -29,7 +31,7 @@ function goToOrder(orderName) {
   } catch (error) {
     console.error("Could not store the recovered order reference:", error);
   }
-  window.location.assign(orderConfirmationUrl(orderName));
+  window.location.assign(orderPaymentUrl(orderName));
 }
 
 function showCart(checkout) {
@@ -82,11 +84,13 @@ async function initialize() {
     }
     function fillSavedAddress() {
       const selected = addresses.find((entry) => entry.name === savedAddress.value);
-      if (!selected) return;
       for (const field of ["address_line_1", "address_line_2", "city", "region", "postal_code"]) {
-        form.elements[field].value = selected[field] || "";
+        form.elements[field].value = selected ? selected[field] || "" : "";
       }
     }
+    savedAddressHelp.textContent = addresses.length
+      ? "Choose a saved address to fill the fields below, or enter a different address."
+      : "You have no saved addresses. Enter the delivery address below, or add one in My account.";
     savedAddress.addEventListener("change", fillSavedAddress);
     const defaultAddress = addresses.find((entry) => entry.is_default);
     if (defaultAddress) {
@@ -97,13 +101,17 @@ async function initialize() {
     for (const entry of checkout.delivery_areas) {
       area.add(new Option(`${entry.name} - ${formatPrice(entry.delivery_fee, entry.currency)}`, entry.name));
     }
+    area.disabled = !checkout.delivery_areas.length;
+    deliveryAreaHelp.textContent = checkout.delivery_areas.length
+      ? "Choose the delivery area for this address."
+      : `No enabled delivery areas are configured for ${checkout.cart.currency}. Ask the store manager to add or enable a Delivery Area with this currency.`;
     showCart(checkout);
     form.hidden = false;
     status.textContent = !canSubmit(checkout)
       ? "Your cart is empty or contains unavailable products. Return to your cart to make changes."
       : checkout.delivery_areas.length
         ? "Select a delivery area to review your total."
-        : "No delivery areas are configured for this currency. Contact the store.";
+        : `No delivery areas are configured for ${checkout.cart.currency}. Contact the store manager.`;
   } catch (error) {
     status.textContent = "Checkout could not be loaded.";
     feedback.textContent = error.message;

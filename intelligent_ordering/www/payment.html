@@ -5,12 +5,12 @@
 {% block smarto_content %}
 <main class="smarto-page" data-page-title="Payment">
   <p class="smarto-eyebrow">Secure payment</p>
-  <h1>Payment</h1>
-  <p>View your order and payment status in your account.</p>
-  <div class="smarto-state">
-    <strong>Pay for an order</strong>
-    <p>Open your order details to view payment attempts or pay with M-Pesa when available.</p>
-    <a href="/account">View my orders</a>
-  </div>
+  <h1>M-Pesa payment</h1>
+  <p>Payment method: M-Pesa only. Confirm your mobile number and approve the STK prompt on your phone. Never enter your M-Pesa PIN on this website.</p>
+  <p id="order-status" role="status" aria-live="polite">Loading order for payment...</p>
+  <a id="order-login" hidden>Sign in to pay for your order</a>
+  <div id="order-detail"></div>
+  <p><a href="/account">View my orders and tracking</a></p>
 </main>
+<script type="module" src="/assets/intelligent_ordering/js/order-confirmation.js"></script>
 {% endblock %}

@@ -15,6 +15,7 @@ class Element {
   replaceChildren(...nodes) { this.children = nodes; }
   add(node) { this.children.push(node); }
   addEventListener(name, handler) { this.listeners[name] = handler; }
+  setAttribute(name, value) { this[name] = value; }
   reportValidity() { return true; }
 }
 
@@ -32,6 +33,7 @@ function install(t) {
     "clear-guest-cart", "checkout-link", "checkout-status", "checkout-feedback",
     "checkout-login", "checkout-form", "checkout-area", "refresh-quote",
     "checkout-submit", "checkout-review", "checkout-totals", "checkout-subtotal", "checkout-address",
+    "saved-address-help", "delivery-area-help",
     "checkout-delivery-fee", "checkout-total", "order-status", "order-detail", "order-login",
   ];
   const nodes = new Map(ids.map((id) => [`#${id}`, new Element()]));
@@ -176,7 +178,7 @@ test("checkout quotes server totals and recovers an interrupted submission", asy
   recover = true;
   await import(`../../intelligent_ordering/public/js/checkout-page.js?reload=${Date.now()}`);
   await tick();
-  assert.equal(locations.at(-1), "/order-confirmation/SO-1");
+  assert.equal(locations.at(-1), "/payment?order=SO-1");
   assert.equal(session.get("smarto.checkout.pending-order.v1"), "SO-1");
   assert.equal(calls.filter((call) => call.url.includes("checkout.create_order")).length, 1);
 });
@@ -218,7 +220,7 @@ test("retry uses the same checkout token and accepts an existing order", async (
   await nodes.get("#checkout-form").listeners.submit({ preventDefault() {} });
   assert.equal(tokens.length, 2);
   assert.equal(tokens[0], tokens[1]);
-  assert.equal(locations.at(-1), "/order-confirmation/SO-1");
+  assert.equal(locations.at(-1), "/payment?order=SO-1");
 });
 
 test("a definitive validation rejection allows a corrected new submission", async (t) => {
@@ -247,7 +249,7 @@ test("a definitive validation rejection allows a corrected new submission", asyn
   await nodes.get("#checkout-form").listeners.submit({ preventDefault() {} });
   assert.equal(tokens.length, 2);
   assert.notEqual(tokens[0], tokens[1]);
-  assert.equal(locations.at(-1), "/order-confirmation/SO-2");
+  assert.equal(locations.at(-1), "/payment?order=SO-2");
 });
 
 test("failed delivery quotes never enable order submission", async (t) => {
@@ -307,6 +309,84 @@ test("checkout fills a default saved address without submitting its owner", asyn
   await tick();
   assert.equal(nodes.get("#checkout-address").value, "ADDR-1");
   assert.equal(nodes.get("#checkout-form").elements.address_line_1.value, "Saved Road");
+});
+
+test("checkout explains missing saved addresses and delivery areas for the cart currency", async (t) => {
+  const { nodes } = install(t);
+  t.mock.method(globalThis, "fetch", async (url) => response(url.includes("cart.get_cart") ? cart : {
+    ...checkout, delivery_areas: [], saved_addresses: [],
+  }));
+  await import(`../../intelligent_ordering/public/js/checkout-page.js?empty-choices=${Date.now()}`);
+  await tick();
+  assert.match(nodes.get("#saved-address-help").textContent, /no saved addresses.*enter the delivery address/i);
+  assert.match(nodes.get("#delivery-area-help").textContent, /KES.*add or enable/i);
+  assert.equal(nodes.get("#checkout-area").disabled, true);
+  assert.equal(nodes.get("#checkout-submit").disabled, true);
+});
+
+test("choosing a new delivery address clears the previously selected saved address", async (t) => {
+  const { nodes } = install(t);
+  t.mock.method(globalThis, "fetch", async (url) => response(url.includes("cart.get_cart") ? cart : {
+    ...checkout, saved_addresses: [{
+      name: "ADDR-1", address_label: "Home", address_line_1: "Saved Road", city: "Nairobi", is_default: 1,
+    }],
+  }));
+  await import(`../../intelligent_ordering/public/js/checkout-page.js?new-address=${Date.now()}`);
+  await tick();
+  nodes.get("#checkout-address").value = "";
+  nodes.get("#checkout-address").listeners.change();
+  assert.equal(nodes.get("#checkout-form").elements.address_line_1.value, "");
+  assert.equal(nodes.get("#checkout-form").elements.city.value, "");
+});
+
+test("payment page loads an owned order and initiates only the existing M-Pesa API", async (t) => {
+  const { nodes, session } = install(t);
+  window.location.pathname = "/payment";
+  window.location.search = "?order=SO-1";
+  session.set("smarto.checkout.pending-order.v1", "SO-1");
+  session.set("smarto.checkout.pending-token.v1", "token");
+  const calls = [];
+  let initiated = false;
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (url.includes("orders.get_my_order")) return response({
+      name: "SO-1", status: "Pending", payment_status: "Unpaid",
+      customer_name: "Customer", customer_phone: "+254700000000", delivery_address: "Road",
+      items: [{ ...item, line_total: 100 }], subtotal: 100, total: 110, delivery_fee: 10, currency: "KES",
+    });
+    if (url.includes("payments.get_order_payments")) return response(initiated ? [{ status: "Pending", amount: 110 }] : []);
+    if (url.includes("payments.initiate_payment")) {
+      initiated = true;
+      return response({ status: "Pending", amount: 110 });
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/order-confirmation.js?payment=${Date.now()}`);
+  await tick();
+  assert.equal(session.size, 0);
+  assert.equal(calls.some((call) => call.url.includes("initiate_payment")), false);
+  const form = nodes.get("#order-detail").children.find((node) => node.className === "status-update-form");
+  assert.equal(form.children[1].textContent, "Pay with M-Pesa");
+  assert.equal(form.children[1].disabled, false);
+  await form.listeners.submit({ preventDefault() {} });
+  const call = calls.find((entry) => entry.url.includes("initiate_payment"));
+  assert.equal(call.options.body.get("order_name"), "SO-1");
+  assert.equal(call.options.body.get("phone"), "+254700000000");
+  assert.equal(call.options.body.has("amount"), false);
+  assert.equal(form.children[1].disabled, true);
+});
+
+test("payment page preserves its order-specific login return without exposing guest data", async (t) => {
+  const { nodes } = install(t);
+  window.location.pathname = "/payment";
+  window.location.search = "?order=SO-1";
+  t.mock.method(globalThis, "fetch", async () => response({ requires_login: true }));
+  await import(`../../intelligent_ordering/public/js/order-confirmation.js?payment-guest=${Date.now()}`);
+  await tick();
+  assert.equal(nodes.get("#order-detail").children.length, 0);
+  assert.equal(nodes.get("#order-login").hidden, false);
+  const login = new URL(nodes.get("#order-login").href, "https://example.test");
+  assert.equal(login.searchParams.get("redirect-to"), "/payment?order=SO-1");
 });
 
 test("private HTTP checkout uses secure random tokens and preserves same-submission retry checks", async (t) => {

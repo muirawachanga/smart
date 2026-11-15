@@ -84,6 +84,22 @@ shopping. A successful addition displays **View cart and continue to checkout**
 beside its confirmation; catalogue and detail pages also have a prominent cart
 link. The cart reviews quantities before `/checkout`, where guests must sign in.
 
+### Checkout address and delivery-area choices
+
+The saved-address selector is populated only from the signed-in customer's
+addresses at `/account/addresses`. If there are none, the customer can still
+type the address directly into the required fields below the selector, or save
+an address in My account first.
+
+The delivery-area selector is populated from enabled **Delivery Area** records
+whose currency exactly matches the cart's currency. If it is empty, sign in
+with System Manager, Business Admin, Store Manager, or Order Manager, open
+**Delivery Area** in Desk, and create or enable an area with the correct
+currency (for example, KES when the cart subtotal is in KES) and a delivery fee.
+An area with another currency, or a disabled area, will not appear. After saving
+it, reload checkout. The backend verifies the selected enabled area and its
+server-side fee before accepting an order.
+
 Customer and staff pages reuse the existing database-backed catalog, cart,
 checkout, order, inventory, delivery, payment, and reporting APIs. The account,
 orders, inventory, and delivery workspaces use the current user's records and
@@ -332,17 +348,20 @@ Consequently, multiple pending orders can compete for the same stock.
 
 The dedicated checkout stores its request token and a SHA-256 submission
 fingerprint in session storage before submission, and the order reference when
-known; no address or contact details are stored there. After an interrupted
+known. HTTPS uses a hashed fingerprint; private HTTP fallback stores the exact
+submission (including contact/address fields) in tab-scoped session storage for
+retry comparison. Recovery state is cleared after the owned order is loaded.
+After an interrupted
 response or reload, it checks the token against the signed-in customer before
 recovering an existing order. An uncertain attempt can only be retried with the
 same reviewed cart, quote and customer details; contact the store if these cannot
 be restored. A definitive validation rejection allows a corrected new request.
 Session storage recovery is limited to the same browser tab.
-Checkout requires a secure browser context (HTTPS or localhost) for token
-generation and fingerprinting.
+Private HTTP uses cryptographically random UUID tokens and exact retry
+comparison when HTTPS-only digest APIs are unavailable. Use HTTPS in production.
 The confirmation and account pages use owner-scoped endpoints even for customer
 accounts that also have staff roles. The account page reuses the existing
-M-Pesa controls; the dedicated payment page is not yet connected.
+M-Pesa controls; successful dedicated checkout opens `/payment?order=<order-name>`.
 
 Customers can list and view only their own orders. Business Admin and Order
 Manager roles can search, filter, inspect, and update order statuses. Submitted
@@ -356,8 +375,9 @@ legacy records exist.
 The storefront continues to provide checkout review, order confirmation,
 customer order history, and staff order controls. The dedicated `/account` and
 `/dashboard/orders` pages use the same APIs. Completion is performed through
-the delivery workflow, not through the staff order status form. M-Pesa is an optional,
-server-configured integration. New orders include the configured delivery-area
+the delivery workflow, not through the staff order status form. M-Pesa is the only
+customer payment method and must be configured server-side for payment to work.
+New orders include the configured delivery-area
 fee in their immutable server-calculated total. Product/category-at-order
 snapshots support historical reporting; old orders without a snapshot report
 as uncategorized rather than being silently reclassified.
@@ -548,6 +568,45 @@ role-checked reporting dashboard at `/store#admin-dashboard`; the analytics and
 exports continue to use real Frappe records and existing report permissions.
 
 ## M-Pesa configuration and operations
+
+Successful checkout (including a recovered/repeated submission) opens
+`/payment?order=<order-name>`, using the owner-only order API. The page offers
+only M-Pesa STK Push, displays the server-calculated order total and existing
+payment attempts, and never asks for the customer's PIN. It does not initiate a
+charge on page load. The customer explicitly clicks **Pay with M-Pesa**, approves
+the prompt on their phone, then uses **Refresh payment status** to view the
+verified result. Paid or closed orders cannot initiate another payment.
+An unconfigured integration reports an error; it does not offer fake payment
+success or another payment method. The original confirmation URLs remain valid
+and include a link to the payment page.
+
+### Configure this Frappe app
+
+1. In the [Safaricom Daraja portal](https://developer.safaricom.co.ke), create
+   an app with M-Pesa Express enabled. Obtain its matching Sandbox consumer key,
+   consumer secret, test shortcode, and STK passkey from the portal's test data.
+   Do not use unrelated credentials or invent a passkey.
+2. On your Bench server, securely edit
+   `sites/smart.localhost/site_config.json`. Merge the `mpesa` object shown below
+   into the existing JSON; preserve database credentials and other settings.
+   This app reads `frappe.conf.mpesa`, not a generic Payment Gateway DocType.
+   Never put credentials into browser code, chat, or Git.
+3. Configure a publicly reachable HTTPS callback ending in
+   `/api/method/intelligent_ordering.api.payments.callback`. A private IP such
+   as `172.18.183.58`, localhost, or a LAN-only hostname cannot receive Safaricom
+   callbacks. Use a separate controlled sandbox deployment with HTTPS and no
+   development passwords; do not expose your existing development/test-account
+   site publicly. The proxy must route callbacks to the correct Frappe site.
+   Configure the base callback URL without a query string; the app appends its
+   per-attempt token automatically.
+4. Set the system timezone to `Africa/Nairobi`. Restart the Bench services after
+   changing configuration (`bench restart` for managed services; stop and
+   restart `bench start` in development). Run `bench --site smart.localhost
+   clear-cache`. No secret should appear in command arguments or shell history.
+5. Test Sandbox order placement, explicit STK initiation, callback processing,
+   failures, and duplicate refreshes. Only after Safaricom approval use matching
+   Production credentials and an approved business shortcode on a separate
+   production site. Do not mark an order paid manually when a callback is missing.
 
 Configure a nested `mpesa` object in the site's private `site_config.json` using
 Bench or your deployment secret manager. `.env.example` is reference only.

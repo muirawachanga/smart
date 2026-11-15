@@ -21,6 +21,10 @@ export function orderConfirmationUrl(id) {
   return `/order-confirmation/${encodeURIComponent(id)}`;
 }
 
+export function orderPaymentUrl(id) {
+  return `/payment?${new URLSearchParams({ order: id })}`;
+}
+
 export function renderOrderItems(container, items, currency) {
   container.replaceChildren(...items.map((item) => {
     const row = text("article", "", "smarto-order-item");

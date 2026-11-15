@@ -1,10 +1,12 @@
 import { get } from "./api.js";
-import { formatPrice, orderConfirmationUrl, renderOrderItems, text } from "./components/order-display.js";
+import { formatPrice, orderConfirmationUrl, orderPaymentUrl, renderOrderItems, text } from "./components/order-display.js";
+import { mountOrderPayment } from "./payments.js";
 import { FINGERPRINT_KEY, ORDER_KEY, TOKEN_KEY } from "./checkout-recovery.js";
 
 const status = document.querySelector("#order-status");
 const target = document.querySelector("#order-detail");
 const login = document.querySelector("#order-login");
+const paymentPage = window.location.pathname.replace(/\/$/, "") === "/payment";
 
 async function loadOrder() {
   try {
@@ -15,7 +17,7 @@ async function loadOrder() {
     if (!id) throw new Error("An order reference is required.");
     const order = await get("orders.get_my_order", { order_name: id });
     if (order.requires_login) {
-      login.href = `/login?${new URLSearchParams({ "redirect-to": orderConfirmationUrl(id) })}`;
+      login.href = `/login?${new URLSearchParams({ "redirect-to": paymentPage ? orderPaymentUrl(id) : orderConfirmationUrl(id) })}`;
       login.hidden = false;
       status.textContent = "Sign in with the customer account that placed this order.";
       return;
@@ -42,7 +44,19 @@ async function loadOrder() {
       text("p", `Delivery${order.delivery_area ? ` (${order.delivery_area})` : ""}: ${formatPrice(order.delivery_fee, order.currency)}`),
       text("p", `Total: ${formatPrice(order.total, order.currency)}`),
     );
-    status.textContent = "Order details";
+    if (paymentPage) {
+      mountOrderPayment(target, order);
+      status.textContent = order.payment_status === "Paid"
+        ? "This order is paid."
+        : ["Cancelled", "Completed"].includes(order.status)
+          ? "This order is closed; no new payment can be initiated."
+          : "Order placed. Pay using M-Pesa below. Payment is confirmed only after server verification.";
+    } else {
+      const payLink = text("a", "Continue to M-Pesa payment", "smarto-button");
+      payLink.href = orderPaymentUrl(order.name);
+      target.append(payLink);
+      status.textContent = "Order details";
+    }
   } catch (error) {
     status.textContent = `Order could not be loaded: ${error.message}`;
   }
