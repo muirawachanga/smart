@@ -1,5 +1,8 @@
 <header class="smarto-header">
   <div class="smarto-header-inner">
+    <button class="smarto-sidebar-toggle smarto-icon-button" id="smarto-sidebar-toggle" type="button" aria-controls="smarto-sidebar" aria-expanded="false" aria-label="Open staff navigation" hidden>
+      {% from "templates/includes/lucide_icon.html" import icon %}{{ icon("menu") }}
+    </button>
     <a class="smarto-brand" href="/" aria-label="SmartO home">
       {% include "templates/includes/smarto_logo.html" %}
     </a>
@@ -18,21 +21,12 @@
         Cart <span class="smarto-cart-count" id="cart-count" aria-live="polite">0</span>
       </a>
       <span class="smarto-account-links">
+        <a id="smarto-staff-entry-link" href="/dashboard/admin" hidden>Staff workspace</a>
         <a id="smarto-login-link" href="/login">Log in</a>
         <a id="smarto-register-link" href="/register">Register</a>
         <a id="smarto-account-link" href="/account" hidden>My account</a>
         <a id="smarto-logout-link" href="/api/method/logout" hidden>Log out</a>
       </span>
-    </nav>
-    <nav class="smarto-staff-navigation" id="smarto-staff-navigation"
-      aria-label="Staff workspaces" hidden>
-      <a id="staff-orders-link" href="/dashboard/orders" hidden>Orders</a>
-      <a id="payments-link" href="/store#payment-dashboard" hidden>Payments</a>
-      <a id="deliveries-link" href="/dashboard/delivery" hidden>Deliveries</a>
-      <a id="admin-dashboard-link" href="/store#admin-dashboard" hidden>Dashboard</a>
-      <a id="inventory-dashboard-link" href="/dashboard/inventory" hidden>Inventory</a>
-      <a id="support-dashboard-link" href="/dashboard/support" hidden>Support</a>
-      <a id="smarto-workspace-link" href="/account" hidden>Workspace</a>
     </nav>
   </div>
 </header>

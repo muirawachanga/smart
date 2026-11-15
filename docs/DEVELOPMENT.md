@@ -92,6 +92,16 @@ only the selected dashboard, without unrelated store sections. Hash navigation
 and browser back/forward update the view and refresh its data. This presentation
 filter does not change backend role checks or grant access to either dashboard.
 
+Staff dashboards and the two `/store` management views use a shared vertical
+sidebar. Navigation retains the existing role-filtered destinations; shopping
+and customer-account pages keep their normal header navigation and a staff
+workspace link when authorized. The sidebar collapses to labeled-by-tooltip
+icons on desktop and opens as a focus-contained drawer on screens up to 850px.
+Escape, the close button, the backdrop, and navigation links close the drawer.
+Active highlighting follows both dashboard paths and management-view hashes.
+Lucide SVG icons are bundled locally with their license in
+`public/images/lucide-LICENSE.txt`; no external icon service is required.
+
 ### Checkout address and delivery-area choices
 
 The saved-address selector is populated only from the signed-in customer's
@@ -153,6 +163,13 @@ Login destinations are selected server-side from existing workspace permissions.
 Native Desk access remains subject to Frappe authorization.
 
 Offline regression suites do not establish actual session/email behavior.
+Login, customer-account and staff dashboard errors include a safe operation
+name and, when available, HTTP status. Server traceback details are not shown
+for server errors. When reporting an issue, share the page, action, displayed
+error and time; do not share passwords, session cookies, reset links, customer
+details or transaction data. If a page reports that its interactive script did
+not start, check browser developer tools and deployed assets, and redact any
+sensitive data before sharing diagnostics.
 On a dedicated development site, run the Frappe integration tests:
 
 ```bash

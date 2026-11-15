@@ -199,4 +199,6 @@ if (pagination) {
 }
 const refresh = document.querySelector("#customer-refresh");
 if (refresh) refresh.addEventListener("click", load);
+const warning = document.querySelector("#smarto-page-script-warning");
+if (warning) warning.hidden = true;
 load();

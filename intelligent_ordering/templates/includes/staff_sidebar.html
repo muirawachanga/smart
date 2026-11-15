@@ -1,0 +1,26 @@
+{% from "templates/includes/lucide_icon.html" import icon %}
+<aside class="smarto-sidebar" id="smarto-sidebar" aria-label="Staff navigation" hidden>
+  <div class="smarto-sidebar-heading">
+    <a class="smarto-brand" href="/" aria-label="SmartO home">
+      {% include "templates/includes/smarto_logo.html" %}
+    </a>
+    <button class="smarto-sidebar-close smarto-icon-button" id="smarto-sidebar-close" type="button" aria-label="Close staff navigation">
+      {{ icon("x") }}
+    </button>
+  </div>
+  <nav class="smarto-staff-navigation" id="smarto-staff-navigation" aria-label="Staff workspaces" hidden>
+    <a id="smarto-workspace-link" href="/account" title="My workspace" hidden>{{ icon("layout-dashboard") }}<span class="smarto-sidebar-label">My workspace</span></a>
+    <a id="staff-orders-link" href="/dashboard/orders" title="Orders" hidden>{{ icon("clipboard-list") }}<span class="smarto-sidebar-label">Orders</span></a>
+    <a id="payments-link" href="/store#payment-dashboard" title="Payments" hidden>{{ icon("credit-card") }}<span class="smarto-sidebar-label">Payments</span></a>
+    <a id="deliveries-link" href="/dashboard/delivery" title="Deliveries" hidden>{{ icon("truck") }}<span class="smarto-sidebar-label">Deliveries</span></a>
+    <a id="admin-dashboard-link" href="/store#admin-dashboard" title="Operations overview" hidden>{{ icon("layout-dashboard") }}<span class="smarto-sidebar-label">Operations overview</span></a>
+    <a id="inventory-dashboard-link" href="/dashboard/inventory" title="Inventory" hidden>{{ icon("package") }}<span class="smarto-sidebar-label">Inventory</span></a>
+    <a id="support-dashboard-link" href="/dashboard/support" title="Support" hidden>{{ icon("headphones") }}<span class="smarto-sidebar-label">Support</span></a>
+  </nav>
+  <button class="smarto-sidebar-collapse smarto-icon-button" id="smarto-sidebar-collapse" type="button" aria-controls="smarto-staff-navigation" aria-expanded="true" aria-label="Collapse staff navigation" title="Collapse staff navigation">
+    <span class="smarto-collapse-icon">{{ icon("panel-left-close") }}</span>
+    <span class="smarto-expand-icon">{{ icon("panel-left-open") }}</span>
+    <span class="smarto-sidebar-label">Collapse sidebar</span>
+  </button>
+</aside>
+<button class="smarto-sidebar-backdrop" id="smarto-sidebar-backdrop" type="button" aria-label="Close staff navigation" tabindex="-1" hidden></button>

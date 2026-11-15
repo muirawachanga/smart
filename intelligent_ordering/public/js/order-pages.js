@@ -284,4 +284,6 @@ if (filters) filters.addEventListener("submit", (event) => {
 });
 previous.addEventListener("click", () => { if (page > 1) { page -= 1; loadOrders(); } });
 next.addEventListener("click", () => { if (hasMore) { page += 1; loadOrders(); } });
+const warning = document.querySelector("#smarto-page-script-warning");
+if (warning) warning.hidden = true;
 loadOrders();

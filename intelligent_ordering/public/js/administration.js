@@ -10,7 +10,17 @@ function action(label, callback, className = "secondary-button") {
   const element = text("button", label);
   element.className = className;
   element.type = "button";
-  element.addEventListener("click", callback);
+  element.addEventListener("click", async () => {
+    if (element.disabled) return;
+    element.disabled = true;
+    try {
+      await callback();
+    } catch (error) {
+      document.querySelector("#admin-feedback").textContent = error.message;
+    } finally {
+      element.disabled = false;
+    }
+  });
   return element;
 }
 

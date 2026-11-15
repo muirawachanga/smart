@@ -39,6 +39,22 @@ SHELL_ROUTES = {
 
 
 class TestSmartOWebsiteRoutes(unittest.TestCase):
+    def test_role_pages_and_auth_include_script_startup_warning(self):
+        routes = [
+            "dashboard/admin.html", "dashboard/owner.html", "dashboard/sales.html",
+            "dashboard/orders.html", "dashboard/inventory.html", "dashboard/delivery.html",
+            "dashboard/support.html", "account.html", "account/profile.html",
+            "account/addresses.html", "account/payments.html", "account/notifications.html",
+            "store.html",
+        ]
+        for route in routes:
+            with self.subTest(route=route):
+                self.assertIn("page_script_warning.html", (WWW / route).read_text())
+        self.assertIn("page_script_warning.html", (APP_ROOT / "templates/auth.html").read_text())
+        warning = (APP_ROOT / "templates/includes/page_script_warning.html").read_text()
+        self.assertIn('role="alert"', warning)
+        self.assertNotIn(" hidden", warning)
+
     def test_smart_design_assets_are_registered_and_logo_is_shared(self):
         logo_path = "/assets/intelligent_ordering/images/smarto-logo.svg"
         self.assertIn("/assets/intelligent_ordering/css/design-tokens.css", web_include_css)

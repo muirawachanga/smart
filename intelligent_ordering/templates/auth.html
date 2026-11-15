@@ -15,6 +15,7 @@
       <p>Shop, order, and track deliveries with your SmartO account.</p>
     </aside>
     <section class="smarto-auth-panel">
+      {% include "templates/includes/page_script_warning.html" %}
       {% block auth_form %}{% endblock %}
       <p id="auth-status" role="status" aria-live="polite"></p>
       <p id="auth-error" role="alert"></p>

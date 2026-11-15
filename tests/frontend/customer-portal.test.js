@@ -126,5 +126,5 @@ test("unauthorized portal requests show an error and login without customer reco
   await tick();
   assert.equal(nodes.get("#customer-list").children.length, 0);
   assert.equal(nodes.get("#customer-login").hidden, false);
-  assert.match(nodes.get("#customer-feedback").textContent, /Customer access required/);
+  assert.match(nodes.get("#customer-feedback").textContent, /permission.*customers\.payment_history, HTTP 403/);
 });

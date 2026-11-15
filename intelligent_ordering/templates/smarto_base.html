@@ -6,7 +6,13 @@
 {% endblock %}
 
 {% block page_content %}
+<div class="smarto-workspace-shell" id="smarto-workspace-shell">
+{% include "templates/includes/staff_sidebar.html" %}
+<div class="smarto-workspace-content" id="smarto-workspace-content">
 {% include "templates/includes/smarto_header.html" %}
+<p id="smarto-session-error" class="smarto-script-warning" role="alert" hidden></p>
+<p id="smarto-unexpected-error" class="smarto-script-warning" role="alert" hidden></p>
+<script src="/assets/intelligent_ordering/js/error-monitor.js"></script>
 <div class="smarto-main" id="main-content">
   <nav class="smarto-breadcrumb" aria-label="Breadcrumb">
     <ol>
@@ -17,6 +23,8 @@
   {% block smarto_content %}{% endblock %}
 </div>
 {% include "templates/includes/smarto_footer.html" %}
+</div>
+</div>
 <p id="smarto-nav-status" class="smarto-visually-hidden" role="status" aria-live="polite"></p>
 <script type="module" src="/assets/intelligent_ordering/js/site.js"></script>
 {% endblock %}

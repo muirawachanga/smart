@@ -11,6 +11,7 @@ class Element {
   }
   addEventListener(name, handler) { this.listeners[name] = handler; }
   setAttribute(name, value) { this[name] = value; }
+  getAttribute(name) { return this[name] ?? null; }
   removeAttribute(name) { delete this[name]; }
 }
 
@@ -25,6 +26,10 @@ test("each staff role sees only authorized navigation and its own workspace", as
   });
 
   for (const [role, destination, visible] of [
+    ["Administrator", "/dashboard/admin", [
+      "#staff-orders-link", "#payments-link", "#deliveries-link", "#admin-dashboard-link",
+      "#inventory-dashboard-link", "#support-dashboard-link",
+    ]],
     ["System Manager", "/dashboard/admin", [
       "#staff-orders-link", "#payments-link", "#deliveries-link", "#admin-dashboard-link",
       "#inventory-dashboard-link", "#support-dashboard-link",
@@ -45,8 +50,20 @@ test("each staff role sees only authorized navigation and its own workspace", as
     const nodes = new Map();
     const document = {
       querySelector(selector) {
-        if (selector === "[data-route-reference]") return null;
-        if (!nodes.has(selector)) nodes.set(selector, new Element());
+        if (["[data-route-reference]", "#smarto-sidebar"].includes(selector)) return null;
+        if (!nodes.has(selector)) {
+          const link = new Element();
+          const paths = {
+            "#staff-orders-link": "/dashboard/orders",
+            "#payments-link": "/store#payment-dashboard",
+            "#deliveries-link": "/dashboard/delivery",
+            "#admin-dashboard-link": "/store#admin-dashboard",
+            "#inventory-dashboard-link": "/dashboard/inventory",
+            "#support-dashboard-link": "/dashboard/support",
+          };
+          if (paths[selector]) link.href = paths[selector];
+          nodes.set(selector, link);
+        }
         return nodes.get(selector);
       },
       querySelectorAll: () => [],
@@ -58,11 +75,18 @@ test("each staff role sees only authorized navigation and its own workspace", as
     });
     t.mock.method(globalThis, "fetch", async () => ({
       ok: true,
-      json: async () => ({ message: { user: "test@example.test", roles: [role] } }),
+      json: async () => ({ message: {
+        user: role === "Administrator" ? "Administrator" : "test@example.test",
+        roles: role === "Administrator" ? [] : [role],
+      } }),
     }));
     await import(`../../intelligent_ordering/public/js/site.js?role=${encodeURIComponent(role)}`);
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert.equal(nodes.get("#smarto-workspace-link").href, destination);
+    assert.equal(nodes.get("#smarto-staff-entry-link").href, destination);
+    assert.equal(nodes.get("#smarto-workspace-link").hidden,
+      ["/dashboard/orders", "/dashboard/inventory", "/dashboard/delivery", "/dashboard/support"]
+        .includes(destination));
     for (const selector of [
       "#staff-orders-link", "#payments-link", "#deliveries-link",
       "#admin-dashboard-link", "#inventory-dashboard-link", "#support-dashboard-link",
@@ -82,6 +106,7 @@ test("customer account navigation marks only the current account section", async
       else delete globalThis[key];
     }
   });
+
   const links = ["/account", "/account/profile", "/account/addresses", "/account/payments", "/account/notifications"]
     .map((path) => {
       const link = new Element();
@@ -91,7 +116,7 @@ test("customer account navigation marks only the current account section", async
   const nodes = new Map();
   const document = {
     querySelector(selector) {
-      if (selector === "[data-route-reference]") return null;
+      if (["[data-route-reference]", "#smarto-sidebar"].includes(selector)) return null;
       if (!nodes.has(selector)) nodes.set(selector, new Element());
       return nodes.get(selector);
     },
@@ -112,4 +137,39 @@ test("customer account navigation marks only the current account section", async
   assert.equal(links.find((link) => link.dataset.accountPath === "/account/payments")["aria-current"], "page");
   assert.ok(links.filter((link) => link.dataset.accountPath !== "/account/payments")
     .every((link) => !("aria-current" in link)));
+});
+
+test("logout failures are visibly reported with an operation and HTTP status", async (t) => {
+  const original = Object.fromEntries(["document", "window"].map((key) =>
+    [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  t.after(() => {
+    for (const [key, descriptor] of Object.entries(original)) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    }
+  });
+  const nodes = new Map();
+  const document = {
+    querySelector(selector) {
+      if (["[data-route-reference]", "#smarto-sidebar"].includes(selector)) return null;
+      if (!nodes.has(selector)) nodes.set(selector, new Element());
+      return nodes.get(selector);
+    },
+    querySelectorAll: () => [],
+    addEventListener() {},
+  };
+  Object.defineProperty(globalThis, "document", { value: document, configurable: true });
+  Object.defineProperty(globalThis, "window", {
+    value: { location: { pathname: "/store" }, frappe: {} }, configurable: true,
+  });
+  t.mock.method(globalThis, "fetch", async (url) => url.includes("current_user")
+    ? { ok: true, json: async () => ({ message: { user: "test@example.test", roles: ["Customer"] } }) }
+    : { ok: false, status: 500 });
+  await import(`../../intelligent_ordering/public/js/site.js?logout-failure=${Date.now()}`);
+  const link = nodes.get("#smarto-logout-link");
+  link.href = "/api/method/logout";
+  await link.listeners.click({ preventDefault() {}, currentTarget: link });
+  assert.equal(nodes.get("#smarto-session-error").hidden, false);
+  assert.match(nodes.get("#smarto-session-error").textContent, /authentication\.logout, HTTP 500/);
+  assert.equal(link["aria-disabled"], undefined);
 });

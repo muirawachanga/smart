@@ -11,7 +11,7 @@ export class ApiError extends Error {
 export async function get(endpoint, parameters = {}) {
   const query = new URLSearchParams(parameters);
   const suffix = query.size ? `?${query}` : "";
-  return request(`${API_ROOT}.${endpoint}${suffix}`, {
+  return request(`${API_ROOT}.${endpoint}${suffix}`, endpoint, {
     method: "GET",
     headers: { Accept: "application/json" },
   });
@@ -19,7 +19,7 @@ export async function get(endpoint, parameters = {}) {
 
 export async function post(endpoint, parameters = {}) {
   const body = new URLSearchParams(parameters);
-  return request(`${API_ROOT}.${endpoint}`, {
+  return request(`${API_ROOT}.${endpoint}`, endpoint, {
     method: "POST",
     headers: {
       Accept: "application/json",
@@ -30,23 +30,42 @@ export async function post(endpoint, parameters = {}) {
   });
 }
 
-async function request(url, options) {
-  const response = await fetch(url, {
-    ...options,
-    credentials: "same-origin",
-  });
+async function request(url, operation, options) {
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      credentials: "same-origin",
+    });
+  } catch {
+    throw new Error(`Could not connect to the server. Check your connection and try again. (Operation: ${operation})`);
+  }
+  const payload = await readResponse(response, operation);
+  return payload.message;
+}
+
+export async function readResponse(response, operation, { login = false } = {}) {
   let payload;
   try {
     payload = await response.json();
   } catch {
-    throw new Error("The server returned an invalid response.");
+    const status = Number.isInteger(response.status) ? `, HTTP ${response.status}` : "";
+    throw new Error(`The server returned an invalid response. Try again or contact support. (Operation: ${operation}${status})`);
   }
 
   if (!response.ok) {
-    throw new ApiError(serverErrorMessage(payload), response.status);
+    const status = response.status;
+    let message;
+    if (login && status === 401) message = "Invalid credentials. Please try again.";
+    else if (status === 401) message = "Your session may have expired. Sign in and try again.";
+    else if (status === 403) message = "You do not have permission for this action, or your session has expired.";
+    else if (status === 429) message = "Too many attempts. Please try again later.";
+    else if (status >= 500) message = "The server encountered an error. Contact your administrator.";
+    else message = serverErrorMessage(payload);
+    const code = Number.isInteger(status) ? `, HTTP ${status}` : "";
+    throw new ApiError(`${message} (Operation: ${operation}${code})`, status);
   }
-
-  return payload.message;
+  return payload;
 }
 
 export function serverErrorMessage(payload) {

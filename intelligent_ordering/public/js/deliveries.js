@@ -250,6 +250,10 @@ export function initDeliveryDashboard() {
   readyPrevious.addEventListener("click", () => { if (readyPage > 1) { readyPage -= 1; refresh(); } });
   readyNext.addEventListener("click", () => { readyPage += 1; refresh(); });
   document.querySelector("#deliveries-link").addEventListener("click", refresh);
+  if (document.querySelector("[data-delivery-page]")) {
+    const warning = document.querySelector("#smarto-page-script-warning");
+    if (warning) warning.hidden = true;
+  }
   if (window.location.hash === "#delivery-dashboard" || document.querySelector("[data-delivery-page]")) {
     refresh();
   }

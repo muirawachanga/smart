@@ -1,4 +1,4 @@
-import { serverErrorMessage } from "./api.js";
+import { get, readResponse } from "./api.js";
 
 const page = document.querySelector("[data-auth-page]");
 const kind = page.dataset.authPage;
@@ -9,28 +9,25 @@ let busy = false;
 let challenge = "";
 
 async function request(endpoint, values) {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    credentials: "same-origin",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      "X-Frappe-CSRF-Token": page.dataset.authCsrf,
-    },
-    body: new URLSearchParams(values),
-  });
-  let payload;
+  const operation = kind === "login" ? "authentication.login"
+    : kind === "register" ? "customers.register"
+      : kind === "forgot" ? "authentication.forgot_password" : "authentication.reset_password";
+  let response;
   try {
-    payload = await response.json();
+    response = await fetch(endpoint, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Frappe-CSRF-Token": page.dataset.authCsrf,
+      },
+      body: new URLSearchParams(values),
+    });
   } catch {
-    throw new Error("The server returned an invalid response. Please try again.");
+    throw new Error(`Could not connect to the server. Check your connection and try again. (Operation: ${operation})`);
   }
-  if (!response.ok) {
-    throw new Error(response.status === 401 ? "Invalid credentials. Please try again."
-      : response.status === 429 ? "Too many attempts. Please try again later."
-        : serverErrorMessage(payload));
-  }
-  return payload;
+  return readResponse(response, operation, { login: kind === "login" });
 }
 
 async function finishLogin(payload) {
@@ -58,12 +55,8 @@ async function finishLogin(payload) {
     throw new Error("Sign-in was not completed. Please try again.");
   }
   const redirect = new URLSearchParams(window.location.search).get("redirect-to") || "";
-  const response = await fetch(`/api/method/intelligent_ordering.api.authentication.destination?${
-    new URLSearchParams({ redirect_to: redirect })
-  }`, { credentials: "same-origin", headers: { Accept: "application/json" } });
-  const result = await response.json();
-  if (!response.ok) throw new Error(serverErrorMessage(result));
-  const target = result.message?.destination;
+  const result = await get("authentication.destination", { redirect_to: redirect });
+  const target = result?.destination;
   if (typeof target !== "string" || !target.startsWith("/") || target.startsWith("//")) {
     throw new Error("The sign-in destination is invalid.");
   }
@@ -129,3 +122,5 @@ for (const toggle of document.querySelectorAll("[data-toggle-password]")) {
     toggle.setAttribute("aria-pressed", String(visible));
   });
 }
+const warning = document.querySelector("#smarto-page-script-warning");
+if (warning) warning.hidden = true;

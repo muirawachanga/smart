@@ -1,5 +1,6 @@
 import { get, post } from "./api.js";
 import { readGuestCart } from "./cart-storage.js";
+import { initStaffSidebar } from "./staff-sidebar.js";
 
 const menuButton = document.querySelector("#smarto-menu-toggle");
 const primaryNavigation = document.querySelector("#smarto-primary-navigation");
@@ -99,6 +100,7 @@ function setVisible(element, visible) {
 function setupAccountNavigation(user) {
   const roles = new Set(user?.roles || []);
   const authenticated = Boolean(user?.user);
+  const administrator = user?.user === "Administrator";
   setVisible(document.querySelector("#smarto-login-link"), !authenticated);
   setVisible(document.querySelector("#smarto-register-link"), !authenticated);
   setVisible(document.querySelector("#smarto-account-link"), authenticated);
@@ -116,7 +118,7 @@ function setupAccountNavigation(user) {
   let hasStaffLinks = false;
   for (const [selector, allowedRoles] of staffControls) {
     const link = document.querySelector(selector);
-    const visible = authenticated && allowedRoles.some((role) => roles.has(role));
+    const visible = authenticated && (administrator || allowedRoles.some((role) => roles.has(role)));
     setVisible(link, visible);
     hasStaffLinks ||= visible;
   }
@@ -132,17 +134,24 @@ function setupAccountNavigation(user) {
     [["Customer Support"], "/dashboard/support"],
   ];
   const destination = workspaceByRole.find(([allowedRoles]) =>
-    allowedRoles.some((role) => roles.has(role)));
+    administrator || allowedRoles.some((role) => roles.has(role)));
+  const staffEntry = document.querySelector("#smarto-staff-entry-link");
   if (destination) {
     workspace.href = destination[1];
-    workspace.textContent = "Staff workspace";
-    setVisible(workspace, true);
+    staffEntry.href = destination[1];
+    const duplicate = staffControls.some(([selector]) => {
+      const link = document.querySelector(selector);
+      return !link.hidden && link.getAttribute("href") === destination[1];
+    });
+    setVisible(workspace, !duplicate);
+    setVisible(staffEntry, true);
     hasStaffLinks = true;
   } else {
     setVisible(workspace, false);
+    setVisible(staffEntry, false);
   }
   staffNavigation.hidden = !hasStaffLinks;
-  document.querySelector(".smarto-header-inner").classList.toggle("has-staff-links", hasStaffLinks);
+  initStaffSidebar(hasStaffLinks);
 }
 
 async function loadCartCount(user) {
@@ -181,10 +190,21 @@ async function signOut(event) {
       credentials: "same-origin",
       headers: { "X-Frappe-CSRF-Token": window.frappe?.csrf_token || "" },
     });
-    if (!response.ok) throw new Error("SmartO could not end this session. Try again.");
+    if (!response.ok) {
+      throw new Error(`SmartO could not end this session. Try again. (Operation: authentication.logout, HTTP ${response.status})`);
+    }
     window.location.assign("/logged-out");
   } catch (error) {
-    pageStatus.textContent = error.message;
+    const sessionError = document.querySelector("#smarto-session-error");
+    const message = error instanceof TypeError
+      ? "Could not connect to the server. Check your connection and try again. (Operation: authentication.logout)"
+      : error.message;
+    if (sessionError) {
+      sessionError.textContent = message;
+      sessionError.hidden = false;
+    } else {
+      pageStatus.textContent = message;
+    }
     link.removeAttribute("aria-disabled");
   }
 }
@@ -202,7 +222,16 @@ get("v1.current_user")
     if (!isExistingStorefront) return loadCartCount(user);
     return undefined;
   })
-  .catch(() => {
+  .catch((error) => {
     setupAccountNavigation(null);
+    const path = window.location.pathname;
+    if (path.startsWith("/dashboard/") || (path === "/store"
+      && ["#admin-dashboard", "#payment-dashboard"].includes(window.location.hash))) {
+      const sessionError = document.querySelector("#smarto-session-error");
+      if (sessionError) {
+        sessionError.textContent = `Staff navigation could not be loaded: ${error.message}`;
+        sessionError.hidden = false;
+      }
+    }
     if (!isExistingStorefront) loadCartCount(null);
   });

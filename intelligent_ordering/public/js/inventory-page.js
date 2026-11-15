@@ -296,5 +296,7 @@ document.querySelector("#inventory-movements-next").addEventListener("click", ()
   loadMovements().catch((error) => { feedback.textContent = error.message; });
 });
 
+const warning = document.querySelector("#smarto-page-script-warning");
+if (warning) warning.hidden = true;
 Promise.all([loadOverview(), loadStock(), loadMovements()])
   .catch((error) => { feedback.textContent = `Inventory workspace could not be loaded: ${error.message}`; });

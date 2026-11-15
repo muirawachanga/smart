@@ -20,7 +20,7 @@ class Element {
 function install(t, kind, search = "") {
   const page = new Element();
   page.dataset = { authPage: kind, authCsrf: "CSRF-TEST" };
-  const nodes = new Map(["auth-form", "auth-status", "auth-error", "auth-otp-form", "auth-otp-prompt"]
+  const nodes = new Map(["auth-form", "auth-status", "auth-error", "auth-otp-form", "auth-otp-prompt", "smarto-page-script-warning"]
     .map((id) => [`#${id}`, new Element()]));
   const form = nodes.get("#auth-form");
   form.elements = Object.fromEntries([
@@ -67,13 +67,14 @@ const start = (tag) => import(`../../intelligent_ordering/public/js/authenticati
 const submit = (form) => form.listeners.submit({ preventDefault() {} });
 
 test("login sends credentials to Frappe and uses the server-authorized destination", async (t) => {
-  const { form, redirects } = install(t, "login", "?redirect-to=%2Fcheckout");
+  const { form, nodes, redirects } = install(t, "login", "?redirect-to=%2Fcheckout");
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
     calls.push({ url, options });
     return response(url === "/" ? { message: "No App" } : { message: { destination: "/checkout" } });
   });
   await start("login");
+  assert.equal(nodes.get("#smarto-page-script-warning").hidden, true);
   form.elements.email.value = "customer@example.test";
   form.elements.password.value = "long unique test password";
   await submit(form);
@@ -91,7 +92,31 @@ test("invalid login credentials show feedback without a success redirect", async
   await start("invalid");
   await submit(form);
   assert.match(nodes.get("#auth-error").textContent, /Invalid credentials/);
+  assert.match(nodes.get("#auth-error").textContent, /authentication\.login, HTTP 401/);
   assert.deepEqual(redirects, []);
+});
+
+test("login displays a network error without exposing credentials or browser details", async (t) => {
+  const { form, nodes } = install(t, "login");
+  t.mock.method(globalThis, "fetch", async () => { throw new Error("secret transport detail"); });
+  await start("network");
+  form.elements.password.value = "private password";
+  await submit(form);
+  const message = nodes.get("#auth-error").textContent;
+  assert.match(message, /Could not connect.*authentication\.login/);
+  assert.doesNotMatch(message, /private password|secret transport detail/);
+});
+
+test("login reports destination errors without exposing redirect parameters", async (t) => {
+  const { form, nodes } = install(t, "login", "?redirect-to=%2Fcheckout%3Fsecret%3Dprivate");
+  t.mock.method(globalThis, "fetch", async (url) => url === "/"
+    ? response({ message: "Logged In" })
+    : response({ message: "private server trace" }, 500));
+  await start("destination-error");
+  await submit(form);
+  const message = nodes.get("#auth-error").textContent;
+  assert.match(message, /authentication\.destination, HTTP 500/);
+  assert.doesNotMatch(message, /private|secret/);
 });
 
 test("two-factor login submits only the Frappe challenge and verification code", async (t) => {

@@ -118,7 +118,7 @@ test("admin dashboard reports failed data requests instead of claiming a refresh
   await import(`../../intelligent_ordering/public/js/admin-dashboard.js?failure=${Date.now()}`);
   await tick();
   assert.match(nodes.get("#admin-dashboard-status").textContent, /could not be refreshed/);
-  assert.equal(nodes.get("#admin-dashboard-error").textContent, "Not authorized.");
+  assert.match(nodes.get("#admin-dashboard-error").textContent, /permission.*administration\.sales_analytics, HTTP 403/);
 });
 
 test("admin dashboard shows honest empty states when the APIs return no records", async (t) => {

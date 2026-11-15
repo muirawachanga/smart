@@ -81,7 +81,7 @@ export function mountOrderPayment(container, order) {
       try {
         await load();
       } catch (refreshError) {
-        feedback.textContent = refreshError.message;
+        feedback.textContent = `${error.message} Payment status could not be refreshed: ${refreshError.message}`;
       }
     }
   });

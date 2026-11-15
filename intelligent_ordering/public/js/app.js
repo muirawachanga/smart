@@ -1241,6 +1241,8 @@ function formatPrice(amount, currency) {
 initPaymentDashboard();
 initDeliveryDashboard();
 initAdministrationDashboard();
+const scriptWarning = document.querySelector("#smarto-page-script-warning");
+if (scriptWarning) scriptWarning.hidden = true;
 loadCatalog();
 if (window.location.hash === "#order-history") {
   loadCustomerOrders();
