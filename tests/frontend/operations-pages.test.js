@@ -306,37 +306,119 @@ const deliveryIds = [
   "delivery-feedback", "delivery-filters", "delivery-list", "delivery-detail",
   "delivery-manager", "delivery-ready-orders", "delivery-area-form",
   "delivery-previous", "delivery-next", "delivery-ready-previous", "delivery-ready-next",
-  "delivery-workloads", "delivery-areas", "deliveries-link",
+  "delivery-workloads", "delivery-areas", "deliveries-link", "delivery-metrics",
+  "delivery-delayed", "delivery-performance", "delivery-area-management",
 ];
 
-test("delivery workspace shows assigned deliveries using scoped APIs", async (t) => {
+test("delivery workspace shows assigned details and accepts rider assignments", async (t) => {
   const nodes = install(t, deliveryIds, "[data-delivery-page]", {});
   const calls = [];
+  let status = "Assigned";
   t.mock.method(globalThis, "fetch", async (url) => {
     calls.push(String(url));
-    if (url.includes("deliveries.delivery_dashboard")) return response({ manager: false });
+    if (url.includes("deliveries.delivery_dashboard")) return response({
+      manager: false, summary: { total: 1, pending: 1, accepted: 0, picked_up: 0 },
+      delayed_deliveries: 2,
+    });
     if (url.includes("deliveries.list_deliveries")) {
       return response({ deliveries: [{
-        name: "DEL-1", order: "SO-1", status: "Assigned",
+        name: "DEL-1", order: "SO-1", status,
         delivery_area: "Central", scheduled_delivery_date: "2026-11-15",
       }], has_more: false });
     }
     if (url.includes("deliveries.get_delivery")) return response({
-      name: "DEL-1", order: "SO-1", status: "Assigned",
+      name: "DEL-1", order: "SO-1", status,
       customer_name: "Buyer", customer_phone: "254712345678",
       delivery_address: "Nairobi", delivery_area: "Central",
       currency: "KES", delivery_fee: 20, assigned_delivery_person: "driver@example.test",
-      allowed_statuses: ["In Transit"], activities: [],
+      payment_status: "Paid", assignment_date: "2026-11-14",
+      items: [{ product_name_snapshot: "Milk", product_sku_snapshot: "SKU-1", quantity: 2 }],
+      allowed_statuses: status === "Assigned" ? ["Accepted"] : ["Preparing"], activities: [],
     });
+    if (url.includes("deliveries.update_delivery")) {
+      status = "Accepted";
+      return response({ name: "DEL-1" });
+    }
     throw new Error(`Unexpected request: ${url}`);
   });
   await import(`../../intelligent_ordering/public/js/delivery-page.js?delivery=${Date.now()}`);
   await tick();
+  assert.equal(nodes.get("#delivery-metrics").children.length, 4);
+  assert.match(nodes.get("#delivery-delayed").textContent, /2 delayed deliveries/);
   assert.match(nodes.get("#delivery-list").children[0].textContent, /DEL-1/);
   nodes.get("#delivery-list").children[0].children.at(-1).listeners.click();
   await tick();
   assert.ok(calls.some((url) => url.includes("deliveries.get_delivery")));
   assert.ok(nodes.get("#delivery-detail").children.filter(Boolean)
     .some((child) => /Buyer/.test(child.textContent)), nodes.get("#delivery-feedback").textContent);
+  assert.ok(nodes.get("#delivery-detail").children.filter(Boolean)
+    .some((child) => /SKU-1/.test(child.textContent)));
+  nodes.get("#delivery-detail").children.find((child) => child.textContent === "Accept delivery")
+    .listeners.click();
+  await tick();
+  assert.ok(calls.some((url) => url.includes("deliveries.update_delivery")));
+  assert.ok(nodes.get("#delivery-detail").children.some((child) => /Accepted/.test(child.textContent)));
   assert.equal(nodes.get("#delivery-feedback").textContent, "");
+});
+
+test("delivery manager sees performance and cannot edit protected delivery areas", async (t) => {
+  const nodes = install(t, deliveryIds, "[data-delivery-page]", {});
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("deliveries.delivery_dashboard")) return response({
+      manager: true, summary: { total: 4, unassigned: 1, assigned: 2, completed: 1 },
+      delayed_deliveries: 1, available_riders: 1, can_manage_areas: false,
+      personnel: [{ name: "rider@example.test", full_name: "Rider", workload: 2 }],
+      personnel_performance: [{ rider: "rider@example.test", completed: 3, failed: 1, total: 4 }],
+      ready_orders: [], areas: [], has_more: false,
+    });
+    if (url.includes("deliveries.list_deliveries")) return response({ deliveries: [], has_more: false });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?manager=${Date.now()}`);
+  await tick();
+  assert.equal(nodes.get("#delivery-area-management").hidden, true);
+  assert.match(nodes.get("#delivery-performance").textContent, /3 completed/);
+  assert.ok(nodes.get("#delivery-metrics").children.some((item) => /Total deliveries4/.test(item.textContent)));
+});
+
+test("rider rejection requires a reason and returns the assignment to the queue", async (t) => {
+  const nodes = install(t, deliveryIds, "[data-delivery-page]", {});
+  const calls = [];
+  let assigned = true;
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (url.includes("deliveries.delivery_dashboard")) return response({
+      manager: false, summary: {}, delayed_deliveries: 0,
+    });
+    if (url.includes("deliveries.list_deliveries")) return response({
+      deliveries: assigned ? [{
+        name: "DEL-1", order: "SO-1", status: "Assigned",
+        delivery_area: "Central", scheduled_delivery_date: "2026-11-15",
+      }] : [], has_more: false,
+    });
+    if (url.includes("deliveries.get_delivery")) return response({
+      name: "DEL-1", order: "SO-1", status: "Assigned",
+      customer_name: "Buyer", customer_phone: "254712345678",
+      delivery_address: "Nairobi", delivery_area: "Central",
+      currency: "KES", delivery_fee: 20, assigned_delivery_person: "driver@example.test",
+      allowed_statuses: ["Accepted"], activities: [],
+    });
+    if (url.includes("deliveries.reject_delivery")) {
+      assigned = false;
+      return response({ name: "DEL-1" });
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?reject=${Date.now()}`);
+  await tick();
+  nodes.get("#delivery-list").children[0].children.at(-1).listeners.click();
+  await tick();
+  const form = nodes.get("#delivery-detail").children.find((child) => child.tag === "form");
+  const reason = form.children[0].children[0];
+  reason.value = "Rider unavailable";
+  await form.listeners.submit({ preventDefault() {} });
+  await tick();
+  const rejection = calls.find((call) => call.url.includes("deliveries.reject_delivery"));
+  assert.equal(new URLSearchParams(rejection.options.body).get("reason"), "Rider unavailable");
+  assert.equal(nodes.get("#delivery-list").children[0].textContent, "No matching deliveries.");
 });

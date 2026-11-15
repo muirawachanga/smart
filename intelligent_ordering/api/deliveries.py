@@ -1,3 +1,5 @@
+import base64
+import binascii
 import re
 from contextlib import contextmanager
 
@@ -22,6 +24,8 @@ DELIVERY_FIELDS = [
     "scheduled_delivery_date", "dispatch_date", "completion_date", "completed_by",
     "status", "delivery_notes",
 ]
+MANAGE_DELIVERY_AREA_ROLES = {"System Manager", "Business Admin", "Store Manager", "Order Manager"}
+MAX_PROOF_BYTES = 5 * 1024 * 1024
 
 
 def is_manager(user=None):
@@ -87,6 +91,36 @@ def _check_assigned(delivery):
 def _serialize(delivery, detail=False):
     data = {field: delivery.get(field) for field in DELIVERY_FIELDS}
     if detail:
+        order = frappe.db.get_value(
+            "Sales Order", delivery.order, ["payment_status"], as_dict=True
+        )
+        data["payment_status"] = order.payment_status if order else None
+        data["items"] = frappe.get_all(
+            "Sales Order Item",
+            filters={"parent": delivery.order, "parenttype": "Sales Order"},
+            fields=["product_name_snapshot", "product_sku_snapshot", "quantity"],
+            order_by="idx asc",
+            limit_page_length=100,
+        )
+        data["assignment_date"] = next(
+            (
+                row.activity_datetime for row in reversed(delivery.activities)
+                if row.assigned_person == delivery.assigned_delivery_person
+                and row.to_status == "Assigned"
+            ),
+            None,
+        )
+        data["proof_files"] = frappe.get_all(
+            "File",
+            filters={
+                "attached_to_doctype": "Delivery",
+                "attached_to_name": delivery.name,
+                "is_private": 1,
+            },
+            fields=["file_name", "file_url", "creation"],
+            order_by="creation desc",
+            limit_page_length=20,
+        )
         transitions = DELIVERY_TRANSITIONS if is_manager() else PERSONNEL_TRANSITIONS
         data["allowed_statuses"] = sorted(transitions.get(delivery.status, set()))
         if delivery.assigned_delivery_person != frappe.session.user:
@@ -124,6 +158,7 @@ def _save(delivery, order, previous_status="", previous_person="", notes=""):
         event = "Delivery Assigned"
     elif previous_status != delivery.status:
         event = {
+            "Picked Up": "Order Dispatched",
             "Dispatched": "Order Dispatched",
             "Delivered": "Delivery Completed",
             "Failed": "Delivery Failed",
@@ -169,8 +204,51 @@ def get_delivery(delivery_name):
 def delivery_dashboard(page=1, page_size=20):
     _require_access()
     if not is_manager():
-        return {"manager": False}
+        assigned = frappe.session.user
+        summary = frappe.db.sql(
+            """
+            SELECT COUNT(*) AS total,
+              SUM(status = 'Assigned') AS pending,
+              SUM(status = 'Accepted') AS accepted,
+              SUM(status = 'Picked Up') AS picked_up,
+              SUM(status IN ('Preparing','Ready for Dispatch','Dispatched','In Transit')) AS in_progress,
+              SUM(status = 'Delivered') AS delivered,
+              SUM(status = 'Failed') AS failed
+            FROM `tabDelivery` WHERE assigned_delivery_person = %s
+            """, assigned, as_dict=True,
+        )[0]
+        return {
+            "manager": False,
+            "summary": _delivery_summary(summary),
+            "delayed_deliveries": _delayed_count(assigned),
+            "personnel": [],
+        }
     page, page_size = _pagination(page, page_size)
+    personnel = frappe.db.sql(
+        """
+        SELECT u.name, u.full_name,
+            (SELECT COUNT(*) FROM `tabDelivery` d
+             WHERE d.assigned_delivery_person = u.name
+               AND d.status NOT IN ('Delivered', 'Failed', 'Cancelled')) AS workload
+        FROM `tabUser` u
+        WHERE u.enabled = 1 AND u.name NOT IN ('Guest', 'Administrator')
+          AND EXISTS (SELECT 1 FROM `tabHas Role` r
+                      WHERE r.parent = u.name AND r.parenttype = 'User'
+                        AND r.role = 'Delivery Staff')
+        ORDER BY u.full_name, u.name
+        """, as_dict=True,
+    )
+    summary = frappe.db.sql(
+        """
+        SELECT COUNT(*) AS total,
+          SUM(status IN ('Awaiting Assignment','Failed') AND assigned_delivery_person IS NULL) AS unassigned,
+          SUM(status IN ('Assigned','Accepted')) AS assigned,
+          SUM(status IN ('Preparing','Ready for Dispatch','Picked Up','Dispatched','In Transit')) AS in_progress,
+          SUM(status = 'Delivered') AS completed,
+          SUM(status = 'Failed') AS failed
+        FROM `tabDelivery`
+        """, as_dict=True,
+    )[0]
     ready = frappe.db.sql(
         """
         SELECT o.name, o.customer_name_snapshot, o.delivery_address_snapshot,
@@ -182,18 +260,17 @@ def delivery_dashboard(page=1, page_size=20):
         LIMIT %s OFFSET %s
         """, (page_size + 1, (page - 1) * page_size), as_dict=True,
     )
-    personnel = frappe.db.sql(
+    performance = frappe.db.sql(
         """
-        SELECT u.name, u.full_name,
-            (SELECT COUNT(*) FROM `tabDelivery` d
-             WHERE d.assigned_delivery_person = u.name
-               AND d.status NOT IN ('Delivered', 'Cancelled')) AS workload
-        FROM `tabUser` u
-        WHERE u.enabled = 1 AND u.name NOT IN ('Guest', 'Administrator')
-          AND EXISTS (SELECT 1 FROM `tabHas Role` r
-                      WHERE r.parent = u.name AND r.parenttype = 'User'
-                        AND r.role = 'Delivery Staff')
-        ORDER BY u.full_name, u.name
+        SELECT d.assigned_delivery_person AS rider,
+          SUM(d.status = 'Delivered') AS completed,
+          SUM(d.status = 'Failed') AS failed,
+          COUNT(*) AS total
+        FROM `tabDelivery` d
+        WHERE d.assigned_delivery_person IS NOT NULL
+        GROUP BY d.assigned_delivery_person
+        ORDER BY total DESC, rider
+        LIMIT 100
         """, as_dict=True,
     )
     areas = frappe.get_list(
@@ -201,16 +278,42 @@ def delivery_dashboard(page=1, page_size=20):
         order_by="area_name", limit_page_length=0,
     )
     return {
-        "manager": True, "ready_orders": ready[:page_size],
+        "manager": True, "summary": _delivery_summary(summary),
+        "delayed_deliveries": _delayed_count(),
+        "available_riders": sum(1 for person in personnel if not int(person.workload or 0)),
+        "personnel_performance": performance,
+        "can_manage_areas": frappe.has_permission("Delivery Area", "write"),
+        "ready_orders": ready[:page_size],
         "has_more": len(ready) > page_size, "personnel": personnel, "areas": areas,
     }
+
+
+def _delivery_summary(row):
+    return {key: int(row.get(key) or 0) for key in row}
+
+
+def _delayed_count(assigned_person=None):
+    filters = ""
+    values = []
+    if assigned_person:
+        filters = "AND assigned_delivery_person = %s"
+        values.append(assigned_person)
+    row = frappe.db.sql(
+        f"""
+        SELECT COUNT(*) AS delayed
+        FROM `tabDelivery`
+        WHERE scheduled_delivery_date < CURDATE()
+          AND status NOT IN ('Delivered','Failed','Cancelled')
+          {filters}
+        """, values, as_dict=True,
+    )[0]
+    return int(row.delayed or 0)
 
 
 @frappe.whitelist(methods=["POST"])
 def create_delivery(order_name, delivery_area=""):
     _require_manager()
     order = _order_locked(order_name)
-    order.check_permission("read")
     existing = frappe.db.get_value("Delivery", {"order": order.name}, "name", for_update=True)
     if existing:
         return get_delivery(existing)
@@ -303,18 +406,21 @@ def update_delivery(delivery_name, status, notes="", confirmation=0):
         frappe.throw("Assign a delivery person first.", frappe.ValidationError)
     if status in {"Failed", "Cancelled"} and not notes:
         frappe.throw("A reason is required for failed or cancelled deliveries.", frappe.ValidationError)
-    if status in {"Dispatched", "In Transit", "Delivered"} and order.payment_status != "Paid":
+    if status in {"Picked Up", "Dispatched", "In Transit", "Delivered"} and order.payment_status != "Paid":
         frappe.throw("Verified payment is required before dispatch or delivery.", frappe.ValidationError)
     if status == "Delivered":
         if str(confirmation) != "1":
             frappe.throw("Explicit delivery confirmation is required.", frappe.ValidationError)
         if frappe.session.user != delivery.assigned_delivery_person:
             frappe.throw("Only the assigned delivery person can confirm receipt.", frappe.PermissionError)
+        if not _proof_files(delivery.name):
+            frappe.throw("Upload a private proof-of-delivery photo before completing delivery.",
+                         frappe.ValidationError)
     previous_status, previous_person = delivery.status, delivery.assigned_delivery_person
     delivery.status = status
     if notes:
         delivery.delivery_notes = notes
-    if status == "Dispatched" and previous_status != status:
+    if status in {"Picked Up", "Dispatched"} and previous_status != status:
         delivery.dispatch_date = now_datetime()
     if status == "Delivered":
         delivery.completion_date = now_datetime()
@@ -328,8 +434,87 @@ def update_delivery(delivery_name, status, notes="", confirmation=0):
 
 
 @frappe.whitelist(methods=["POST"])
+def reject_delivery(delivery_name, reason):
+    if "Delivery Staff" not in frappe.get_roles(frappe.session.user):
+        frappe.throw("Only assigned delivery personnel can reject an assignment.", frappe.PermissionError)
+    reason = _text(reason, "Rejection reason", 1000, required=True)
+    delivery, order = _delivery_locked(delivery_name)
+    if delivery.assigned_delivery_person != frappe.session.user:
+        frappe.throw("You can only reject your assigned delivery.", frappe.PermissionError)
+    if delivery.status != "Assigned":
+        frappe.throw("Only an unaccepted assignment can be rejected.", frappe.ValidationError)
+    previous_person = delivery.assigned_delivery_person
+    delivery.status = "Awaiting Assignment"
+    delivery.assigned_delivery_person = None
+    delivery.scheduled_delivery_date = None
+    delivery.delivery_notes = reason
+    _save(delivery, order, "Assigned", previous_person, f"Assignment rejected: {reason}")
+    return _serialize(delivery, detail=True)
+
+
+def _proof_files(delivery_name):
+    return frappe.get_all(
+        "File",
+        filters={
+            "attached_to_doctype": "Delivery",
+            "attached_to_name": delivery_name,
+            "is_private": 1,
+        },
+        fields=["name", "file_name", "file_url", "creation"],
+        order_by="creation desc",
+        limit_page_length=20,
+    )
+
+
+@frappe.whitelist(methods=["POST"])
+def upload_delivery_proof(delivery_name, file_data):
+    if "Delivery Staff" not in frappe.get_roles(frappe.session.user):
+        frappe.throw("Only delivery personnel can upload proof of delivery.", frappe.PermissionError)
+    delivery, order = _delivery_locked(delivery_name)
+    if delivery.assigned_delivery_person != frappe.session.user:
+        frappe.throw("You can only upload proof for your assigned delivery.", frappe.PermissionError)
+    if delivery.status not in {"Picked Up", "Dispatched", "In Transit"}:
+        frappe.throw("Proof can only be uploaded for an active delivery.", frappe.ValidationError)
+    if not isinstance(file_data, str) or not file_data or len(file_data) > ((MAX_PROOF_BYTES + 2) // 3) * 4:
+        frappe.throw("Proof photo must be no larger than 5 MB.", frappe.ValidationError)
+    try:
+        content = base64.b64decode(file_data, validate=True)
+    except (ValueError, binascii.Error):
+        frappe.throw("The proof photo is not valid base64 image data.", frappe.ValidationError)
+    if not content or len(content) > MAX_PROOF_BYTES:
+        frappe.throw("Proof photo must be no larger than 5 MB.", frappe.ValidationError)
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        extension = "png"
+    elif content.startswith(b"\xff\xd8\xff"):
+        extension = "jpg"
+    elif len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        extension = "webp"
+    else:
+        frappe.throw("Upload a PNG, JPEG, or WebP proof photo.", frappe.ValidationError)
+    from frappe.utils.file_manager import save_file
+
+    saved = save_file(
+        f"delivery-proof-{delivery.name}.{extension}",
+        content,
+        "Delivery",
+        delivery.name,
+        is_private=1,
+    )
+    return {
+        "file_name": saved.file_name,
+        "file_url": saved.file_url,
+        "creation": saved.creation,
+    }
+
+
+@frappe.whitelist(methods=["POST"])
 def save_delivery_area(area_name, delivery_fee, currency="KES", enabled=1):
     _require_manager()
+    if (
+        frappe.session.user != "Administrator"
+        and not MANAGE_DELIVERY_AREA_ROLES.intersection(frappe.get_roles())
+    ):
+        frappe.throw("Delivery area settings are not available to this role.", frappe.PermissionError)
     area_name = _text(area_name, "Area name", required=True)
     if str(enabled) not in {"0", "1"}:
         frappe.throw("Enabled must be 0 or 1.", frappe.ValidationError)

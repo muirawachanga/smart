@@ -120,8 +120,8 @@ def dashboard():
         """
         SELECT
           SUM(status = 'Awaiting Assignment') AS pending_deliveries,
-          SUM(status IN ('Assigned','Preparing','Ready for Dispatch')) AS assigned_deliveries,
-          SUM(status IN ('Dispatched','In Transit')) AS dispatched_deliveries,
+          SUM(status IN ('Assigned','Accepted','Preparing','Ready for Dispatch')) AS assigned_deliveries,
+          SUM(status IN ('Picked Up','Dispatched','In Transit')) AS dispatched_deliveries,
           SUM(status = 'Delivered') AS completed_deliveries,
           SUM(status = 'Failed') AS failed_deliveries
         FROM `tabDelivery`

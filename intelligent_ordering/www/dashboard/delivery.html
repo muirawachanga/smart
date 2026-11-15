@@ -7,11 +7,18 @@
   {% include "templates/includes/page_script_warning.html" %}
   <p class="smarto-eyebrow">Delivery workspace</p>
   <h1>Delivery management</h1>
-  <p>Delivery staff can see only assigned work. Inventory is dispatched when an order reaches Ready for Delivery; delivery updates do not deduct stock again. A delivery can only be marked delivered by its assigned person after payment is verified.</p>
+  <p>Delivery staff can see only assigned work. Order inventory and payment values remain read-only in this workspace.</p>
   <p id="delivery-feedback" role="status" aria-live="polite">Loading deliveries...</p>
+  <section aria-labelledby="delivery-overview-heading">
+    <h2 id="delivery-overview-heading">Delivery overview</h2>
+    <div id="delivery-metrics" class="smarto-admin-metrics" aria-live="polite"></div>
+    <p id="delivery-delayed" class="smarto-dashboard-note"></p>
+  </section>
   <section id="delivery-manager" hidden>
     <h2>Delivery personnel workloads</h2>
     <div id="delivery-workloads" class="smarto-inventory-metrics"></div>
+    <h2>Rider performance</h2>
+    <div id="delivery-performance" class="smarto-cart-items"></div>
     <h2>Orders ready for delivery</h2>
     <p>Legacy order totals are preserved. Selecting a routing area for a legacy order does not add a delivery fee.</p>
     <div id="delivery-ready-orders" class="smarto-cart-items"></div>
@@ -21,8 +28,9 @@
     </nav>
     <h2>Delivery areas</h2>
     <p>Area rate changes affect new orders only.</p>
-    <div id="delivery-areas" class="smarto-cart-items"></div>
-    <form id="delivery-area-form" class="smarto-checkout-form">
+    <div id="delivery-area-management">
+      <div id="delivery-areas" class="smarto-cart-items"></div>
+      <form id="delivery-area-form" class="smarto-checkout-form">
       <label>Area name
         <input name="area_name" type="text" maxlength="140" required>
       </label>
@@ -36,7 +44,8 @@
         <select name="enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select>
       </label>
       <button type="submit" class="smarto-button">Save delivery area</button>
-    </form>
+      </form>
+    </div>
   </section>
   <h2>Deliveries</h2>
   <form id="delivery-filters" class="smarto-catalog-form">
@@ -46,8 +55,9 @@
     <label>Delivery status
       <select name="status">
         <option value="">All statuses</option>
-        <option>Awaiting Assignment</option><option>Assigned</option><option>Preparing</option>
-        <option>Ready for Dispatch</option><option>Dispatched</option><option>In Transit</option>
+        <option>Awaiting Assignment</option><option>Assigned</option><option>Accepted</option>
+        <option>Preparing</option><option>Ready for Dispatch</option><option>Picked Up</option>
+        <option>Dispatched</option><option>In Transit</option>
         <option>Delivered</option><option>Failed</option><option>Cancelled</option>
       </select>
     </label>

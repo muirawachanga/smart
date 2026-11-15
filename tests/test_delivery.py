@@ -12,12 +12,38 @@ from intelligent_ordering.utils.delivery import (
 class TestDeliveryValidation(unittest.TestCase):
     def test_delivery_route_and_failure_retry(self):
         route = [
-            "Awaiting Assignment", "Assigned", "Preparing", "Ready for Dispatch",
-            "Dispatched", "In Transit", "Failed", "Assigned", "Preparing",
-            "Ready for Dispatch", "Dispatched", "In Transit", "Delivered",
+            "Awaiting Assignment", "Assigned", "Accepted", "Preparing",
+            "Ready for Dispatch", "Picked Up", "In Transit", "Failed",
+            "Assigned", "Accepted", "Preparing", "Ready for Dispatch",
+            "Dispatched", "In Transit", "Delivered",
         ]
         for before, after in zip(route, route[1:]):
             self.assertEqual(validate_delivery_transition(before, after), after)
+        self.assertEqual(
+            validate_delivery_transition("Ready for Dispatch", "Picked Up", personnel=True),
+            "Picked Up",
+        )
+
+    def test_explicit_acceptance_and_pickup_preserve_legacy_dispatch_route(self):
+        route = [
+            "Assigned", "Accepted", "Preparing", "Ready for Dispatch",
+            "Picked Up", "In Transit", "Delivered",
+        ]
+        for before, after in zip(route, route[1:]):
+            self.assertEqual(validate_delivery_transition(before, after), after)
+            self.assertEqual(
+                validate_delivery_transition(before, after, personnel=True), after
+            )
+        self.assertEqual(
+            validate_delivery_transition("Awaiting Assignment", "Assigned"), "Assigned"
+        )
+        self.assertEqual(
+            validate_delivery_transition("Ready for Dispatch", "Dispatched"), "Dispatched"
+        )
+        self.assertEqual(
+            validate_delivery_transition("Ready for Dispatch", "Dispatched", personnel=True),
+            "Dispatched",
+        )
 
     def test_invalid_transitions_and_terminal_states(self):
         for before, after in (

@@ -5,9 +5,11 @@ from decimal import Decimal, InvalidOperation
 
 DELIVERY_TRANSITIONS = {
     "Awaiting Assignment": {"Assigned", "Cancelled"},
-    "Assigned": {"Preparing", "Cancelled"},
+    "Assigned": {"Accepted", "Cancelled"},
+    "Accepted": {"Preparing", "Cancelled"},
     "Preparing": {"Ready for Dispatch", "Cancelled"},
-    "Ready for Dispatch": {"Dispatched", "Cancelled"},
+    "Ready for Dispatch": {"Picked Up", "Dispatched", "Cancelled"},
+    "Picked Up": {"In Transit", "Failed"},
     "Dispatched": {"In Transit", "Failed"},
     "In Transit": {"Delivered", "Failed"},
     "Failed": {"Assigned", "Cancelled"},
@@ -15,9 +17,11 @@ DELIVERY_TRANSITIONS = {
     "Cancelled": set(),
 }
 PERSONNEL_TRANSITIONS = {
-    "Assigned": {"Preparing"},
+    "Assigned": {"Accepted"},
+    "Accepted": {"Preparing"},
     "Preparing": {"Ready for Dispatch"},
-    "Ready for Dispatch": {"Dispatched"},
+    "Ready for Dispatch": {"Picked Up", "Dispatched"},
+    "Picked Up": {"In Transit", "Failed"},
     "Dispatched": {"In Transit", "Failed"},
     "In Transit": {"Delivered", "Failed"},
 }

@@ -20,7 +20,7 @@
     {"fieldname": "dispatch_date", "fieldtype": "Datetime", "label": "Dispatch Date", "read_only": 1},
     {"fieldname": "completion_date", "fieldtype": "Datetime", "label": "Completion Date", "read_only": 1},
     {"fieldname": "completed_by", "fieldtype": "Link", "options": "User", "label": "Completed By", "read_only": 1},
-    {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Awaiting Assignment\nAssigned\nPreparing\nReady for Dispatch\nDispatched\nIn Transit\nDelivered\nFailed\nCancelled", "default": "Awaiting Assignment", "reqd": 1, "read_only": 1, "in_list_view": 1},
+    {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Awaiting Assignment\nAssigned\nAccepted\nPreparing\nReady for Dispatch\nPicked Up\nDispatched\nIn Transit\nDelivered\nFailed\nCancelled", "default": "Awaiting Assignment", "reqd": 1, "read_only": 1, "in_list_view": 1},
     {"fieldname": "delivery_notes", "fieldtype": "Small Text", "label": "Delivery Notes", "read_only": 1},
     {"fieldname": "activities", "fieldtype": "Table", "options": "Delivery Activity", "label": "Activity History", "read_only": 1}
   ],

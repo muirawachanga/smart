@@ -1,3 +1,4 @@
+import base64
 import importlib.util
 import sys
 import types
@@ -70,7 +71,17 @@ class TestDeliveryWorkflow(unittest.TestCase):
         self.frappe.get_doc.side_effect = lambda doctype, *args, **kwargs: (
             self.order if doctype == "Sales Order" else self.delivery
         )
-        self.frappe.db.get_value.return_value = "SO-1"
+        def get_value(doctype, *args, **kwargs):
+            if doctype == "Delivery":
+                if args and isinstance(args[0], dict):
+                    return self.frappe.db.get_value.return_value
+                return "SO-1"
+            if doctype == "Sales Order":
+                return types.SimpleNamespace(payment_status=self.order.payment_status)
+            return "SO-1"
+
+        self.frappe.db.get_value.return_value = None
+        self.frappe.db.get_value.side_effect = get_value
         self.save_patch = patch.object(self.service, "_save")
         self.save = self.save_patch.start()
         self.addCleanup(self.save_patch.stop)
@@ -206,8 +217,49 @@ class TestDeliveryWorkflow(unittest.TestCase):
         self.delivery.status = "Ready for Dispatch"
         self.order.payment_status = "Unpaid"
         with self.assertRaisesRegex(DeliveryError, "payment"):
-            self.service.update_delivery("DEL-1", "Dispatched")
+            self.service.update_delivery("DEL-1", "Picked Up")
         self.save.assert_not_called()
+
+    def test_delivery_completion_requires_a_proof_attachment(self):
+        self.as_driver()
+        with patch.object(self.service, "_proof_files", return_value=[]):
+            with self.assertRaisesRegex(DeliveryError, "proof-of-delivery"):
+                self.service.update_delivery("DEL-1", "Delivered", confirmation=1)
+        self.save.assert_not_called()
+        self.order.save.assert_not_called()
+
+    def test_rider_can_reject_only_an_unaccepted_assigned_delivery_with_reason(self):
+        self.as_driver()
+        self.delivery.status = "Assigned"
+        with patch.object(self.service, "_serialize", return_value={"name": "DEL-1"}):
+            with self.assertRaisesRegex(DeliveryError, "required"):
+                self.service.reject_delivery("DEL-1", " ")
+            result = self.service.reject_delivery("DEL-1", "Rider unavailable")
+        self.assertEqual(result, {"name": "DEL-1"})
+        self.assertEqual(self.delivery.status, "Awaiting Assignment")
+        self.assertIsNone(self.delivery.assigned_delivery_person)
+        self.assertIsNone(self.delivery.scheduled_delivery_date)
+        self.assertEqual(self.delivery.delivery_notes, "Rider unavailable")
+        self.save.assert_called_once_with(
+            self.delivery, self.order, "Assigned", "driver@example.test",
+            "Assignment rejected: Rider unavailable",
+        )
+
+    def test_proof_upload_is_private_and_rejects_non_images(self):
+        self.as_driver()
+        self.delivery.status = "In Transit"
+        file_manager = types.ModuleType("frappe.utils.file_manager")
+        file_manager.save_file = Mock(return_value=types.SimpleNamespace(
+            file_name="proof.png", file_url="/private/files/proof.png", creation="now",
+        ))
+        image = b"\x89PNG\r\n\x1a\n" + b"image-data"
+        with patch.dict(sys.modules, {"frappe.utils.file_manager": file_manager}):
+            result = self.service.upload_delivery_proof("DEL-1", base64.b64encode(image).decode())
+            with self.assertRaisesRegex(DeliveryError, "PNG, JPEG, or WebP"):
+                self.service.upload_delivery_proof("DEL-1", base64.b64encode(b"not an image").decode())
+        self.assertEqual(result["file_url"], "/private/files/proof.png")
+        self.assertEqual(file_manager.save_file.call_args.args[1], image)
+        self.assertEqual(file_manager.save_file.call_args.kwargs["is_private"], 1)
 
     def test_dispatch_timestamp_recorded_once_and_notes_only_do_not_move_stock(self):
         self.as_driver()
