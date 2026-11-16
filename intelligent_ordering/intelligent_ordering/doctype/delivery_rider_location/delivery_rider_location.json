@@ -1,0 +1,23 @@
+{
+  "doctype": "DocType",
+  "name": "Delivery Rider Location",
+  "module": "Intelligent Ordering",
+  "autoname": "field:rider",
+  "engine": "InnoDB",
+  "field_order": ["rider", "location_set", "latitude", "longitude", "accuracy_meters", "location_updated_at"],
+  "fields": [
+    {"fieldname": "rider", "fieldtype": "Link", "options": "User", "label": "Rider", "reqd": 1, "unique": 1, "read_only": 1},
+    {"fieldname": "location_set", "fieldtype": "Check", "label": "Location Shared", "read_only": 1},
+    {"fieldname": "latitude", "fieldtype": "Float", "precision": "6", "label": "Latitude", "read_only": 1},
+    {"fieldname": "longitude", "fieldtype": "Float", "precision": "6", "label": "Longitude", "read_only": 1},
+    {"fieldname": "accuracy_meters", "fieldtype": "Float", "label": "Reported Accuracy (meters)", "read_only": 1},
+    {"fieldname": "location_updated_at", "fieldtype": "Datetime", "label": "Shared At", "read_only": 1}
+  ],
+  "permissions": [
+    {"role": "System Manager", "read": 1},
+    {"role": "Business Admin", "read": 1},
+    {"role": "Store Manager", "read": 1},
+    {"role": "Delivery Manager", "read": 1},
+    {"role": "Order Manager", "read": 1}
+  ]
+}

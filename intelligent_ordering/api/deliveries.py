@@ -1,7 +1,11 @@
 import base64
 import binascii
+import hashlib
+import json
+import math
 import re
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 
 import frappe
 from frappe.utils import getdate, now_datetime
@@ -9,6 +13,9 @@ from frappe.utils import getdate, now_datetime
 from intelligent_ordering.utils.delivery import (
     DELIVERY_TRANSITIONS,
     PERSONNEL_TRANSITIONS,
+    distance_km,
+    nearest_delivery_route,
+    validate_coordinates,
     validate_delivery_text,
     validate_delivery_transition,
 )
@@ -22,7 +29,7 @@ DELIVERY_FIELDS = [
     "name", "order", "customer_name", "customer_phone", "delivery_address",
     "delivery_area", "assigned_delivery_person", "currency", "delivery_fee",
     "scheduled_delivery_date", "dispatch_date", "completion_date", "completed_by",
-    "status", "delivery_notes",
+    "status", "delivery_notes", "location_set", "latitude", "longitude",
 ]
 MANAGE_DELIVERY_AREA_ROLES = {"System Manager", "Business Admin", "Store Manager", "Order Manager"}
 MAX_PROOF_BYTES = 5 * 1024 * 1024
@@ -164,7 +171,11 @@ def _save(delivery, order, previous_status="", previous_person="", notes=""):
             "Failed": "Delivery Failed",
         }.get(delivery.status)
     if event:
-        prepare_notification(event, order, delivery, f"{delivery.name}:{len(delivery.activities)}:{event}")
+        event_key = (
+            f"{delivery.name}:{event}" if event == "Order Dispatched"
+            else f"{delivery.name}:{len(delivery.activities)}:{event}"
+        )
+        prepare_notification(event, order, delivery, event_key)
 
 
 @frappe.whitelist()
@@ -375,7 +386,9 @@ def _schedule(value):
 @frappe.whitelist(methods=["POST"])
 def assign_delivery(delivery_name, assigned_person, scheduled_delivery_date, notes=""):
     _require_manager()
-    person = _validate_person(assigned_person)
+    person = _text(assigned_person, "Delivery person", required=True)
+    frappe.db.sql("SELECT name FROM `tabUser` WHERE name = %s FOR UPDATE", person)
+    person = _validate_person(person)
     scheduled = _schedule(scheduled_delivery_date)
     notes = _text(notes, "Assignment notes", 1000)
     delivery, order = _delivery_locked(delivery_name)
@@ -398,6 +411,252 @@ def assign_delivery(delivery_name, assigned_person, scheduled_delivery_date, not
     delivery.scheduled_delivery_date = scheduled
     _save(delivery, order, previous_status, previous_person, notes)
     return _serialize(delivery, detail=True)
+
+
+def _coordinates(latitude, longitude):
+    try:
+        return validate_coordinates(latitude, longitude)
+    except ValueError as error:
+        frappe.throw(str(error), frappe.ValidationError)
+
+
+def _require_rider():
+    user = frappe.session.user
+    if user in {"Guest", "Administrator"} or "Delivery Staff" not in frappe.get_roles(user):
+        frappe.throw("Only delivery personnel can share their location.", frappe.PermissionError)
+    if not frappe.db.get_value("User", user, "enabled"):
+        frappe.throw("This delivery account is disabled.", frappe.PermissionError)
+    return user
+
+
+def _rider_location(rider, *, for_update=False):
+    location = frappe.db.get_value(
+        "Delivery Rider Location", rider,
+        ["location_set", "latitude", "longitude", "accuracy_meters", "location_updated_at"],
+        as_dict=True, for_update=for_update,
+    )
+    if not location or not location.location_set or not location.location_updated_at:
+        return None
+    updated = location.location_updated_at
+    if isinstance(updated, str):
+        updated = datetime.fromisoformat(updated)
+    now = now_datetime()
+    if updated > now or updated < now - timedelta(minutes=30):
+        return None
+    return location
+
+
+@frappe.whitelist(methods=["POST"])
+def share_rider_location(latitude, longitude, accuracy_meters):
+    rider = _require_rider()
+    latitude, longitude = _coordinates(latitude, longitude)
+    try:
+        accuracy = float(accuracy_meters)
+        if not math.isfinite(accuracy) or accuracy < 0 or accuracy > 10000000:
+            raise ValueError
+    except (ValueError, TypeError, OverflowError):
+        frappe.throw("A valid GPS accuracy in meters is required.", frappe.ValidationError)
+    frappe.db.sql("SELECT name FROM `tabUser` WHERE name = %s FOR UPDATE", rider)
+    if frappe.db.exists("Delivery Rider Location", rider):
+        location = frappe.get_doc("Delivery Rider Location", rider, for_update=True)
+    else:
+        location = frappe.get_doc({"doctype": "Delivery Rider Location", "rider": rider})
+    location.location_set = 1
+    location.latitude, location.longitude = latitude, longitude
+    location.accuracy_meters = accuracy
+    location.location_updated_at = now_datetime()
+    previous = getattr(frappe.flags, "sharing_delivery_location", False)
+    frappe.flags.sharing_delivery_location = True
+    try:
+        location.save(ignore_permissions=True)
+    finally:
+        frappe.flags.sharing_delivery_location = previous
+    return {"shared_at": location.location_updated_at, "accuracy_meters": accuracy}
+
+
+@frappe.whitelist(methods=["POST"])
+def clear_rider_location():
+    rider = _require_rider()
+    frappe.db.sql("SELECT name FROM `tabUser` WHERE name = %s FOR UPDATE", rider)
+    if frappe.db.exists("Delivery Rider Location", rider):
+        location = frappe.get_doc("Delivery Rider Location", rider, for_update=True)
+        location.location_set = 0
+        location.latitude = location.longitude = location.accuracy_meters = 0
+        location.location_updated_at = None
+        previous = getattr(frappe.flags, "sharing_delivery_location", False)
+        frappe.flags.sharing_delivery_location = True
+        try:
+            location.save(ignore_permissions=True)
+        finally:
+            frappe.flags.sharing_delivery_location = previous
+    return {"shared": False}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_delivery_coordinates(delivery_name, latitude, longitude):
+    _require_manager()
+    latitude, longitude = _coordinates(latitude, longitude)
+    delivery, order = _delivery_locked(delivery_name)
+    if delivery.status in {"Delivered", "Cancelled"}:
+        frappe.throw("Coordinates cannot be changed for a completed or cancelled delivery.", frappe.ValidationError)
+    delivery.latitude, delivery.longitude, delivery.location_set = latitude, longitude, 1
+    _save(delivery, order, delivery.status, delivery.assigned_delivery_person, "Delivery coordinates updated.")
+    return _serialize(delivery, detail=True)
+
+
+@frappe.whitelist(methods=["POST"])
+def clear_delivery_coordinates(delivery_name):
+    _require_manager()
+    delivery, order = _delivery_locked(delivery_name)
+    if delivery.status in {"Delivered", "Cancelled"}:
+        frappe.throw("Coordinates cannot be changed for a completed or cancelled delivery.", frappe.ValidationError)
+    if delivery.location_set:
+        delivery.latitude = delivery.longitude = 0
+        delivery.location_set = 0
+        _save(delivery, order, delivery.status, delivery.assigned_delivery_person, "Delivery coordinates cleared.")
+    return _serialize(delivery, detail=True)
+
+
+def _plan_signature(rider, location, deliveries):
+    snapshot = [
+        rider, str(location.location_updated_at), float(location.latitude), float(location.longitude),
+        sorted((row.name, row.delivery_area, float(row.latitude), float(row.longitude)) for row in deliveries),
+    ]
+    return hashlib.sha256(json.dumps(snapshot, separators=(",", ":")).encode()).hexdigest()
+
+
+@frappe.whitelist()
+def suggest_delivery_group(delivery_name, radius_km=5, max_stops=5):
+    _require_manager()
+    try:
+        radius = float(radius_km)
+        count = int(str(max_stops))
+        if not math.isfinite(radius) or not 0.1 <= radius <= 50 or not 1 <= count <= 10:
+            raise ValueError
+    except (ValueError, TypeError, OverflowError):
+        frappe.throw("Select a radius from 0.1 to 50 km and 1 to 10 stops.", frappe.ValidationError)
+    name = _text(delivery_name, "Delivery", required=True)
+    seed = frappe.get_doc("Delivery", name)
+    if seed.status != "Awaiting Assignment" or seed.assigned_delivery_person or not seed.location_set or not seed.delivery_area:
+        frappe.throw("Choose an unassigned delivery with an area and coordinates.", frappe.ValidationError)
+    origin = _coordinates(seed.latitude, seed.longitude)
+    now = now_datetime()
+    riders = frappe.db.sql(
+        """
+        SELECT u.name, u.full_name, l.latitude, l.longitude, l.accuracy_meters, l.location_updated_at
+        FROM `tabUser` u
+        INNER JOIN `tabDelivery Rider Location` l ON l.rider = u.name
+        WHERE u.enabled = 1 AND u.name NOT IN ('Guest', 'Administrator')
+          AND l.location_set = 1 AND l.location_updated_at BETWEEN %s AND %s
+          AND EXISTS (SELECT 1 FROM `tabHas Role` r
+              WHERE r.parent = u.name AND r.parenttype = 'User' AND r.role = 'Delivery Staff')
+          AND NOT EXISTS (SELECT 1 FROM `tabDelivery` d
+              WHERE d.assigned_delivery_person = u.name
+                AND d.status NOT IN ('Delivered', 'Failed', 'Cancelled'))
+        """, (now - timedelta(minutes=30), now), as_dict=True,
+    )
+    if not riders:
+        frappe.throw("No idle riders have shared a recent location.", frappe.ValidationError)
+    rider = min(riders, key=lambda row: (distance_km((row.latitude, row.longitude), origin), row.name))
+    candidates = frappe.db.sql(
+        """
+        SELECT d.name, d.`order`, d.delivery_address, d.delivery_area, d.status, d.latitude, d.longitude
+        FROM `tabDelivery` d
+        INNER JOIN `tabSales Order` o ON o.name = d.`order`
+        WHERE d.delivery_area = %s AND d.status = 'Awaiting Assignment'
+          AND COALESCE(d.assigned_delivery_person, '') = '' AND d.location_set = 1
+          AND o.status = 'Ready for Delivery'
+        ORDER BY d.name LIMIT 1001
+        """, seed.delivery_area, as_dict=True,
+    )
+    if len(candidates) > 1000:
+        frappe.throw("Too many deliveries in this area to plan safely; narrow the backlog first.", frappe.ValidationError)
+    if not any(row.name == name for row in candidates):
+        frappe.throw("The delivery is no longer ready for assignment.", frappe.ValidationError)
+    nearby = sorted(
+        (row for row in candidates if row.name != name
+         and distance_km(origin, (row.latitude, row.longitude)) <= radius),
+        key=lambda row: (distance_km(origin, (row.latitude, row.longitude)), row.name),
+    )
+    selected = [next(row for row in candidates if row.name == name)] + nearby[:count - 1]
+    route = nearest_delivery_route((rider.latitude, rider.longitude), selected)
+    return {
+        "rider": rider.name, "rider_name": rider.full_name,
+        "location_updated_at": rider.location_updated_at,
+        "accuracy_meters": rider.accuracy_meters,
+        "plan_token": _plan_signature(rider.name, rider, selected),
+        "route": route, "total_distance_km": round(sum(row["distance_km"] for row in route), 2),
+    }
+
+
+@frappe.whitelist(methods=["POST"])
+def assign_delivery_group(rider, delivery_names, scheduled_delivery_date, plan_token):
+    _require_manager()
+    try:
+        names = json.loads(delivery_names) if isinstance(delivery_names, str) else delivery_names
+    except (ValueError, TypeError):
+        frappe.throw("Select valid deliveries for the group.", frappe.ValidationError)
+    if (
+        not isinstance(names, list) or not 1 <= len(names) <= 10
+        or any(not isinstance(name, str) or not name.strip() or len(name) > 140 for name in names)
+    ):
+        frappe.throw("Select 1 to 10 valid deliveries for the group.", frappe.ValidationError)
+    names = [name.strip() for name in names]
+    if len(set(names)) != len(names):
+        frappe.throw("A delivery cannot appear twice in a group.", frappe.ValidationError)
+    if not isinstance(plan_token, str) or not re.fullmatch(r"[a-f0-9]{64}", plan_token):
+        frappe.throw("A current delivery plan is required.", frappe.ValidationError)
+    rider = _text(rider, "Delivery person", required=True)
+    _schedule(scheduled_delivery_date)
+    frappe.db.sql("SELECT name FROM `tabUser` WHERE name = %s FOR UPDATE", rider)
+    _validate_person(rider)
+    location = _rider_location(rider, for_update=True)
+    if not location:
+        frappe.throw("The rider must share a recent location again.", frappe.ValidationError)
+    active = frappe.db.sql(
+        """SELECT name FROM `tabDelivery` WHERE assigned_delivery_person = %s
+           AND status NOT IN ('Delivered', 'Failed', 'Cancelled') LIMIT 1 FOR UPDATE""", rider,
+    )
+    if active:
+        frappe.throw("The rider is no longer idle. Plan the group again.", frappe.ValidationError)
+    deliveries = [_delivery_locked(name) for name in sorted(names)]
+    areas = set()
+    for delivery, order in deliveries:
+        if (delivery.status != "Awaiting Assignment" or delivery.assigned_delivery_person
+                or not delivery.location_set or not delivery.delivery_area or order.status != "Ready for Delivery"):
+            frappe.throw("A delivery is no longer ready for grouping. Plan again.", frappe.ValidationError)
+        _coordinates(delivery.latitude, delivery.longitude)
+        areas.add(delivery.delivery_area)
+    if len(areas) != 1:
+        frappe.throw("Grouped deliveries must belong to the same delivery area.", frappe.ValidationError)
+    if _plan_signature(rider, location, [delivery for delivery, _ in deliveries]) != plan_token:
+        frappe.throw("The rider location or delivery coordinates changed. Plan the group again.", frappe.ValidationError)
+    for name in names:
+        assign_delivery(name, rider, scheduled_delivery_date, "Assigned as a planned delivery group.")
+    return {"rider": rider, "deliveries": names}
+
+
+@frappe.whitelist()
+def my_delivery_route():
+    rider = _require_rider()
+    location = _rider_location(rider)
+    if not location:
+        frappe.throw("Share your current location to plan a route.", frappe.ValidationError)
+    deliveries = frappe.get_all(
+        "Delivery", filters={
+            "assigned_delivery_person": rider, "status": ["not in", ["Delivered", "Failed", "Cancelled"]],
+        },
+        fields=["name", "order", "status", "delivery_address", "delivery_area",
+                "latitude", "longitude", "location_set"],
+        order_by="name", limit_page_length=0,
+    )
+    located = [row for row in deliveries if row.location_set]
+    route = nearest_delivery_route((location.latitude, location.longitude), located)
+    return {
+        "route": route, "missing_coordinates": len(deliveries) - len(located),
+        "location_updated_at": location.location_updated_at,
+        "total_distance_km": round(sum(row["distance_km"] for row in route), 2),
+    }
 
 
 @frappe.whitelist(methods=["POST"])

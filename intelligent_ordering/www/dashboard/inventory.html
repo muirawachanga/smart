@@ -12,6 +12,7 @@
   <p id="inventory-feedback" role="status" aria-live="polite"></p>
   <h2>Stock overview</h2>
   <div id="inventory-metrics" class="smarto-inventory-metrics"></div>
+  {% include "templates/includes/demand_forecast.html" %}
   <h2>Stock by product and warehouse</h2>
   <form id="inventory-stock-filters" class="smarto-catalog-form">
     <label>Search products
@@ -127,4 +128,5 @@
   {% include "templates/includes/workspace_reports.html" %}
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/inventory-page.js"></script>
+<script type="module" src="/assets/intelligent_ordering/js/forecasts.js"></script>
 {% endblock %}

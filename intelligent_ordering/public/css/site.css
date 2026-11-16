@@ -65,6 +65,19 @@
   width: 10.5rem;
 }
 
+.smarto-business-brand {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.smarto-business-name {
+  max-width: 16rem;
+  font-size: 0.8rem;
+  letter-spacing: normal;
+  overflow-wrap: anywhere;
+}
+
 .smarto-navigation,
 .smarto-account-links {
   display: flex;

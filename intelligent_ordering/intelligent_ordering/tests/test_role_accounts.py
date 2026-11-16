@@ -90,6 +90,21 @@ class TestRoleAccounts(FrappeTestCase):
             with self.subTest(role=role), self.assertRaises(frappe.PermissionError):
                 payments.reconcile_payment("ROLE-TEST-NONEXISTENT")
 
+    def test_forecast_roles_cannot_cross_finance_and_inventory_boundaries(self):
+        frappe.set_user(self.users["Inventory Manager"])
+        administration.demand_forecast()
+        with self.assertRaises(frappe.PermissionError):
+            administration.sales_forecast()
+        frappe.set_user(self.users["Finance Manager"])
+        administration.sales_forecast()
+        administration.demand_forecast()
+        for role in ("Customer Support", "Delivery Manager", "Delivery Staff"):
+            frappe.set_user(self.users[role])
+            with self.subTest(role=role), self.assertRaises(frappe.PermissionError):
+                administration.sales_forecast()
+            with self.subTest(role=role), self.assertRaises(frappe.PermissionError):
+                administration.demand_forecast()
+
     def test_rider_cannot_manage_orders_or_deliveries_for_another_person(self):
         frappe.set_user(self.users["Delivery Staff"])
         listing = deliveries.list_deliveries()

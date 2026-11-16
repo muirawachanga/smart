@@ -30,6 +30,9 @@ class Element {
       if (this.tag === "select") this.options = this.children;
     }
   }
+  prepend(...nodes) {
+    this.children.unshift(...nodes);
+  }
   replaceChildren(...nodes) {
     this.children = [];
     this.options = [];
@@ -309,6 +312,138 @@ const deliveryIds = [
   "delivery-workloads", "delivery-areas", "deliveries-link", "delivery-metrics",
   "delivery-delayed", "delivery-performance", "delivery-area-management",
 ];
+const optimizationIds = [
+  "delivery-location-share", "delivery-share-location", "delivery-clear-location",
+  "delivery-my-route", "delivery-my-route-results", "delivery-optimization-manager",
+  "delivery-plan-form", "delivery-plan-results",
+];
+
+function installOptimization(t) {
+  const nodes = install(t, [...deliveryIds, ...optimizationIds], "[data-delivery-page]", {});
+  const form = nodes.get("#delivery-plan-form");
+  form.elements = {
+    delivery_name: new Element(), scheduled_delivery_date: new Element(),
+    radius_km: new Element(), max_stops: new Element(),
+  };
+  form.queries = { 'button[type="submit"]': new Element("button") };
+  return nodes;
+}
+
+test("rider explicitly shares, uses, and clears a location", async (t) => {
+  const nodes = installOptimization(t);
+  const calls = [];
+  window.navigator = { geolocation: {
+    getCurrentPosition: (resolve) => resolve({ coords: { latitude: -1.2, longitude: 36.8, accuracy: 10 } }),
+  } };
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (url.includes("deliveries.delivery_dashboard")) return response({ manager: false, summary: {}, delayed_deliveries: 0 });
+    if (url.includes("deliveries.list_deliveries")) return response({ deliveries: [], has_more: false });
+    if (url.includes("deliveries.share_rider_location")) return response({ shared_at: "now" });
+    if (url.includes("deliveries.my_delivery_route")) return response({
+      route: [{ name: "D1", order: "SO-1", status: "Accepted", delivery_address: "Nairobi", distance_km: 1 }],
+      total_distance_km: 1, missing_coordinates: 1,
+    });
+    if (url.includes("deliveries.clear_rider_location")) return response({ shared: false });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?gps=${Date.now()}`);
+  await tick();
+  assert.equal(nodes.get("#delivery-location-share").hidden, false);
+  assert.equal(calls.filter((call) => call.url.includes("share_rider_location")).length, 0);
+  await nodes.get("#delivery-share-location").listeners.click();
+  const share = calls.find((call) => call.url.includes("share_rider_location"));
+  assert.equal(share.options.body.get("latitude"), "-1.2");
+  await nodes.get("#delivery-my-route").listeners.click();
+  assert.match(nodes.get("#delivery-my-route-results").textContent, /SO-1/);
+  assert.match(nodes.get("#delivery-my-route-results").textContent, /1 assigned deliveries have no coordinates/);
+  await nodes.get("#delivery-clear-location").listeners.click();
+  assert.equal(nodes.get("#delivery-my-route-results").textContent, "");
+  assert.ok(calls.some((call) => call.url.includes("clear_rider_location")));
+});
+
+test("manager reviews and assigns an optimized group", async (t) => {
+  const nodes = installOptimization(t);
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (url.includes("deliveries.delivery_dashboard")) return response({
+      manager: true, summary: {}, delayed_deliveries: 0, available_riders: 1,
+      can_manage_areas: false, personnel: [], personnel_performance: [],
+      ready_orders: [], areas: [], has_more: false,
+    });
+    if (url.includes("deliveries.list_deliveries")) return response({ deliveries: [], has_more: false });
+    if (url.includes("deliveries.suggest_delivery_group")) return response({
+      rider: "rider@example.test", rider_name: "Rider", location_updated_at: "today",
+      accuracy_meters: 10, total_distance_km: 2, plan_token: "plan-token",
+      route: [
+        { name: "D1", order: "SO-1", status: "Awaiting Assignment", delivery_address: "First", distance_km: 1 },
+        { name: "D2", order: "SO-2", status: "Awaiting Assignment", delivery_address: "Second", distance_km: 1 },
+      ],
+    });
+    if (url.includes("deliveries.assign_delivery_group")) return response({ deliveries: ["D1", "D2"] });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?planning=${Date.now()}`);
+  await tick();
+  assert.equal(nodes.get("#delivery-optimization-manager").hidden, false);
+  const form = nodes.get("#delivery-plan-form");
+  form.elements.delivery_name.value = "D1";
+  form.elements.scheduled_delivery_date.value = "2026-11-17";
+  form.elements.radius_km.value = "5";
+  form.elements.max_stops.value = "5";
+  form.listeners.submit({ preventDefault() {} });
+  await tick();
+  const plan = nodes.get("#delivery-plan-results");
+  assert.match(plan.textContent, /Suggested rider: Rider/);
+  assert.match(plan.textContent, /not a road route/);
+  assert.ok(!calls.some((call) => call.url.includes("assign_delivery_group")));
+  await plan.children.find((child) => child.textContent === "Assign this group").listeners.click();
+  const assigned = calls.find((call) => call.url.includes("assign_delivery_group"));
+  assert.equal(assigned.options.body.get("delivery_names"), '["D1","D2"]');
+  assert.equal(assigned.options.body.get("scheduled_delivery_date"), "2026-11-17");
+  assert.equal(assigned.options.body.get("plan_token"), "plan-token");
+  assert.match(nodes.get("#delivery-feedback").textContent, /rider must accept each delivery/);
+});
+
+test("manager saves coordinates against the existing delivery", async (t) => {
+  const nodes = installOptimization(t);
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (url.includes("deliveries.delivery_dashboard")) return response({
+      manager: true, summary: {}, delayed_deliveries: 0, available_riders: 1,
+      can_manage_areas: false, personnel: [], personnel_performance: [],
+      ready_orders: [], areas: [], has_more: false,
+    });
+    if (url.includes("deliveries.list_deliveries")) return response({
+      deliveries: [{ name: "D1", order: "SO-1", status: "Awaiting Assignment", delivery_area: "Central" }],
+      has_more: false,
+    });
+    if (url.includes("deliveries.get_delivery")) return response({
+      name: "D1", order: "SO-1", status: "Awaiting Assignment", delivery_area: "Central",
+      allowed_statuses: [], activities: [],
+    });
+    if (url.includes("deliveries.set_delivery_coordinates")) return response({ name: "D1" });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?coordinates=${Date.now()}`);
+  await tick();
+  nodes.get("#delivery-list").children[0].children.find((child) => child.textContent === "View delivery").listeners.click();
+  await tick();
+  const form = nodes.get("#delivery-detail").children.find(
+    (child) => child.tag === "form" && child.textContent.includes("Set delivery coordinates"),
+  );
+  form.children[1].children[0].value = "-1.28";
+  form.children[2].children[0].value = "36.82";
+  form.listeners.submit({ preventDefault() {} });
+  await tick();
+  const saved = calls.find((call) => call.url.includes("set_delivery_coordinates"));
+  assert.equal(saved.options.body.get("delivery_name"), "D1");
+  assert.equal(saved.options.body.get("latitude"), "-1.28");
+  assert.equal(saved.options.body.get("longitude"), "36.82");
+  assert.match(nodes.get("#delivery-feedback").textContent, /coordinates saved/);
+});
 
 test("delivery workspace shows assigned details and accepts rider assignments", async (t) => {
   const nodes = install(t, deliveryIds, "[data-delivery-page]", {});

@@ -26,8 +26,13 @@ override_whitelisted_methods = {
     "frappe.core.doctype.user.user.sign_up": "intelligent_ordering.api.customers.sign_up",
 }
 role_home_page = {"Customer": "account"}
+update_website_context = "intelligent_ordering.utils.business.update_website_context"
 
 doc_events = {
+    "Website Settings": {
+        "validate": "intelligent_ordering.utils.business.validate_business_settings",
+        "on_update": "intelligent_ordering.utils.business.audit_business_settings",
+    },
     "Sales Order": {
         "on_update": [
             "intelligent_ordering.utils.inventory.handle_order_status_change",
@@ -43,6 +48,7 @@ doc_events = {
     "Payment Transaction": {"on_update": [
         "intelligent_ordering.utils.audit.audit_payment_status",
         "intelligent_ordering.utils.customer_notifications.on_update",
+        "intelligent_ordering.utils.fulfillment_notifications.handle_payment_status_change",
     ]},
     "Stock Ledger Entry": {"after_insert": "intelligent_ordering.utils.audit.audit_stock_movement"},
     "Delivery": {"after_insert": "intelligent_ordering.utils.audit.audit_delivery",
@@ -52,6 +58,10 @@ doc_events = {
         "after_insert": "intelligent_ordering.utils.audit.audit_user_roles",
         "on_update": "intelligent_ordering.utils.audit.audit_user_roles",
     },
+}
+
+scheduler_events = {
+    "all": ["intelligent_ordering.utils.fulfillment_notifications.send_pending_sms"],
 }
 
 permission_query_conditions = {

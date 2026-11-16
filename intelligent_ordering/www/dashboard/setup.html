@@ -1,0 +1,73 @@
+{% extends "templates/smarto_base.html" %}
+
+{% block title %}Business setup | SmartO{% endblock %}
+
+{% block smarto_content %}
+<main class="smarto-page" data-page-title="Business setup">
+  {% include "templates/includes/page_script_warning.html" %}
+  <header class="smarto-page-heading">
+    <div>
+      <p class="smarto-eyebrow">Commercial foundation</p>
+      <h1>Business setup and launch checks</h1>
+      <p>Configure this business only. Each business must have its own Frappe site and database.</p>
+    </div>
+    <a class="smarto-button smarto-button-secondary" href="/dashboard/admin">Administrator dashboard</a>
+  </header>
+  <p id="setup-status" role="status" aria-live="polite">Loading site configuration checks...</p>
+  <p id="setup-error" role="alert"></p>
+  <section class="smarto-admin-section" aria-labelledby="setup-business-heading">
+    <h2 id="setup-business-heading">Public business details</h2>
+    <p>These details appear on the storefront and contact page. Do not enter private credentials here.</p>
+    {% if not can_manage_users %}<p>Only a System Manager can save these details.</p>{% endif %}
+    <form id="setup-business-form" class="smarto-checkout-form">
+      <fieldset id="setup-business-fields" disabled>
+        <p><label for="setup-name">Business name</label>
+          <input id="setup-name" name="name" maxlength="140" required></p>
+        <p><label for="setup-email">Public support email</label>
+          <input id="setup-email" name="email" type="email" maxlength="140"></p>
+        <p><label for="setup-phone">Public support phone</label>
+          <input id="setup-phone" name="phone" type="tel" maxlength="30"></p>
+        <p><label for="setup-address">Public business address</label>
+          <textarea id="setup-address" name="address" maxlength="500"></textarea></p>
+        <p>Provide at least one support contact.</p>
+        {% if can_manage_users %}
+        <button class="smarto-button" type="submit">Save public business details</button>
+        {% endif %}
+      </fieldset>
+    </form>
+  </section>
+  <section class="smarto-admin-section" aria-labelledby="setup-checks-heading">
+    <h2 id="setup-checks-heading">Database and configuration checks</h2>
+    <p>Configured does not mean tested. This workspace makes no provider calls and never changes payments or stock.</p>
+    <button id="setup-refresh" class="smarto-button smarto-button-secondary" type="button">Refresh checks</button>
+    <div id="setup-checks"></div>
+    <h3>Optional integrations</h3>
+    <div id="setup-optional"></div>
+  </section>
+  <section class="smarto-admin-section" aria-labelledby="setup-manual-heading">
+    <h2 id="setup-manual-heading">Required manual verification</h2>
+    <p>Keep evidence in your deployment records. These tasks cannot be certified by a configuration check.</p>
+    <div id="setup-manual"></div>
+  </section>
+  <section class="smarto-admin-section" aria-labelledby="setup-data-heading">
+    <h2 id="setup-data-heading">Initial data and staff setup</h2>
+    <p>Create categories, products, warehouses and delivery areas in Desk. Receive opening stock through the inventory workflow.
+      Create named users and assign only their intended roles.</p>
+    <p>Use Frappe Data Import templates for supported master data, reviewing a small test import first.
+      Do not import payment success states, stock balances or order status changes to bypass validated workflows.</p>
+    <nav class="smarto-admin-shortcuts" aria-label="Business setup tools">
+      <a href="/app/product-category">Categories</a>
+      <a href="/app/product">Products</a>
+      <a href="/app/stock-warehouse">Warehouses</a>
+      <a href="/app/delivery-area">Delivery areas</a>
+      <a href="/app/smarto-policy-version">Policies</a>
+      {% if can_manage_users %}
+      <a href="/app/user">Staff accounts</a>
+      <a href="/app/data-import">Data import</a>
+      <a href="/app/website-settings">Website settings</a>
+      {% endif %}
+    </nav>
+  </section>
+</main>
+<script type="module" src="/assets/intelligent_ordering/js/onboarding.js"></script>
+{% endblock %}

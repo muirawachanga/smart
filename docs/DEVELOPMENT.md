@@ -2,7 +2,8 @@
 
 This repository contains a custom Frappe app. The Frappe framework and MariaDB
 are managed by a Frappe Bench installation; this repository is installed as an
-app inside that bench. The project proposal remains in the root `README.md`.
+app inside that bench. The root `README.md` contains the product overview,
+feature status, quick start and commercial launch checklist.
 The website product name is SmartO. The internal Frappe app, Python package,
 and DocType module remain `intelligent_ordering` / `Intelligent Ordering` to
 preserve existing identifiers and database compatibility.
@@ -43,6 +44,80 @@ ordering and staff operations remain at `/store`. Frappe's login and session
 handling provide the authentication foundation. Assign the app roles to test
 users from the Frappe Desk.
 
+## Multiple businesses: one site per business
+
+Each business must use its own Frappe site and database. Install the same app
+on each site; do not share or point multiple sites at one database:
+
+```bash
+bench new-site business-a.example.com
+bench --site business-a.example.com install-app intelligent_ordering
+bench new-site business-b.example.com
+bench --site business-b.example.com install-app intelligent_ordering
+```
+
+Configure DNS and HTTPS for each hostname, route requests to the matching
+Frappe site, and verify that each site's `site_config.json` has a distinct
+database and database credentials. Configure users, roles, products, inventory,
+policies, delivery areas, scheduler, and payment/SMS/Gemini credentials
+separately for each business. Use business-specific payment callback URLs and
+provider accounts; do not put site-specific credentials in
+`common_site_config.json`. Restrict cross-site administrators, backups, logs,
+and file storage, and test that a user and order created on one site cannot be
+read on the other. Back up and restore each site independently.
+
+This deployment model provides separate stores, not a shared marketplace or
+cross-business checkout. Isolation depends on correct Frappe site, database,
+host, cookie, storage and administrator configuration; it is not guaranteed by
+application-level tenant filters. Validate isolation on the actual deployment
+before onboarding businesses.
+
+## Business onboarding and launch checks
+
+After updating the app, run `bench --site <site-name> migrate` and build assets.
+Migration adds SmartO public business identity fields to the existing
+**Website Settings** singleton, without a second business/settings DocType.
+Open `/dashboard/setup` from the Administrator dashboard.
+
+System Managers can save a business name, public support email/phone and public
+address. At least one contact is required. Names appear beside the SmartO
+storefront branding and in the footer; the contact page uses the saved contact
+details. Only these public fields are added to website context; provider
+credentials and other private settings are never returned by the setup API.
+Changes, including Desk edits, record field names in the existing Admin Audit
+Log without copying contact values into the audit details.
+
+System Manager and Business Admin can read
+`intelligent_ordering.api.onboarding.readiness`; saving through
+`intelligent_ordering.api.onboarding.save_business` is POST-only and requires
+System Manager. This narrowly scoped API saves only the four validated public
+fields with elevated document permissions; it does not grant general Website
+Settings access. Normal Frappe permissions still apply to Desk.
+Business Admin does not gain access to System Settings or user management.
+
+The read-only report checks schema, identity, published policies, enabled
+catalog/category records, positive saleable stock, delivery areas matching
+catalog currencies, named staff accounts, configured HTTPS origin, disabled
+developer mode, scheduler flags and production M-Pesa configuration with a
+same-origin callback. An installed product without stock does not imply it is
+saleable. The stock check requires at least one saleable product, not stock for
+every catalog item. Optional SMS/Gemini integrations show their enabled state
+only, not validated credentials.
+
+These are configuration/database checks, not external probes: an HTTPS string
+does not prove a valid certificate; enabled scheduler flags do not prove a
+running worker; a production credential configuration does not prove provider
+approval or successful payments. The workspace always lists separate unverified
+manual tasks for workflows, providers, backup/restore, infrastructure, site
+isolation and policy review. It does not persist success checkboxes or certify
+readiness. Keep actual verification evidence in restricted deployment records.
+
+Create initial records through the existing Desk/workspace tools. Standard
+Frappe Data Import can be used for supported master data after testing a small
+import. Do not import balances, successful payments or status transitions to
+bypass inventory, payment or order APIs. Publish approved policies rather than
+the seeded review drafts.
+
 ## SmartO website routes
 
 The public website uses native Frappe `www` routes and a shared Jinja layout;
@@ -55,6 +130,7 @@ route-aware page labels.
 | `/` | SmartO homepage |
 | `/about` | About SmartO |
 | `/products` | Searchable, filterable, sortable product catalogue |
+| `/assistant` | Opt-in Gemini shopping assistance and customer-scoped recommendations |
 | `/products/<product_id>` | Database-backed product details |
 | `/product-details?product=<product_id>` | Product details for identifiers that cannot be used as a path segment |
 | `/categories` | Enabled product categories |
@@ -64,7 +140,7 @@ route-aware page labels.
 | `/order-confirmation/<order_id>` | Owner-scoped order confirmation |
 | `/order-confirmation?order=<order_id>` | Confirmation for identifiers that cannot be used as a path segment |
 | `/track-order` | Tracking page shell |
-| `/contact` | Contact page shell; business contact data is not configured |
+| `/contact` | Configured public business contact details, with an explicit unconfigured state |
 | `/login` | SmartO login using Frappe authentication, sessions, and verification challenges |
 | `/register` | Customer-only registration with published Terms and Privacy acceptance |
 | `/forgot-password` | Generic-response password recovery through Frappe |
@@ -73,6 +149,7 @@ route-aware page labels.
 | `/account` | Owner-scoped order history and payment controls |
 | `/dashboard/owner` | Role-protected business workspace |
 | `/dashboard/admin` | Role-protected administration workspace |
+| `/dashboard/setup` | Administrator onboarding and configuration/manual launch checks |
 | `/dashboard/sales` | Role-protected sales workspace |
 | `/dashboard/orders` | Role-protected order search, details and status updates |
 | `/dashboard/inventory` | Role-protected inventory workspace |
@@ -239,8 +316,70 @@ Order details poll persisted order/payment/delivery state every 15 seconds while
 the page is visible, with an explicit refresh button. No GPS position is
 invented. New orders and subsequent order, delivery, payment, or cancellation
 updates create native Frappe Notification Log records for the owning customer.
-The notification list and mark-read operation are recipient-scoped. There is no
-SMS delivery or backfill of historical notifications in this implementation.
+The notification list and mark-read operation are recipient-scoped. SMS is an
+independent, optional delivery channel described below; historical notification
+events are not backfilled.
+
+### Africa's Talking SMS
+
+The existing Fulfillment Notification outbox records customer SMS events for
+confirmed orders, persisted payment status transitions, delivery assignment,
+dispatch, completion and failure. Messages go to the phone saved on the order,
+not the rider's phone. A payment is described as successful only after the
+existing verified payment workflow records it as Successful.
+
+Create an Africa's Talking account and obtain the username and API key from its
+dashboard. For testing, use the sandbox username `sandbox` and sandbox API key;
+for production use your live username and key, sufficient SMS balance, and an
+approved sender ID if required by the destination. Configure the following
+nested object in the site's private `sites/<site-name>/site_config.json` or
+deployment secret configuration. Never commit credentials:
+
+```json
+{
+  "fulfillment_notifications": {
+    "provider": "africas_talking",
+    "enabled": true,
+    "environment": "sandbox",
+    "username": "sandbox",
+    "api_key": "YOUR_SANDBOX_API_KEY"
+  }
+}
+```
+
+For live sending change `environment` to `production` and use the live
+credentials. Optionally add `"sender_id": "YOUR_APPROVED_SENDER_ID"`; omit it
+when not needed. Local Kenyan mobile numbers and international numbers in E.164
+format are accepted. Invalid or missing order phone snapshots produce a Failed
+event; retrying alone cannot correct an immutable order snapshot.
+`.env.example` is reference only and is not loaded by Frappe.
+
+After updating the app and configuration, run `bench --site <site-name> migrate`,
+enable the scheduler with `bench --site <site-name> enable-scheduler`, and ensure
+the Bench scheduler and workers are running. The scheduler processes up to 20
+prepared events per run. Test with a sandbox test number and inspect Fulfillment
+Notification records in Frappe Desk; verify production routing, sender approval,
+provider balance and charges with Africa's Talking before going live.
+
+Events capture their configured provider and environment at creation. Events
+created before Africa's Talking is configured are not sent later. Disabling the
+integration pauses already-prepared Africa's Talking events, which resume when
+it is re-enabled in the same environment. Switching environments does not send
+the other environment's queue. Invalid configuration is logged without exposing
+secrets. Provider authentication errors are recorded as uncertain outcomes;
+neither condition prevents orders or payments from being saved.
+
+`Submitted` means the provider accepted the request, **not** that the handset
+received the SMS; delivery receipts are not integrated. `Failed` means local
+validation failed or the provider explicitly rejected the recipient.
+`Unknown` or a stuck `Sending` may already have reached the provider: investigate
+the provider records and do not blindly resend. Timeouts and ambiguous responses
+are never automatically retried. After correcting a definite rejection, a
+System Manager or Business Admin can request an audited retry with a POST to
+`/api/method/intelligent_ordering.utils.fulfillment_notifications.retry_failed_sms`
+and `name` set to the Fulfillment Notification name. Only Failed events can be
+retried; the scheduler sends them when enabled. Keep access to these records and
+provider logs restricted because they contain customer phone numbers.
 
 Customers may submit a cancellation request with a reason for an open order.
 Only one pending request is allowed at a time; rejected requests may be
@@ -315,9 +454,61 @@ Configure database/site settings using Bench and store provider secrets in
 the site's `site_config.json` or the deployment secret manager. Do not commit
 credentials or production site configuration.
 
-The current scaffold does not call external AI, payment, SMS, or mapping
-services. Use provider sandbox credentials only when those integrations are
-implemented.
+Payment, SMS and the optional Gemini assistant call external providers when
+configured. Mapping and road-routing services are not integrated.
+
+### Gemini shopping assistant
+
+The `/assistant` page is available to signed-in Customer accounts. Obtain a
+Gemini API key from Google AI Studio and configure each site's private
+`site_config.json` (merge this object into the existing file):
+
+```json
+{
+  "gemini": {
+    "enabled": true,
+    "model": "gemini-2.5-flash",
+    "api_key": "YOUR_GEMINI_API_KEY"
+  }
+}
+```
+
+Use a model available to the account and verify Google's current pricing,
+terms and data handling before enabling it. This is disabled unless explicitly
+configured. `.env.example` is reference only and is not loaded by Frappe.
+Requests are rate-limited and require an explicit checkbox acknowledging that
+the current message, recent conversation and matching public product data go
+to Gemini. Do not enter personal, financial or authentication information. The
+server rejects common phone/email patterns, but this is not comprehensive
+redaction. Conversation history remains in the browser page and is not stored
+as a SmartO record; Google may retain data according to its terms.
+
+The assistant has no access to private order history, payment transactions or
+customer profiles and cannot place orders or modify payments. Suggested product
+IDs and quantities are checked against the live public catalog and stock; the
+customer must explicitly add each suggestion through the existing cart API and
+complete checkout normally. Product availability and totals are revalidated by
+the existing workflows. AI replies can be inaccurate and must not be treated as
+authoritative payment, delivery or policy information.
+
+The separate **Load my suggestions** action uses only the signed-in customer's
+completed orders and historical product categories, ranking currently enabled,
+in-stock products. It sends no purchase history to Gemini. Customers without
+completed purchase history receive an empty result.
+
+### Forecasts
+
+Owner and finance workspaces show seven-day sales and demand estimates;
+inventory staff can view demand estimates. A local weekday-seasonal linear
+trend fits at most 56 complete days and requires at least 28 days of history
+and five days with activity; otherwise it reports insufficient data. Sales
+use only successful payment transactions, grouped by transaction date,
+currency and sandbox/production environment. Demand uses completed order-item
+quantities by order date for up to 20 recently popular enabled products.
+Today is excluded from training because it is incomplete. These are statistical
+baselines, not guarantees: stockouts, promotions, holidays, returns, changing
+business hours and short history can make the estimates inaccurate. They do
+not modify orders, payments or inventory.
 
 ## Tests and checks
 
@@ -648,6 +839,38 @@ the delivery to Assigned so the replacement rider must accept it; picked-up
 deliveries cannot be reassigned. Completion requires the assigned rider's
 explicit confirmation, private proof photo, and verified payment, with existing
 activity records retaining actors and timestamps.
+
+### Delivery planning and rider locations
+
+Run `bench --site <site-name> migrate` after installing the update. A rider can
+choose **Share current location** on the delivery dashboard; the browser asks
+for location permission and usually requires HTTPS. This captures a single GPS
+position, not continuous tracking. Only the rider can share or clear their own
+position. The latest position and its reported accuracy are stored in the
+Delivery Rider Location DocType, visible only to delivery-management roles.
+Clearing it removes the current coordinates; normal database backups may still
+contain older data. Locations older than 30 minutes are not used for planning.
+
+A delivery manager opens a delivery and enters verified latitude and longitude
+for its delivery-address snapshot. No geocoding service is used. On **Plan a
+delivery group**, select that unassigned delivery, a date, a radius and a maximum
+number of stops. The planner suggests the nearest enabled, idle rider with a
+recent shared location, then groups other unassigned, ready deliveries in the
+same area within the chosen radius of the starting delivery. A nearest-neighbor
+ordering suggests the stop sequence. The manager reviews the result and
+explicitly assigns the group; each delivery uses the existing assignment,
+acceptance, history and notification workflows. The server rechecks the rider
+and every delivery when assigning, rejecting a plan if its reviewed coordinates
+or rider location have changed. Incorrect delivery coordinates can be cleared
+from the delivery details. Riders can view a suggested route containing
+only their own active, located deliveries; unlocated deliveries are counted
+separately.
+
+Distances are approximate straight-line distances, not driving directions or
+travel-time estimates. They do not account for pickup location, roads, traffic,
+obstacles, GPS uncertainty or rider capacity. Review addresses, rider workload,
+vehicle capacity and real road directions before dispatch. Planning does not
+change payments, inventory or order totals.
 
 Inventory, delivery-management, order, finance, owner and administrator pages
 offer CSV/XLSX exports directly on the page using the existing

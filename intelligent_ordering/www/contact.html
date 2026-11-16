@@ -24,6 +24,16 @@
       <span class="smarto-card-link">View payments <span aria-hidden="true">→</span></span>
     </a>
   </div>
+  {% if smarto_business and (smarto_business.email or smarto_business.phone) %}
+  <section class="smarto-admin-section" aria-labelledby="business-contact-heading">
+    <h2 id="business-contact-heading">{{ smarto_business.name | e }}</h2>
+    {% if smarto_business.email %}<p>Support email: <a href="mailto:{{ smarto_business.email | e }}">{{ smarto_business.email | e }}</a></p>{% endif %}
+    {% if smarto_business.phone %}<p>Support phone: <a href="tel:{{ smarto_business.phone | e }}">{{ smarto_business.phone | e }}</a></p>{% endif %}
+    {% if smarto_business.address %}<p>Business address: {{ smarto_business.address | e }}</p>{% endif %}
+    <p>Use these channels for support. Do not share passwords or payment PINs.</p>
+  </section>
+  {% else %}
   <p class="smarto-contact-note">A direct support email or phone number has not been configured. SmartO will not accept or discard messages through an inactive contact form.</p>
+  {% endif %}
 </main>
 {% endblock %}

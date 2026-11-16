@@ -74,6 +74,11 @@ export function initDeliveryDashboard() {
   const next = document.querySelector("#delivery-next");
   const readyPrevious = document.querySelector("#delivery-ready-previous");
   const readyNext = document.querySelector("#delivery-ready-next");
+  const riderLocation = document.querySelector("#delivery-location-share");
+  const managerPlan = document.querySelector("#delivery-optimization-manager");
+  const planForm = document.querySelector("#delivery-plan-form");
+  const planResults = document.querySelector("#delivery-plan-results");
+  const routeResults = document.querySelector("#delivery-my-route-results");
   let page = 1;
   let readyPage = 1;
   let dashboard = { manager: false, personnel: [], areas: [] };
@@ -105,6 +110,8 @@ export function initDeliveryDashboard() {
     if (completion) completion.textContent = dashboard.manager
       ? `${dashboard.completion_rate}% of all deliveries completed.` : "";
     manager.hidden = !dashboard.manager;
+    if (riderLocation) riderLocation.hidden = dashboard.manager;
+    if (managerPlan) managerPlan.hidden = !dashboard.manager;
     if (!dashboard.manager) return;
     document.querySelector("#delivery-workloads").replaceChildren(
       ...dashboard.personnel.map((person) =>
@@ -175,6 +182,13 @@ export function initDeliveryDashboard() {
         text("p", `${delivery.name} · ${delivery.customer_name} · ${delivery.customer_phone}`),
         text("p", `${delivery.delivery_address} · ${delivery.delivery_area}`),
         text("p", `Scheduled: ${delivery.scheduled_delivery_date || "Not scheduled"}`), view);
+      if (dashboard.manager && planForm && delivery.status === "Awaiting Assignment") {
+        card.append(button("Plan group from this delivery", () => {
+          planForm.elements.delivery_name.value = delivery.name;
+          planResults.replaceChildren();
+          managerPlan.scrollIntoView({ behavior: "smooth" });
+        }));
+      }
       return card;
     }));
     if (!listing.deliveries.length) results.append(text("p", "No matching deliveries."));
@@ -199,6 +213,9 @@ export function initDeliveryDashboard() {
       text("p", `Completed: ${delivery.completion_date || "Not completed"}${delivery.completed_by ? ` by ${delivery.completed_by}` : ""}`),
       text("p", `Notes: ${delivery.delivery_notes || "None"}`),
     );
+    if (delivery.location_set) {
+      detail.append(text("p", `Delivery coordinates: ${delivery.latitude}, ${delivery.longitude}`));
+    }
     const items = document.createElement("ul");
     items.setAttribute("aria-label", "Order items");
     for (const item of delivery.items || []) {
@@ -278,6 +295,47 @@ export function initDeliveryDashboard() {
       });
       detail.append(assignment);
     }
+    if (dashboard.manager && !["Delivered", "Cancelled"].includes(delivery.status)) {
+      const coordinates = document.createElement("form");
+      coordinates.className = "smarto-checkout-form";
+      coordinates.append(text("h4", "Set delivery coordinates"));
+      const latitude = field(coordinates, "Latitude", input("number", delivery.location_set ? delivery.latitude : ""));
+      latitude.min = "-90";
+      latitude.max = "90";
+      latitude.step = "any";
+      latitude.required = true;
+      const longitude = field(coordinates, "Longitude", input("number", delivery.location_set ? delivery.longitude : ""));
+      longitude.min = "-180";
+      longitude.max = "180";
+      longitude.step = "any";
+      longitude.required = true;
+      const save = text("button", "Save delivery coordinates");
+      save.type = "submit";
+      save.className = "smarto-button";
+      coordinates.append(save);
+      if (delivery.location_set) {
+        const clear = button("Clear delivery coordinates", () => act(clear, async () => {
+          await post("deliveries.clear_delivery_coordinates", { delivery_name: name });
+          if (planResults) planResults.replaceChildren();
+          await showDetail(name);
+          feedback.textContent = "Delivery coordinates cleared.";
+        }));
+        coordinates.append(clear);
+      }
+      coordinates.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (!coordinates.reportValidity()) return;
+        act(save, async () => {
+          await post("deliveries.set_delivery_coordinates", {
+            delivery_name: name, latitude: latitude.value, longitude: longitude.value,
+          });
+          if (planResults) planResults.replaceChildren();
+          await showDetail(name);
+          feedback.textContent = "Delivery coordinates saved.";
+        });
+      });
+      detail.append(coordinates);
+    }
     if (!["Delivered", "Cancelled"].includes(delivery.status)) {
       const update = document.createElement("form");
       update.className = "smarto-checkout-form";
@@ -354,11 +412,89 @@ export function initDeliveryDashboard() {
       await loadDashboard();
       await loadList();
       feedback.textContent = "";
+      return true;
     } catch (error) {
       results.replaceChildren();
       manager.hidden = true;
+      if (riderLocation) riderLocation.hidden = true;
+      if (managerPlan) managerPlan.hidden = true;
       feedback.textContent = error.message;
+      return false;
     }
+  }
+
+  function renderRoute(container, data) {
+    container.replaceChildren(
+      text("p", `Suggested straight-line route: approximately ${data.total_distance_km} km. This is not a road route.`),
+    );
+    for (const [index, stop] of data.route.entries()) {
+      container.append(text("p",
+        `${index + 1}. ${stop.name} · Order ${stop.order} · ${stop.status} · ${stop.delivery_address} · ${stop.distance_km} km from previous stop`));
+    }
+    if (!data.route.length) container.append(text("p", "No located active deliveries."));
+    if (data.missing_coordinates) {
+      container.append(text("p", `${data.missing_coordinates} assigned deliveries have no coordinates and are not included.`));
+    }
+  }
+
+  if (riderLocation) {
+    const share = document.querySelector("#delivery-share-location");
+    const clear = document.querySelector("#delivery-clear-location");
+    const route = document.querySelector("#delivery-my-route");
+    share.addEventListener("click", () => act(share, async () => {
+      if (!window.navigator?.geolocation) throw new Error("Location sharing is unavailable in this browser or connection.");
+      const position = await new Promise((resolve, reject) => {
+        window.navigator.geolocation.getCurrentPosition(resolve,
+          () => reject(new Error("Location could not be obtained. Check browser permissions and try again.")),
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+      });
+      await post("deliveries.share_rider_location", {
+        latitude: position.coords.latitude, longitude: position.coords.longitude,
+        accuracy_meters: position.coords.accuracy,
+      });
+      routeResults.replaceChildren();
+      feedback.textContent = "Current location shared for delivery planning.";
+    }));
+    clear.addEventListener("click", () => act(clear, async () => {
+      await post("deliveries.clear_rider_location");
+      routeResults.replaceChildren();
+      feedback.textContent = "Your shared location was cleared.";
+    }));
+    route.addEventListener("click", () => act(route, async () => {
+      renderRoute(routeResults, await get("deliveries.my_delivery_route"));
+    }));
+  }
+
+  if (planForm) {
+    planForm.addEventListener("input", () => planResults.replaceChildren());
+    planForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!planForm.reportValidity()) return;
+      const values = Object.fromEntries(new FormData(planForm));
+      act(planForm.querySelector('button[type="submit"]'), async () => {
+        const plan = await get("deliveries.suggest_delivery_group", {
+          delivery_name: values.delivery_name, radius_km: values.radius_km, max_stops: values.max_stops,
+        });
+        if (Object.entries(values).some(([key, value]) => planForm.elements[key].value !== value)) {
+          throw new Error("Planning inputs changed. Request a new suggestion.");
+        }
+        renderRoute(planResults, plan);
+        planResults.prepend(text("p",
+          `Suggested rider: ${plan.rider_name} (${plan.rider}). Location shared ${plan.location_updated_at}; reported accuracy ±${plan.accuracy_meters} m.`));
+        const assign = button("Assign this group", () => act(assign, async () => {
+          await post("deliveries.assign_delivery_group", {
+            rider: plan.rider, delivery_names: JSON.stringify(plan.route.map((stop) => stop.name)),
+            scheduled_delivery_date: values.scheduled_delivery_date, plan_token: plan.plan_token,
+          });
+          planResults.replaceChildren();
+          const refreshed = await refresh();
+          feedback.textContent = refreshed
+            ? "Delivery group assigned. The rider must accept each delivery."
+            : `Delivery group assigned, but the display could not refresh. Reload before continuing. ${feedback.textContent}`;
+        }));
+        planResults.append(assign);
+      });
+    });
   }
 
   areaForm.addEventListener("submit", (event) => {

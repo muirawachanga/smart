@@ -16,15 +16,23 @@ APP_ROLES = {
 
 def after_install():
     ensure_roles()
+    ensure_business_fields()
     ensure_policy_indexes()
     ensure_policy_drafts()
 
 
 def after_migrate():
     ensure_roles()
+    ensure_business_fields()
     ensure_inventory_indexes()
     ensure_policy_indexes()
     ensure_policy_drafts()
+
+
+def ensure_business_fields():
+    from intelligent_ordering.utils.business import ensure_business_fields as create_fields
+
+    create_fields()
 
 
 def ensure_policy_drafts():

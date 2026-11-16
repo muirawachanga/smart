@@ -3,8 +3,11 @@
     <button class="smarto-sidebar-toggle smarto-icon-button" id="smarto-sidebar-toggle" type="button" aria-controls="smarto-sidebar" aria-expanded="false" aria-label="Open staff navigation" hidden>
       {% from "templates/includes/lucide_icon.html" import icon %}{{ icon("menu") }}
     </button>
-    <a class="smarto-brand" href="/" aria-label="SmartO home">
+    <a class="smarto-brand smarto-business-brand" href="/" aria-label="SmartO home">
       {% include "templates/includes/smarto_logo.html" %}
+      {% if smarto_business and smarto_business.name %}
+      <span class="smarto-business-name">{{ smarto_business.name | e }}</span>
+      {% endif %}
     </a>
     <button class="smarto-menu-toggle" id="smarto-menu-toggle" type="button"
       aria-controls="smarto-primary-navigation" aria-expanded="false">

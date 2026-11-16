@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import date, timedelta
 
 import frappe
 
@@ -8,6 +9,7 @@ from intelligent_ordering.utils.admin_analytics import (
     REPORTS,
     build_order_filter_sql,
     build_payment_filter_sql,
+    forecast_daily,
     parse_report_filters,
     report_filename,
     spreadsheet_cell,
@@ -156,6 +158,101 @@ def dashboard():
 def _integers(row):
     return {key: (int(value or 0) if key != "total_sales" else float(value or 0))
             for key, value in row.items()}
+
+
+@frappe.whitelist()
+def sales_forecast():
+    _require("finance")
+    from frappe.utils import now_datetime
+
+    last_day = now_datetime().date() - timedelta(days=1)
+    start = last_day - timedelta(days=55)
+    rows = frappe.db.sql(
+        """
+        SELECT t.environment, o.currency, DATE(t.transaction_date) AS day,
+               SUM(t.amount) AS amount, first_sale.first_day
+        FROM `tabPayment Transaction` t
+        INNER JOIN `tabSales Order` o ON o.name = t.`order`
+        INNER JOIN (
+            SELECT p.environment, so.currency, MIN(DATE(p.transaction_date)) AS first_day
+            FROM `tabPayment Transaction` p
+            INNER JOIN `tabSales Order` so ON so.name = p.`order`
+            WHERE p.status = 'Successful' AND p.transaction_date IS NOT NULL
+            GROUP BY p.environment, so.currency
+        ) first_sale ON first_sale.environment = t.environment AND first_sale.currency = o.currency
+        WHERE t.status = 'Successful' AND t.transaction_date >= %s AND t.transaction_date < %s
+        GROUP BY t.environment, o.currency, DATE(t.transaction_date), first_sale.first_day
+        ORDER BY t.environment, o.currency, day
+        """, (start, last_day + timedelta(days=1)), as_dict=True,
+    )
+    groups = {}
+    for row in rows:
+        key = (row["environment"], row["currency"])
+        group = groups.setdefault(key, {"first_day": row["first_day"], "observations": {}})
+        group["observations"][_forecast_date(row["day"])] = float(row["amount"])
+    return {
+        "model": "Weekday-seasonal linear trend; estimates are not guaranteed.",
+        "basis": "Successful payments by transaction date, separated by currency and environment.",
+        "series": [{
+            "environment": environment, "currency": currency,
+            **forecast_daily(group["observations"], _forecast_date(group["first_day"]), last_day),
+        } for (environment, currency), group in groups.items()],
+    }
+
+
+@frappe.whitelist()
+def demand_forecast():
+    _require_any("inventory", "store", "finance")
+    from frappe.utils import now_datetime
+
+    last_day = now_datetime().date() - timedelta(days=1)
+    start = last_day - timedelta(days=55)
+    rows = frappe.db.sql(
+        """
+        SELECT i.product, p.product_name, DATE(o.order_datetime) AS day,
+               SUM(i.quantity) AS quantity, first_order.first_day
+        FROM `tabSales Order Item` i
+        INNER JOIN `tabSales Order` o ON o.name = i.parent
+        INNER JOIN `tabProduct` p ON p.name = i.product AND p.enabled = 1
+        INNER JOIN (
+            SELECT item.product, MIN(DATE(so.order_datetime)) AS first_day
+            FROM `tabSales Order Item` item
+            INNER JOIN `tabSales Order` so ON so.name = item.parent
+            WHERE item.parenttype = 'Sales Order' AND item.parentfield = 'items' AND so.status = 'Completed'
+            GROUP BY item.product
+        ) first_order ON first_order.product = i.product
+        INNER JOIN (
+            SELECT item.product
+            FROM `tabSales Order Item` item
+            INNER JOIN `tabSales Order` so ON so.name = item.parent
+            WHERE item.parenttype = 'Sales Order' AND item.parentfield = 'items'
+              AND so.status = 'Completed' AND so.order_datetime >= %s AND so.order_datetime < %s
+            GROUP BY item.product ORDER BY SUM(item.quantity) DESC, item.product LIMIT 20
+        ) top_products ON top_products.product = i.product
+        WHERE i.parenttype = 'Sales Order' AND i.parentfield = 'items'
+          AND o.status = 'Completed' AND o.order_datetime >= %s AND o.order_datetime < %s
+        GROUP BY i.product, p.product_name, DATE(o.order_datetime), first_order.first_day
+        ORDER BY i.product, day
+        """, (start, last_day + timedelta(days=1), start, last_day + timedelta(days=1)), as_dict=True,
+    )
+    groups = {}
+    for row in rows:
+        group = groups.setdefault(row["product"], {
+            "product_name": row["product_name"], "first_day": row["first_day"], "observations": {},
+        })
+        group["observations"][_forecast_date(row["day"])] = float(row["quantity"])
+    return {
+        "model": "Weekday-seasonal linear trend; estimates are not guaranteed.",
+        "basis": "Completed order item quantities by order date; up to 20 recent high-demand products.",
+        "products": [{
+            "product": product, "product_name": group["product_name"],
+            **forecast_daily(group["observations"], _forecast_date(group["first_day"]), last_day),
+        } for product, group in groups.items()],
+    }
+
+
+def _forecast_date(value):
+    return value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
 
 
 @frappe.whitelist()

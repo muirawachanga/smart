@@ -4,7 +4,7 @@
   "module": "Intelligent Ordering",
   "autoname": "naming_series:",
   "engine": "InnoDB",
-  "field_order": ["naming_series", "order", "customer", "customer_name", "customer_phone", "delivery_address", "delivery_area", "assigned_delivery_person", "currency", "delivery_fee", "scheduled_delivery_date", "dispatch_date", "completion_date", "completed_by", "status", "delivery_notes", "activities"],
+  "field_order": ["naming_series", "order", "customer", "customer_name", "customer_phone", "delivery_address", "delivery_area", "location_set", "latitude", "longitude", "assigned_delivery_person", "currency", "delivery_fee", "scheduled_delivery_date", "dispatch_date", "completion_date", "completed_by", "status", "delivery_notes", "activities"],
   "fields": [
     {"fieldname": "naming_series", "fieldtype": "Select", "options": "DEL-.YYYY.-.#####", "default": "DEL-.YYYY.-.#####", "label": "Naming Series", "reqd": 1},
     {"fieldname": "order", "fieldtype": "Link", "options": "Sales Order", "label": "Order", "reqd": 1, "unique": 1, "read_only": 1, "in_list_view": 1},
@@ -13,6 +13,9 @@
     {"fieldname": "customer_phone", "fieldtype": "Data", "label": "Customer Phone", "read_only": 1},
     {"fieldname": "delivery_address", "fieldtype": "Small Text", "label": "Delivery Address", "read_only": 1},
     {"fieldname": "delivery_area", "fieldtype": "Link", "options": "Delivery Area", "label": "Delivery Area", "read_only": 1, "in_list_view": 1},
+    {"fieldname": "location_set", "fieldtype": "Check", "label": "Delivery Coordinates Set", "read_only": 1},
+    {"fieldname": "latitude", "fieldtype": "Float", "precision": "6", "label": "Delivery Latitude", "read_only": 1},
+    {"fieldname": "longitude", "fieldtype": "Float", "precision": "6", "label": "Delivery Longitude", "read_only": 1},
     {"fieldname": "assigned_delivery_person", "fieldtype": "Link", "options": "User", "label": "Assigned Delivery Person", "read_only": 1, "in_list_view": 1},
     {"fieldname": "currency", "fieldtype": "Data", "label": "Currency", "read_only": 1},
     {"fieldname": "delivery_fee", "fieldtype": "Currency", "options": "currency", "label": "Delivery Fee", "read_only": 1},

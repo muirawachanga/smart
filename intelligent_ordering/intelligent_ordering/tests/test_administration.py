@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import getdate, now_datetime
@@ -8,8 +10,12 @@ from intelligent_ordering.api.administration import (
     export_report,
     list_customers,
     management_activity,
+    sales_forecast,
+    demand_forecast,
     sales_analytics,
 )
+from intelligent_ordering.api.catalog import personalized_recommendations
+from intelligent_ordering.api import assistant, cart
 from intelligent_ordering.api.inventory import adjust_stock
 from intelligent_ordering.api.payments import _save
 
@@ -140,6 +146,33 @@ class TestAdministrationAnalytics(FrappeTestCase):
             sales_analytics()
         with self.assertRaises(frappe.PermissionError):
             export_report("payments", "csv")
+        with self.assertRaises(frappe.PermissionError):
+            sales_forecast()
+        with self.assertRaises(frappe.PermissionError):
+            demand_forecast()
+
+    def test_recommendations_only_use_the_signed_in_customers_completed_orders(self):
+        self.order.db_set("status", "Completed")
+        other = self._make_user(f"other-{frappe.generate_hash(length=8)}@example.test", "Customer")
+        frappe.get_doc({
+            "doctype": "Customer Profile", "user": other.name,
+            "full_name": "Other Customer", "phone": "+254700000000", "enabled": 1,
+        }).insert(ignore_permissions=True)
+        frappe.set_user(self.customer.name)
+        self.assertIn(self.product.name, {row.name for row in personalized_recommendations()["products"]})
+        frappe.set_user(other.name)
+        self.assertEqual(personalized_recommendations()["products"], [])
+
+    def test_assistant_suggestions_require_explicit_cart_action(self):
+        frappe.set_user(self.customer.name)
+        config = {"enabled": True, "model": "gemini-2.5-flash", "api_key": "test-key"}
+        response = {"reply": "Consider this product.", "products": [{"id": self.product.name, "quantity": 1}]}
+        with patch.dict(frappe.conf, {"gemini": config}), patch.object(assistant, "_request_gemini", return_value=response):
+            result = assistant.converse("Find Analytics Product", consent=1)
+        self.assertEqual(result["products"][0]["name"], self.product.name)
+        self.assertFalse(frappe.db.exists("Shopping Cart", {"user": self.customer.name}))
+        added = cart.add_item(result["products"][0]["name"], result["products"][0]["quantity"])
+        self.assertEqual(added["items"][0]["product"], self.product.name)
 
     def test_support_customer_search_excludes_payment_aggregates_and_keeps_history_read_only(self):
         support = self._make_user(f"support-{frappe.generate_hash(length=8)}@example.test", "Customer Support")

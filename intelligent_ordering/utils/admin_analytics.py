@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 
 ORDER_STATUSES = {
@@ -74,6 +74,31 @@ def spreadsheet_cell(value):
     if isinstance(value, str) and value.startswith(("=", "+", "-", "@", "\t", "\r")):
         return "'" + value
     return value
+
+
+def forecast_daily(observations, first_day, last_day, horizon=7):
+    """Fit a weekday-seasonal linear trend to complete daily observations."""
+    first_day = max(first_day, last_day - timedelta(days=55))
+    days = (last_day - first_day).days + 1
+    values = [float(observations.get(first_day + timedelta(days=index), 0)) for index in range(max(days, 0))]
+    active_days = sum(value > 0 for value in values)
+    if days < 28 or active_days < 5:
+        return {"available": False, "history_days": max(days, 0), "active_days": active_days, "forecast": []}
+    center = (days - 1) / 2
+    mean = sum(values) / days
+    denominator = sum((index - center) ** 2 for index in range(days))
+    slope = sum((index - center) * (value - mean) for index, value in enumerate(values)) / denominator
+    seasonal = {day: [] for day in range(7)}
+    for index, value in enumerate(values):
+        weekday = (first_day + timedelta(days=index)).weekday()
+        seasonal[weekday].append(value - slope * (index - center))
+    forecast = []
+    for offset in range(1, horizon + 1):
+        target = last_day + timedelta(days=offset)
+        baseline = sum(seasonal[target.weekday()]) / len(seasonal[target.weekday()])
+        estimate = max(0, baseline + slope * (days - 1 + offset - center))
+        forecast.append({"date": target.isoformat(), "estimate": round(estimate, 2)})
+    return {"available": True, "history_days": days, "active_days": active_days, "forecast": forecast}
 
 
 def build_order_filter_sql(filters, order_alias="o", item_alias="oi"):

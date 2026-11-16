@@ -56,11 +56,14 @@
       </article>
     </div>
   </section>
+  {% include "templates/includes/sales_forecast.html" %}
+  {% include "templates/includes/demand_forecast.html" %}
   {% include "templates/includes/management_activity.html" %}
   {% include "templates/includes/customer_workspace.html" %}
   {% include "templates/includes/workspace_reports.html" %}
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/role-dashboard.js"></script>
+<script type="module" src="/assets/intelligent_ordering/js/forecasts.js"></script>
 <script type="module" src="/assets/intelligent_ordering/js/management-activity.js"></script>
 <script type="module" src="/assets/intelligent_ordering/js/customer-workspace.js"></script>
 {% endblock %}

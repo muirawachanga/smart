@@ -148,3 +148,41 @@ def get_product(product):
     if not rows:
         frappe.throw("This product is unavailable.", frappe.DoesNotExistError)
     return rows[0]
+
+
+@frappe.whitelist()
+def personalized_recommendations():
+    from intelligent_ordering.api.checkout import _require_customer
+
+    user = _require_customer()
+    rows = frappe.db.sql(
+        f"""
+        {PRODUCT_SELECT}
+        LEFT JOIN (
+            SELECT item.product, SUM(item.quantity) AS quantity
+            FROM `tabSales Order Item` item
+            INNER JOIN `tabSales Order` so ON so.name = item.parent
+            INNER JOIN `tabCustomer Profile` cp ON cp.name = so.customer
+            WHERE cp.user = %s AND cp.enabled = 1 AND so.status = 'Completed'
+              AND item.parenttype = 'Sales Order' AND item.parentfield = 'items'
+            GROUP BY item.product
+        ) purchased ON purchased.product = p.name
+        LEFT JOIN (
+            SELECT item.product_category_snapshot AS category, SUM(item.quantity) AS quantity
+            FROM `tabSales Order Item` item
+            INNER JOIN `tabSales Order` so ON so.name = item.parent
+            INNER JOIN `tabCustomer Profile` cp ON cp.name = so.customer
+            WHERE cp.user = %s AND cp.enabled = 1 AND so.status = 'Completed'
+              AND item.parenttype = 'Sales Order' AND item.parentfield = 'items'
+              AND COALESCE(item.product_category_snapshot, '') != ''
+            GROUP BY item.product_category_snapshot
+        ) preference ON preference.category = p.category
+        WHERE {" AND ".join(PUBLIC_CONDITIONS)}
+          AND COALESCE(stock.available_quantity, 0) > 0
+          AND (purchased.product IS NOT NULL OR preference.category IS NOT NULL)
+        ORDER BY (2 * COALESCE(purchased.quantity, 0) + COALESCE(preference.quantity, 0)) DESC,
+                 p.product_name, p.name
+        LIMIT 8
+        """, (user, user), as_dict=True,
+    )
+    return {"products": rows, "basis": "Based on your completed purchases and their categories."}

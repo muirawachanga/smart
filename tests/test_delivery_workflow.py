@@ -358,6 +358,18 @@ class TestDeliveryWorkflow(unittest.TestCase):
         notify.assert_not_called()
         self.assertFalse(self.frappe.flags.processing_delivery)
 
+    def test_pickup_and_dispatch_share_one_notification_key(self):
+        self.save_patch.stop()
+        self.delivery.activities = [Mock()]
+        with patch.object(self.service, "prepare_notification") as notify:
+            self.delivery.status = "Picked Up"
+            self.service._save(self.delivery, self.order, "Ready for Dispatch", "driver@example.test")
+            self.delivery.status = "Dispatched"
+            self.service._save(self.delivery, self.order, "Picked Up", "driver@example.test")
+        self.assertEqual(notify.call_count, 2)
+        self.assertEqual(notify.call_args_list[0].args[3], "DEL-1:Order Dispatched")
+        self.assertEqual(notify.call_args_list[1].args[3], "DEL-1:Order Dispatched")
+
 
 class TestDeliveryRatesAndNotifications(unittest.TestCase):
     def setUp(self):

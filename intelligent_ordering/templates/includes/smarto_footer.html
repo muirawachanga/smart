@@ -4,6 +4,9 @@
       {% with smarto_logo_class="smarto-logo smarto-logo-footer" %}{% include "templates/includes/smarto_logo.html" %}{% endwith %}
     </a>
     <p>Ordering and fulfillment, connected.</p>
+    {% if smarto_business and smarto_business.name %}
+    <p>{{ smarto_business.name | e }} &middot; Powered by SmartO</p>
+    {% endif %}
     <nav aria-label="Footer navigation">
       <a href="/about">About</a>
       <a href="/products">Products</a>

@@ -1,6 +1,45 @@
 import hashlib
 import json
+import math
 from decimal import Decimal, InvalidOperation
+
+
+def validate_coordinates(latitude, longitude):
+    try:
+        if isinstance(latitude, bool) or isinstance(longitude, bool):
+            raise ValueError
+        lat, lon = float(latitude), float(longitude)
+    except (ValueError, TypeError, OverflowError):
+        raise ValueError("Enter valid latitude and longitude.") from None
+    if not math.isfinite(lat) or not math.isfinite(lon) or not -90 <= lat <= 90 or not -180 <= lon <= 180:
+        raise ValueError("Latitude must be between -90 and 90 and longitude between -180 and 180.")
+    return lat, lon
+
+
+def distance_km(origin, destination):
+    lat1, lon1 = validate_coordinates(*origin)
+    lat2, lon2 = validate_coordinates(*destination)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
+    a = (math.sin(delta_lat / 2) ** 2
+         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
+         * math.sin(delta_lon / 2) ** 2)
+    return 6371.0088 * 2 * math.asin(math.sqrt(min(1, a)))
+
+
+def nearest_delivery_route(origin, deliveries):
+    remaining = list(deliveries)
+    route = []
+    current = origin
+    while remaining:
+        stop = min(remaining, key=lambda row: (
+            distance_km(current, (row["latitude"], row["longitude"])), row["name"],
+        ))
+        distance = distance_km(current, (stop["latitude"], stop["longitude"]))
+        route.append({**stop, "distance_km": round(distance, 2)})
+        current = (stop["latitude"], stop["longitude"])
+        remaining.remove(stop)
+    return route
 
 
 DELIVERY_TRANSITIONS = {

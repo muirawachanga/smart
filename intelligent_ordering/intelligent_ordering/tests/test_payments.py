@@ -87,6 +87,10 @@ class TestPaymentTransaction(FrappeTestCase):
         self.assertEqual(self.order.status, "Pending")
         self.assertEqual(self.payment.status, "Successful")
         self.assertEqual(self.payment.mpesa_receipt_number, self.receipt)
+        self.assertEqual(frappe.db.count("Fulfillment Notification", {
+            "event_key": f"payment:{self.payment.name}:Successful",
+            "event_type": "Payment Successful",
+        }), 1)
         self.assertFalse(frappe.db.exists(
             "Stock Ledger Entry", {"reference_order": self.order.name}
         ))
