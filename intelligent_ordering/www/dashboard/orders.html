@@ -7,6 +7,8 @@
   {% include "templates/includes/page_script_warning.html" %}
   <p class="smarto-eyebrow">Order workspace</p>
   <h1>Order management</h1>
+  <p>Review new orders, validate stock through confirmation, prepare fulfillment, and resolve customer cancellation requests. Completed orders are finalized through verified deliveries.</p>
+  <div id="order-workspace-metrics" class="smarto-admin-metrics" aria-label="Orders by workflow status"></div>
   <form id="orders-filters" class="smarto-catalog-form">
     <label>Search orders
       <input name="search" type="search" maxlength="100" placeholder="Order number, customer, or phone">
@@ -35,6 +37,7 @@
     <button id="orders-next" class="smarto-button smarto-button-secondary" type="button">Next</button>
   </nav>
   <section id="order-detail" aria-live="polite"></section>
+  {% include "templates/includes/workspace_reports.html" %}
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/order-pages.js"></script>
 {% endblock %}

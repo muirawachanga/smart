@@ -9,6 +9,7 @@
   <h1>Customer and order enquiries</h1>
   <p>This workspace is read-only. Payment changes and order status updates are not permitted.</p>
   <p><a href="/app/customer-profile">View customer profiles in Frappe Desk</a></p>
+  {% include "templates/includes/customer_workspace.html" %}
   <form id="orders-filters" class="smarto-catalog-form">
     <label>Search orders
       <input name="search" type="search" maxlength="100" placeholder="Order number, customer, or phone">
@@ -39,4 +40,5 @@
   <section id="order-detail" aria-live="polite"></section>
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/order-pages.js"></script>
+<script type="module" src="/assets/intelligent_ordering/js/customer-workspace.js"></script>
 {% endblock %}

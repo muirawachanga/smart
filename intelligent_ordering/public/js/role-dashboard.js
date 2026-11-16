@@ -1,5 +1,6 @@
 import { get } from "./api.js";
 import { formatPrice, text } from "./components/order-display.js";
+import { initPaymentDashboard } from "./payments.js";
 
 const page = document.querySelector("[data-role-dashboard]");
 if (page) {
@@ -62,6 +63,35 @@ if (page) {
     }));
   }
 
+  async function loadFinance() {
+    const container = document.querySelector("#finance-overview-metrics");
+    if (!container) return;
+    const result = await get("payments.finance_overview");
+    const currencies = new Map(result.payments.map((row) => [row.currency, { ...row }]));
+    for (const row of result.outstanding) {
+      currencies.set(row.currency, { ...currencies.get(row.currency), ...row });
+    }
+    const fields = [
+      ["collected", "Total collected / verified sales"], ["pending", "Pending payment attempts"],
+      ["failed", "Failed payment attempts"], ["reversed", "Reversed payments"],
+      ["outstanding", "Outstanding order balances"], ["daily_revenue", "Today's revenue"],
+      ["weekly_revenue", "This week's revenue"], ["monthly_revenue", "This month's revenue"],
+    ];
+    container.replaceChildren(...[...currencies].flatMap(([currency, values]) =>
+      fields.map(([key, label]) => {
+        const card = text("article", "", "smarto-admin-metric");
+        card.append(text("span", `${label} (${currency})`), text("strong", formatPrice(values[key] || 0, currency)));
+        return card;
+      })));
+    if (!currencies.size) container.append(text("p", "No financial records yet.", "smarto-empty-state"));
+    const methods = document.querySelector("#finance-method-report");
+    if (methods) {
+      methods.replaceChildren(...result.methods.map((row) =>
+        text("p", `${row.payment_method} · ${row.status} · ${row.currency}: ${row.transactions} transactions · ${formatPrice(row.amount, row.currency)}`)));
+      if (!result.methods.length) methods.append(text("p", "No payment method records.", "smarto-empty-state"));
+    }
+  }
+
   async function load() {
     if (refresh.disabled) return;
     refresh.disabled = true;
@@ -76,6 +106,10 @@ if (page) {
       renderBars("#role-dashboard-daily", analytics.daily, "period", "sales");
       renderBars("#role-dashboard-monthly", analytics.monthly, "period", "sales");
       renderBars("#role-dashboard-products", analytics.by_product, "product_name", "item_sales");
+      if (document.querySelector("#role-dashboard-weekly")) {
+        renderBars("#role-dashboard-weekly", analytics.weekly, "period", "sales");
+      }
+      await loadFinance();
       status.textContent = "Dashboard updated from live SmartO records.";
     } catch (error) {
       status.textContent = "The dashboard could not be refreshed.";
@@ -90,3 +124,4 @@ if (page) {
   if (warning) warning.hidden = true;
   load();
 }
+if (document.querySelector("[data-finance-workspace]")) initPaymentDashboard();

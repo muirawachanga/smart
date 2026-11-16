@@ -3,7 +3,7 @@
 {% block title %}Sales and finance dashboard | SmartO{% endblock %}
 
 {% block smarto_content %}
-<main class="smarto-page smarto-admin-page" data-role-dashboard="sales">
+<main class="smarto-page smarto-admin-page" data-role-dashboard="sales" data-finance-workspace>
   {% include "templates/includes/page_script_warning.html" %}
   <header class="smarto-admin-heading">
     <div>
@@ -14,8 +14,8 @@
     <button id="role-dashboard-refresh" class="smarto-button smarto-button-secondary" type="button">Refresh dashboard</button>
   </header>
   <nav class="smarto-admin-shortcuts" aria-label="Sales and finance workspace">
-    <a href="/store#admin-dashboard">Sales reports</a>
-    <a href="/store#payment-dashboard">Payment transactions</a>
+    <a href="#workspace-reports-heading">Sales reports</a>
+    <a href="#payments-heading">Payment transactions</a>
     <a href="/products">Open storefront</a>
   </nav>
   <p id="role-dashboard-status" class="smarto-inline-status" role="status" aria-live="polite">Loading verified sales data...</p>
@@ -30,6 +30,13 @@
     </div>
     <div id="role-dashboard-metrics" class="smarto-admin-metrics"></div>
   </section>
+  <section class="smarto-admin-section" aria-labelledby="finance-overview-heading">
+    <h2 id="finance-overview-heading">Collections and outstanding balances</h2>
+    <p>Amounts are separated by currency. Outstanding balances exclude cancelled orders and subtract only successful collections. Reversed transactions are reported separately; cancellation is not a refund.</p>
+    <div id="finance-overview-metrics" class="smarto-admin-metrics"></div>
+    <h3>Payment method report</h3>
+    <div id="finance-method-report" class="smarto-cart-items"></div>
+  </section>
 
   <section class="smarto-admin-section" aria-labelledby="sales-trends-heading">
     <div class="smarto-section-heading">
@@ -37,10 +44,14 @@
         <p class="smarto-eyebrow">Verified M-Pesa payments</p>
         <h2 id="sales-trends-heading">Sales trends</h2>
       </div>
-      <a class="smarto-text-link" href="/store#payment-dashboard">Review transactions <span aria-hidden="true">→</span></a>
+      <a class="smarto-text-link" href="#payments-heading">Review transactions <span aria-hidden="true">→</span></a>
     </div>
     <p class="smarto-dashboard-note">Revenue is grouped by successful payment date. Pending payments are not counted as sales.</p>
     <div class="smarto-admin-chart-grid">
+      <article class="smarto-admin-chart">
+        <h3>Weekly sales</h3>
+        <div id="role-dashboard-weekly" class="smarto-bar-chart" role="list" aria-label="Weekly verified sales"></div>
+      </article>
       <article class="smarto-admin-chart">
         <h3>Daily sales</h3>
         <div id="role-dashboard-daily" class="smarto-bar-chart" role="list" aria-label="Daily verified sales"></div>
@@ -55,6 +66,8 @@
       </article>
     </div>
   </section>
+  {% include "templates/includes/payment_workspace.html" %}
+  {% include "templates/includes/workspace_reports.html" %}
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/role-dashboard.js"></script>
 {% endblock %}

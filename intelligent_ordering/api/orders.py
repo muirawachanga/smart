@@ -69,7 +69,20 @@ def get_order(order_name):
         return {"requires_login": True}
     order = frappe.get_doc("Sales Order", _validate_order_name(order_name))
     order.check_permission("read")
-    return _serialize_order(order)
+    result = _serialize_order(order)
+    if ORDER_READ_ROLES.intersection(frappe.get_roles(frappe.session.user)) or frappe.session.user == "Administrator":
+        result["history"] = frappe.get_all(
+            "Admin Audit Log",
+            filters={"reference_doctype": "Sales Order", "reference_name": order.name},
+            fields=["event_datetime", "responsible_user", "event_type", "details"],
+            order_by="event_datetime asc", limit_page_length=100,
+        )
+        result["deliveries"] = frappe.get_all(
+            "Delivery", filters={"order": order.name},
+            fields=["name", "status", "assigned_delivery_person", "scheduled_delivery_date"],
+            order_by="creation desc", limit_page_length=20,
+        )
+    return result
 
 
 @frappe.whitelist(allow_guest=True)
@@ -162,6 +175,16 @@ def update_order_status(order_name, status):
     return _serialize_order(order)
 
 
+@frappe.whitelist()
+def order_overview():
+    _require_order_staff()
+    rows = frappe.get_list(
+        "Sales Order", fields=["status", "count(name) as count"],
+        group_by="status", limit_page_length=0,
+    )
+    return {"statuses": rows}
+
+
 def _require_customer(user):
     if "Customer" not in frappe.get_roles(user):
         frappe.throw("Customer access is required.", frappe.PermissionError)
@@ -169,7 +192,7 @@ def _require_customer(user):
 
 def _require_order_staff(read_only=False):
     allowed_roles = ORDER_READ_ROLES if read_only else ORDER_STAFF_ROLES
-    if not allowed_roles.intersection(frappe.get_roles(frappe.session.user)):
+    if frappe.session.user != "Administrator" and not allowed_roles.intersection(frappe.get_roles(frappe.session.user)):
         frappe.throw("Order management access is required.", frappe.PermissionError)
 
 

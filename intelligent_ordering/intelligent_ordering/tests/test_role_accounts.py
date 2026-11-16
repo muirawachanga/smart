@@ -2,7 +2,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils.password import check_password
 
-from intelligent_ordering.api import deliveries, inventory, orders, payments
+from intelligent_ordering.api import administration, deliveries, inventory, orders, payments
 from intelligent_ordering.utils.development_accounts import TEST_ACCOUNTS, _account_roles
 from intelligent_ordering.utils.staff_pages import require_staff_page
 
@@ -44,6 +44,7 @@ class TestRoleAccounts(FrappeTestCase):
         frappe.set_user(self.users["Customer Support"])
         require_staff_page(frappe._dict(), "support")
         orders.list_orders()
+        administration.list_customers()
         self.assertTrue(frappe.has_permission("Customer Profile", "read"))
         self.assertTrue(frappe.has_permission("Sales Order", "read"))
         for doctype in ("Customer Profile", "Sales Order"):
@@ -58,6 +59,8 @@ class TestRoleAccounts(FrappeTestCase):
             payments.list_transactions()
         with self.assertRaises(frappe.PermissionError):
             payments.reconcile_payment("ROLE-TEST-NONEXISTENT")
+        with self.assertRaises(frappe.PermissionError):
+            administration.management_activity()
         self.assertEqual(frappe.get_list("Shopping Cart"), [])
 
     def test_inventory_can_create_and_edit_products_without_financial_access(self):

@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import sqlite3
 import sys
 import types
 import unittest
@@ -71,6 +72,71 @@ class TestPaymentWorkflow(unittest.TestCase):
         self.addCleanup(self.client_patch.stop)
         self.addCleanup(self.save_patch.stop)
         self.addCleanup(self.active_patch.stop)
+
+    def test_finance_overview_calculates_verified_collections_and_currency_balances(self):
+        self.frappe.session.user = "finance@example.test"
+        self.frappe.get_roles.return_value = ["Finance Manager"]
+        database = sqlite3.connect(":memory:")
+        self.addCleanup(database.close)
+        database.row_factory = sqlite3.Row
+        database.create_function("CURDATE", 0, lambda: "2026-11-15")
+        database.create_function("GREATEST", 2, max)
+        database.create_function("YEARWEEK", 2, lambda value, mode: (
+            datetime.fromisoformat(value).strftime("%G-W%V") if value else None
+        ))
+        database.create_function("DATE_FORMAT", 2, lambda value, pattern: (
+            datetime.fromisoformat(value).strftime(pattern) if value else None
+        ))
+        database.executescript("""
+            CREATE TABLE `tabSales Order` (name TEXT, status TEXT, currency TEXT, total NUMERIC);
+            CREATE TABLE `tabPayment Transaction` (`order` TEXT, status TEXT, amount NUMERIC, transaction_date TEXT, payment_method TEXT);
+            INSERT INTO `tabSales Order` VALUES
+                ('PAID', 'Completed', 'KES', 100), ('OPEN', 'Pending', 'KES', 80),
+                ('CANCELLED', 'Cancelled', 'KES', 200), ('FOREIGN', 'Pending', 'USD', 10);
+            INSERT INTO `tabPayment Transaction` VALUES
+                ('PAID', 'Successful', 100, '2026-11-15', 'M-Pesa'),
+                ('OPEN', 'Pending', 80, '2026-11-15', 'M-Pesa'),
+                ('OPEN', 'Failed', 80, '2026-11-15', 'M-Pesa'),
+                ('OPEN', 'Reversed', 25, '2026-11-15', 'M-Pesa'),
+                ('CANCELLED', 'Successful', 20, '2026-10-01', 'M-Pesa'),
+                ('FOREIGN', 'Successful', 3, '2026-11-14', 'M-Pesa');
+        """)
+        self.frappe.db.sql.side_effect = lambda query, **kwargs: [
+            dict(row) for row in database.execute(query).fetchall()
+        ]
+        result = self.service.finance_overview()
+        totals = {row["currency"]: row for row in result["payments"]}
+        self.assertEqual(totals["KES"], {
+            "currency": "KES", "collected": 120, "pending": 80, "failed": 80, "reversed": 25,
+            "daily_revenue": 100, "weekly_revenue": 100, "monthly_revenue": 100,
+        })
+        self.assertEqual(totals["USD"]["collected"], 3)
+        self.assertEqual({row["currency"]: row["outstanding"] for row in result["outstanding"]},
+                         {"KES": 80, "USD": 7})
+        self.assertIn({
+            "payment_method": "M-Pesa", "status": "Successful",
+            "currency": "KES", "transactions": 2, "amount": 120,
+        }, result["methods"])
+
+    def test_finance_overview_rejects_unrelated_roles_before_querying_records(self):
+        for role in ("Customer", "Delivery Staff", "Delivery Manager", "Customer Support",
+                     "Inventory Manager", "Order Manager"):
+            with self.subTest(role=role), self.assertRaises(PaymentError):
+                self.frappe.get_roles.return_value = [role]
+                self.service.finance_overview()
+        self.frappe.db.sql.assert_not_called()
+
+    def test_transaction_detail_returns_linked_order_and_server_reconciliation_authority(self):
+        self.frappe.session.user = "staff@example.test"
+        self.frappe.get_doc.return_value = self.payment
+        self.frappe.db.get_value.return_value = {"name": "SO-1", "status": "Confirmed", "total": 250}
+        for role, allowed in (("Finance Manager", True), ("Store Manager", False), ("Order Manager", False)):
+            with self.subTest(role=role):
+                self.frappe.get_roles.return_value = [role]
+                result = self.service.get_transaction("PAY-1")
+                self.assertEqual(result["can_reconcile"], allowed)
+                self.assertEqual(result["order_summary"]["name"], "SO-1")
+        self.payment.check_permission.assert_called_with("read")
 
     def test_verified_payment_marks_paid_without_confirming_or_touching_inventory(self):
         self.service._reconcile(self.payment)

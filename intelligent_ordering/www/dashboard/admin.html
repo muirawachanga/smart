@@ -14,14 +14,21 @@
     <button id="admin-dashboard-refresh" class="smarto-button smarto-button-secondary" type="button">Refresh dashboard</button>
   </header>
   <nav class="smarto-admin-shortcuts" aria-label="Administration shortcuts">
-    <a href="/store#admin-dashboard">Business reports</a>
-    <a href="/store#payment-dashboard">Payments</a>
+    <a href="#workspace-reports-heading">Business reports</a>
+    <a href="/dashboard/sales#payment-dashboard">Payments</a>
     <a href="/dashboard/orders">Order management</a>
     <a href="/dashboard/inventory">Inventory</a>
     <a href="/dashboard/delivery">Deliveries</a>
     <a href="/app/product">Products</a>
     <a href="/app/product-category">Categories</a>
-    {% if can_manage_users %}<a href="/app/user">User access</a>{% endif %}
+    <a href="/app/customer-profile">Customer management</a>
+    {% if can_manage_users %}
+    <a href="/app/user">User access</a>
+    <a href="/app/role">Role management</a>
+    <a href="/app/permission-manager">Permission management</a>
+    <a href="/app/system-settings">System settings</a>
+    {% endif %}
+    <a href="/app/admin-audit-log">Audit logs</a>
   </nav>
   <p id="admin-dashboard-status" class="smarto-inline-status" role="status" aria-live="polite">Loading live dashboard data...</p>
   <p id="admin-dashboard-error" role="alert"></p>
@@ -78,7 +85,7 @@
           <p class="smarto-eyebrow">Transactions</p>
           <h2 id="admin-payments-heading">Recent payments</h2>
         </div>
-        <a class="smarto-text-link" href="/store#payment-dashboard">View payments <span aria-hidden="true">→</span></a>
+        <a class="smarto-text-link" href="/dashboard/sales#payment-dashboard">View payments <span aria-hidden="true">→</span></a>
       </div>
       <div id="admin-dashboard-payments" class="smarto-admin-table-wrap"></div>
     </section>
@@ -94,6 +101,11 @@
     </div>
     <div id="admin-dashboard-stock" class="smarto-stock-alerts"></div>
   </section>
+  {% include "templates/includes/management_activity.html" %}
+  {% include "templates/includes/customer_workspace.html" %}
+  {% include "templates/includes/workspace_reports.html" %}
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/admin-dashboard.js"></script>
+<script type="module" src="/assets/intelligent_ordering/js/management-activity.js"></script>
+<script type="module" src="/assets/intelligent_ordering/js/customer-workspace.js"></script>
 {% endblock %}

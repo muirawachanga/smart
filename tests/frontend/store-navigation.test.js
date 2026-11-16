@@ -69,7 +69,7 @@ test("payments load on a direct dashboard URL and when returning through hash na
   t.mock.method(globalThis, "fetch", async (url) => {
     calls.push(url);
     return { ok: true, json: async () => ({ message: String(url).includes("payment_summary")
-      ? [{ environment: "Sandbox", status: "Pending", transactions: 1, amount: 100 }]
+      ? [{ environment: "Sandbox", status: "Pending", currency: "KES", transactions: 1, amount: 100 }]
       : { transactions: [{ name: "PAY-1", order: "SO-1", status: "Pending", amount: 100 }], has_more: false } }) };
   });
   initPaymentDashboard();
@@ -109,6 +109,7 @@ test("payment details emphasize transaction fields and keep provider diagnostics
   });
   initPaymentDashboard();
   await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(node("#payment-transactions").children.length, 1, node("#payment-feedback").textContent);
   const view = node("#payment-transactions").children[0].children.find(
     (child) => child.textContent === "View payment",
   );
@@ -118,4 +119,34 @@ test("payment details emphasize transaction fields and keep provider diagnostics
   assert.match(content, /SO-1.*Successful.*KES 1,250\.00/);
   assert.match(content, /254700000000.*ABC123/);
   assert.match(content, /Technical transaction data[\s\S]*CHECKOUT-1[\s\S]*ResultCode/);
+});
+
+test("finance workspace loads without a legacy hash and limits reconciliation controls", async (t) => {
+  const { node } = install(t, "");
+  let permitted = false;
+  t.mock.method(globalThis, "fetch", async (url) => {
+    const target = String(url);
+    return { ok: true, json: async () => ({ message:
+      target.includes("payments.get_transaction") ? {
+        name: "PAY-1", order: "SO-1", status: "Pending", amount: 100,
+        can_reconcile: permitted,
+        order_summary: { name: "SO-1", status: "Confirmed", payment_status: "Unpaid", total: 100, currency: "KES" },
+      } : target.includes("payment_summary") ? [] : {
+        transactions: [{ name: "PAY-1", order: "SO-1", status: "Pending", amount: 100 }],
+        has_more: false,
+      },
+    }) };
+  });
+  initPaymentDashboard();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(node("#payment-transactions").children.length, 1, node("#payment-feedback").textContent);
+  const view = node("#payment-transactions").children[0].children.find(
+    (child) => child.textContent === "View payment",
+  );
+  await view.listeners.click();
+  assert.match(displayedText(node("#payment-detail")), /Associated order.*Confirmed.*Unpaid/);
+  assert.ok(!node("#payment-detail").children.some((child) => child.textContent === "Check with Safaricom"));
+  permitted = true;
+  await view.listeners.click();
+  assert.ok(node("#payment-detail").children.some((child) => child.textContent === "Check with Safaricom"));
 });

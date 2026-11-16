@@ -61,6 +61,21 @@ class TestStaffPages(unittest.TestCase):
         with self.assertRaises(PermissionDenied):
             self.pages.require_staff_page(types.SimpleNamespace(), "inventory")
 
+    def test_report_controls_follow_workspace_and_financial_authority(self):
+        for role, page, expected in (
+            ("Delivery Staff", "delivery", set()),
+            ("Delivery Manager", "delivery", {"deliveries"}),
+            ("Customer Support", "support", set()),
+            ("Finance Manager", "sales", {"sales", "payments"}),
+            ("Store Manager", "sales", {"sales"}),
+            ("Inventory Manager", "inventory", {"inventory"}),
+        ):
+            with self.subTest(role=role):
+                self.frappe.get_roles.return_value = [role]
+                context = types.SimpleNamespace()
+                self.pages.require_staff_page(context, page)
+                self.assertEqual({report for report, label in context.workspace_reports}, expected)
+
     def test_support_can_only_open_its_read_only_workspace(self):
         self.frappe.get_roles.return_value = ["Customer Support"]
         self.pages.require_staff_page(types.SimpleNamespace(), "support")

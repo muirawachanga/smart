@@ -361,7 +361,7 @@ test("delivery workspace shows assigned details and accepts rider assignments", 
   assert.equal(nodes.get("#delivery-feedback").textContent, "");
 });
 
-test("delivery manager sees performance and cannot edit protected delivery areas", async (t) => {
+test("delivery manager sees performance and routing areas without rate editing", async (t) => {
   const nodes = install(t, deliveryIds, "[data-delivery-page]", {});
   t.mock.method(globalThis, "fetch", async (url) => {
     if (url.includes("deliveries.delivery_dashboard")) return response({
@@ -369,15 +369,18 @@ test("delivery manager sees performance and cannot edit protected delivery areas
       delayed_deliveries: 1, available_riders: 1, can_manage_areas: false,
       personnel: [{ name: "rider@example.test", full_name: "Rider", workload: 2 }],
       personnel_performance: [{ rider: "rider@example.test", completed: 3, failed: 1, total: 4 }],
-      ready_orders: [], areas: [], has_more: false,
+      ready_orders: [], areas: [{ name: "Central", currency: "KES", delivery_fee: 20, enabled: 1 }], has_more: false,
     });
     if (url.includes("deliveries.list_deliveries")) return response({ deliveries: [], has_more: false });
     throw new Error(`Unexpected request: ${url}`);
   });
   await import(`../../intelligent_ordering/public/js/delivery-page.js?manager=${Date.now()}`);
   await tick();
-  assert.equal(nodes.get("#delivery-area-management").hidden, true);
+  assert.equal(nodes.get("#delivery-area-management").hidden, false);
+  assert.equal(nodes.get("#delivery-area-form").hidden, true);
+  assert.match(nodes.get("#delivery-areas").textContent, /Central/);
   assert.match(nodes.get("#delivery-performance").textContent, /3 completed/);
+  assert.match(nodes.get("#delivery-performance").textContent, /75\.0% completion/);
   assert.ok(nodes.get("#delivery-metrics").children.some((item) => /Total deliveries4/.test(item.textContent)));
 });
 

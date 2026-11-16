@@ -25,8 +25,9 @@ ROLE_GROUPS = {
     "payment_export": {"System Manager", "Business Admin", "Finance Manager"},
     "inventory": {"System Manager", "Business Admin", "Inventory Manager"},
     "delivery": {
-        "System Manager", "Business Admin", "Delivery Manager", "Order Manager",
+        "System Manager", "Business Admin", "Store Manager", "Delivery Manager", "Order Manager",
     },
+    "support": {"System Manager", "Business Admin", "Store Manager", "Customer Support"},
     "audit": {"System Manager", "Business Admin", "Store Manager"},
 }
 ORDER_STATUSES = (
@@ -131,7 +132,7 @@ def dashboard():
     result = {"business": {}, "inventory": {}, "delivery": {}}
     if frappe.session.user == "Administrator" or roles.intersection(ROLE_GROUPS["store"] | ROLE_GROUPS["finance"]):
         result["business"] = _integers(business)
-    if frappe.session.user == "Administrator" or roles.intersection(ROLE_GROUPS["inventory"]):
+    if frappe.session.user == "Administrator" or roles.intersection(ROLE_GROUPS["inventory"] | ROLE_GROUPS["audit"]):
         result["inventory"] = {
             "total_stock": int(stock.total_stock or 0),
             "available_stock": int(stock.available_stock or 0),
@@ -275,7 +276,7 @@ def _sales_by_area(filters):
 
 @frappe.whitelist()
 def list_customers(search="", page=1, page_size=20):
-    _require("store")
+    _require_any("store", "support")
     if not isinstance(search, str) or len(search) > 100:
         frappe.throw("Customer search must be at most 100 characters.", frappe.ValidationError)
     page, page_size = _page(page, page_size)
@@ -302,12 +303,17 @@ def list_customers(search="", page=1, page_size=20):
         """, (pattern, pattern, pattern, pattern, pattern, page_size + 1,
               (page - 1) * page_size), as_dict=True,
     )
+    if (
+        frappe.session.user != "Administrator"
+        and not ROLE_GROUPS["store"].intersection(frappe.get_roles(frappe.session.user))
+    ):
+        rows = [{key: value for key, value in row.items() if key != "successful_payments"} for row in rows]
     return {"customers": rows[:page_size], "has_more": len(rows) > page_size, "page": page}
 
 
 @frappe.whitelist()
 def customer_activity(customer, page=1, page_size=20):
-    _require("store")
+    _require_any("store", "support")
     if not isinstance(customer, str) or not customer.strip() or len(customer) > 140:
         frappe.throw("Customer identifier is invalid.", frappe.ValidationError)
     page, page_size = _page(page, page_size)
@@ -414,6 +420,34 @@ def audit_events(search="", page=1, page_size=50):
         limit_page_length=page_size + 1,
     )
     return {"events": rows[:page_size], "has_more": len(rows) > page_size, "page": page}
+
+
+@frappe.whitelist()
+def management_activity():
+    _require("audit")
+    from intelligent_ordering.api.deliveries import delivery_dashboard
+
+    alerts = frappe.db.sql(
+        """
+        SELECT p.name, p.sku, p.product_name,
+          COALESCE(stock.available, 0) AS available
+        FROM `tabProduct` p
+        LEFT JOIN (
+          SELECT b.product, SUM(b.available_quantity) AS available
+          FROM `tabStock Balance` b
+          INNER JOIN `tabStock Warehouse` w ON w.name = b.warehouse AND w.status = 'Active'
+          GROUP BY b.product
+        ) stock ON stock.product = p.name
+        WHERE p.enabled = 1 AND COALESCE(stock.available, 0) <= 5
+        ORDER BY available, p.product_name LIMIT 20
+        """, as_dict=True,
+    )
+    return {
+        "inventory_alerts": alerts,
+        "products": product_performance(page_size=5)["products"],
+        "delivery": delivery_dashboard(page_size=5),
+        "events": audit_events(page_size=20)["events"],
+    }
 
 
 REPORT_ACCESS = {
@@ -529,7 +563,7 @@ def _report_rows(report, filters):
         rows = frappe.db.sql(
             f"""
             SELECT p.name, p.`order`, p.customer, p.phone_number, p.amount, p.status,
-                   p.mpesa_receipt_number, p.transaction_date, p.environment
+                   p.mpesa_receipt_number, p.transaction_date, p.environment, p.payment_method
             FROM `tabPayment Transaction` p
             INNER JOIN `tabSales Order` o ON o.name = p.`order`
             WHERE ( %s = '' OR DATE(p.transaction_date) >= %s )
@@ -551,7 +585,7 @@ def _report_rows(report, filters):
             ), as_dict=True,
         )
         headers = ["Payment", "Order", "Customer", "Phone", "Amount", "Status",
-                   "M-Pesa Receipt", "Transaction Date", "Environment"]
+                   "M-Pesa Receipt", "Transaction Date", "Environment", "Payment Method"]
     elif report == "inventory":
         search_pattern = f"%{filters['product']}%"
         rows = frappe.db.sql(
@@ -618,7 +652,7 @@ def _row_values(row, headers, report):
                    "delivery_area"],
         "customers": ["name", "full_name", "phone", "email", "enabled", "orders", "last_order"],
         "payments": ["name", "order", "customer", "phone_number", "amount", "status",
-                     "mpesa_receipt_number", "transaction_date", "environment"],
+                     "mpesa_receipt_number", "transaction_date", "environment", "payment_method"],
         "inventory": ["product", "sku", "product_name", "warehouse", "warehouse_name",
                       "quantity_on_hand", "reserved_quantity", "available_quantity"],
         "deliveries": ["name", "order", "customer_name", "customer_phone", "delivery_area",

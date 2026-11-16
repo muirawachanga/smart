@@ -1,0 +1,26 @@
+{% if workspace_reports %}
+<section class="smarto-admin-section" aria-labelledby="workspace-reports-heading">
+  <h2 id="workspace-reports-heading">Reports</h2>
+  <p>Download live records. Sales include only verified successful payments. Inventory reports are current snapshots: leave date and payment filters empty.</p>
+  <form class="smarto-catalog-form" action="/api/method/intelligent_ordering.api.administration.export_report" method="get">
+    <label>Report
+      <select name="report" required>
+        {% for value, label in workspace_reports %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>From <input name="start_date" type="date"></label>
+    <label>To <input name="end_date" type="date"></label>
+    <label>Payment status
+      <select name="payment_status">
+        <option value="">All transactions / verified sales</option>
+        <option>Successful</option><option>Initiated</option><option>Pending</option>
+        <option>Failed</option><option>Cancelled</option><option>Reversed</option>
+      </select>
+    </label>
+    <label>Format
+      <select name="file_format"><option value="csv">CSV</option><option value="xlsx">Excel</option></select>
+    </label>
+    <button class="smarto-button" type="submit">Download report</button>
+  </form>
+</section>
+{% endif %}

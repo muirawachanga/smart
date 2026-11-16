@@ -77,7 +77,7 @@ async function loadStock() {
   document.querySelector("#inventory-stock-next").disabled = !stockHasMore;
   document.querySelector("#inventory-stock-page").textContent = `Page ${stockPage}`;
   if (!result.stock.length) {
-    stockList.append(node("p", "No stock balances match these filters."));
+    stockList.replaceChildren(node("p", "No stock balances match these filters."));
   } else {
     stockList.replaceChildren(...result.stock.map(stockRow));
   }

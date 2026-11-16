@@ -124,6 +124,9 @@ function setupAccountNavigation(user) {
   }
 
   const workspace = document.querySelector("#smarto-workspace-link");
+  if (administrator || ["System Manager", "Business Admin", "Store Manager", "Finance Manager"].some((role) => roles.has(role))) {
+    document.querySelector("#payments-link").href = "/dashboard/sales#payment-dashboard";
+  }
   const workspaceByRole = [
     [["System Manager", "Business Admin"], "/dashboard/admin"],
     [["Store Manager"], "/dashboard/owner"],

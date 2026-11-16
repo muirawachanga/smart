@@ -273,42 +273,20 @@
       <div id="inventory-movements" class="inventory-list"></div>
     </section>
   </section>
-  <section id="payment-dashboard" class="orders-section" aria-labelledby="payments-heading">
-    <p class="eyebrow">Finance workspace</p>
-    <h2 id="payments-heading">Payment transactions</h2>
-    <p class="intro">Search M-Pesa attempts, review payment status, and reconcile uncertain transactions.</p>
-    <div id="payment-summary" class="payment-summary" aria-label="Payment totals by environment and status"></div>
-    <form id="payment-filters" class="order-filters">
-      <label>Order number or M-Pesa receipt
-        <input name="search" type="search" maxlength="140">
-      </label>
-      <label>Status
-        <select name="status">
-          <option value="">All statuses</option>
-          <option>Initiated</option><option>Pending</option>
-          <option>Successful</option><option>Failed</option>
-          <option>Cancelled</option><option>Reversed</option>
-        </select>
-      </label>
-      <button class="primary-button" type="submit">Search payments</button>
-    </form>
-    <p id="payment-feedback" role="status" aria-live="polite"></p>
-    <div id="payment-transactions" class="order-list"></div>
-    <nav class="pagination" aria-label="Payment pages">
-      <button id="payments-previous" class="secondary-button" type="button" disabled>Previous</button>
-      <button id="payments-next" class="secondary-button" type="button" disabled>Next</button>
-    </nav>
-    <div id="payment-detail"></div>
-  </section>
+  {% include "templates/includes/payment_workspace.html" %}
   <section id="delivery-dashboard" class="orders-section" aria-labelledby="delivery-heading">
     <div class="section-heading">
       <h2 id="delivery-heading">Delivery management</h2>
       <a class="secondary-button" href="/login?redirect-to=%2Fstore%23delivery-dashboard">Sign in</a>
     </div>
     <p id="delivery-feedback" role="status" aria-live="polite"></p>
+    <div id="delivery-metrics" class="smarto-admin-metrics"></div>
+    <p id="delivery-delayed" role="status"></p>
     <div id="delivery-manager" hidden>
       <h3>Delivery personnel workloads</h3>
       <div id="delivery-workloads" class="inventory-summary"></div>
+      <h3>Rider performance</h3>
+      <div id="delivery-performance" class="smarto-cart-items"></div>
       <h3>Orders ready for delivery</h3>
       <p>Inventory was dispatched at Ready for Delivery. Delivery tracking does not deduct stock again.</p>
       <div id="delivery-ready-orders" class="order-list"></div>
@@ -318,6 +296,7 @@
       </nav>
       <h3>Configure delivery areas</h3>
       <p>Changes apply only to new orders. Set a zero fee for free delivery.</p>
+      <div id="delivery-area-management">
       <div id="delivery-areas" class="order-list"></div>
       <form id="delivery-area-form" class="checkout-form">
         <label>Area name
@@ -334,6 +313,7 @@
         </label>
         <button type="submit" class="primary-button">Save delivery area</button>
       </form>
+      </div>
     </div>
     <h3>Deliveries</h3>
     <p>Delivery personnel see only their own assignments.</p>
@@ -344,8 +324,8 @@
       <label>Delivery status
         <select name="status">
           <option value="">All statuses</option>
-          <option>Awaiting Assignment</option><option>Assigned</option><option>Preparing</option>
-          <option>Ready for Dispatch</option><option>Dispatched</option><option>In Transit</option>
+          <option>Awaiting Assignment</option><option>Assigned</option><option>Accepted</option><option>Preparing</option>
+          <option>Ready for Dispatch</option><option>Picked Up</option><option>Dispatched</option><option>In Transit</option>
           <option>Delivered</option><option>Failed</option><option>Cancelled</option>
         </select>
       </label>

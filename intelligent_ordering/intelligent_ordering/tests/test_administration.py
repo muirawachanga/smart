@@ -3,8 +3,11 @@ from frappe.tests.utils import FrappeTestCase
 from frappe.utils import getdate, now_datetime
 
 from intelligent_ordering.api.administration import (
+    customer_activity,
     dashboard,
     export_report,
+    list_customers,
+    management_activity,
     sales_analytics,
 )
 from intelligent_ordering.api.inventory import adjust_stock
@@ -135,6 +138,19 @@ class TestAdministrationAnalytics(FrappeTestCase):
             dashboard()
         with self.assertRaises(frappe.PermissionError):
             sales_analytics()
+        with self.assertRaises(frappe.PermissionError):
+            export_report("payments", "csv")
+
+    def test_support_customer_search_excludes_payment_aggregates_and_keeps_history_read_only(self):
+        support = self._make_user(f"support-{frappe.generate_hash(length=8)}@example.test", "Customer Support")
+        frappe.set_user(support.name)
+        result = list_customers(search=self.profile.name)
+        self.assertEqual(result["customers"][0]["name"], self.profile.name)
+        self.assertNotIn("successful_payments", result["customers"][0])
+        history = customer_activity(self.profile.name)
+        self.assertEqual(history["orders"][0]["name"], self.order.name)
+        with self.assertRaises(frappe.PermissionError):
+            management_activity()
         with self.assertRaises(frappe.PermissionError):
             export_report("payments", "csv")
 

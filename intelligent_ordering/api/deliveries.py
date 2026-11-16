@@ -168,13 +168,15 @@ def _save(delivery, order, previous_status="", previous_person="", notes=""):
 
 
 @frappe.whitelist()
-def list_deliveries(status="", area="", search="", page=1, page_size=20):
+def list_deliveries(status="", area="", search="", page=1, page_size=20, delayed="0"):
     _require_access()
     page, page_size = _pagination(page, page_size)
     search = _text(search, "Search", 100)
     area = _text(area, "Delivery area")
     if not isinstance(status, str) or (status and status not in DELIVERY_TRANSITIONS):
         frappe.throw("Select a valid delivery status.", frappe.ValidationError)
+    if str(delayed) not in {"0", "1"}:
+        frappe.throw("Select a valid delayed-delivery filter.", frappe.ValidationError)
     filters = {}
     if status:
         filters["status"] = status
@@ -182,6 +184,12 @@ def list_deliveries(status="", area="", search="", page=1, page_size=20):
         filters["delivery_area"] = area
     if not is_manager():
         filters["assigned_delivery_person"] = frappe.session.user
+    if str(delayed) == "1":
+        filters["scheduled_delivery_date"] = ["<", now_datetime().date()]
+        if status in {"Delivered", "Failed", "Cancelled"}:
+            frappe.throw("Delayed deliveries must still be active.", frappe.ValidationError)
+        if not status:
+            filters["status"] = ["not in", ["Delivered", "Failed", "Cancelled"]]
     rows = frappe.get_list(
         "Delivery", filters=filters, fields=DELIVERY_FIELDS,
         or_filters=[["order", "like", f"%{search}%"], ["name", "like", f"%{search}%"]] if search else [],
@@ -241,7 +249,8 @@ def delivery_dashboard(page=1, page_size=20):
     summary = frappe.db.sql(
         """
         SELECT COUNT(*) AS total,
-          SUM(status IN ('Awaiting Assignment','Failed') AND assigned_delivery_person IS NULL) AS unassigned,
+          SUM(status IN ('Awaiting Assignment','Failed')
+              AND COALESCE(assigned_delivery_person, '') = '') AS unassigned,
           SUM(status IN ('Assigned','Accepted')) AS assigned,
           SUM(status IN ('Preparing','Ready for Dispatch','Picked Up','Dispatched','In Transit')) AS in_progress,
           SUM(status = 'Delivered') AS completed,
@@ -279,6 +288,10 @@ def delivery_dashboard(page=1, page_size=20):
     )
     return {
         "manager": True, "summary": _delivery_summary(summary),
+        "completion_rate": (
+            round(100 * int(summary.completed or 0) / int(summary.total), 1)
+            if summary.total else 0
+        ),
         "delayed_deliveries": _delayed_count(),
         "available_riders": sum(1 for person in personnel if not int(person.workload or 0)),
         "personnel_performance": performance,
@@ -367,7 +380,7 @@ def assign_delivery(delivery_name, assigned_person, scheduled_delivery_date, not
     notes = _text(notes, "Assignment notes", 1000)
     delivery, order = _delivery_locked(delivery_name)
     if order.status != "Ready for Delivery" or delivery.status in {
-        "Dispatched", "In Transit", "Delivered", "Cancelled",
+        "Picked Up", "Dispatched", "In Transit", "Delivered", "Cancelled",
     }:
         frappe.throw("This delivery cannot be assigned or reassigned.", frappe.ValidationError)
     previous_status, previous_person = delivery.status, delivery.assigned_delivery_person
@@ -379,7 +392,7 @@ def assign_delivery(delivery_name, assigned_person, scheduled_delivery_date, not
         return _serialize(delivery, detail=True)
     if previous_person and previous_person != person and not notes:
         frappe.throw("Provide a reason for delivery reassignment.", frappe.ValidationError)
-    if delivery.status in {"Awaiting Assignment", "Failed"}:
+    if delivery.status in {"Awaiting Assignment", "Failed"} or previous_person != person:
         delivery.status = "Assigned"
     delivery.assigned_delivery_person = person
     delivery.scheduled_delivery_date = scheduled

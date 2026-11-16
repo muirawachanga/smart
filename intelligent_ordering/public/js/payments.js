@@ -6,9 +6,9 @@ function text(tag, value) {
   return element;
 }
 
-function formatKsh(value) {
+function formatCurrency(value, currency = "KES") {
   const amount = Number(value || 0);
-  return `KES ${Number.isFinite(amount) ? amount.toLocaleString(undefined, {
+  return `${currency} ${Number.isFinite(amount) ? amount.toLocaleString(undefined, {
     minimumFractionDigits: 2, maximumFractionDigits: 2,
   }) : "0.00"}`;
 }
@@ -128,29 +128,30 @@ export function initPaymentDashboard() {
       ]);
       summary.replaceChildren(...totals.map((row) => {
         const card = document.createElement("article");
-        card.className = "admin-metric";
+        card.className = "smarto-admin-metric";
         card.append(
           text("span", `${row.environment} · ${row.status}`),
           text("strong", `${row.transactions} transactions`),
-          text("strong", formatKsh(row.amount)),
+          text("strong", `${formatCurrency(row.amount, row.currency)} · ${row.currency || "KES"}`),
         );
         return card;
       }));
       results.replaceChildren(...listing.transactions.map((transaction) => {
         const card = document.createElement("article");
-        card.className = "order-card";
+        card.className = "smarto-order-item";
         const heading = document.createElement("div");
         heading.className = "section-heading";
         heading.append(text("h3", transaction.order), statusBadge(transaction.status));
         card.append(
           heading,
-          text("p", `${formatKsh(transaction.amount)} · ${transaction.phone_number || "No phone number"}`),
+          text("p", `Payment reference: ${transaction.name}`),
+          text("p", `${formatCurrency(transaction.amount)} · ${transaction.phone_number || "No phone number"}`),
           text("p", `Receipt: ${transaction.mpesa_receipt_number || "Not received"} · ` +
             `${transaction.transaction_date || "No transaction date"}`),
         );
         const view = text("button", "View payment");
         view.type = "button";
-        view.className = "secondary-button";
+        view.className = "smarto-button smarto-button-secondary";
         view.addEventListener("click", () => showDetail(transaction.name));
         card.append(view);
         return card;
@@ -160,6 +161,8 @@ export function initPaymentDashboard() {
       next.disabled = !hasMore;
       feedback.textContent = listing.transactions.length ? "" : "No matching payments.";
     } catch (error) {
+      results.replaceChildren();
+      detail.replaceChildren();
       feedback.textContent = error.message;
     }
   }
@@ -167,18 +170,25 @@ export function initPaymentDashboard() {
     try {
       const transaction = await get("payments.get_transaction", { payment_name: name });
       const output = document.createElement("article");
-      output.className = "order-card payment-detail-card";
+      output.className = "smarto-order-item";
       const heading = document.createElement("div");
       heading.className = "section-heading";
       heading.append(text("h3", transaction.order), statusBadge(transaction.status));
       output.append(
         heading,
-        text("p", `Amount: ${formatKsh(transaction.amount)}`),
+        text("p", `Payment reference: ${transaction.name}`),
+        text("p", `Amount: ${formatCurrency(transaction.amount)}`),
         text("p", `Method: ${transaction.payment_method || "M-Pesa"} · Phone: ${transaction.phone_number || "Not recorded"}`),
         text("p", `Receipt: ${transaction.mpesa_receipt_number || "Not received"} · ` +
           `Transaction date: ${transaction.transaction_date || "Not recorded"}`),
         text("p", `Created: ${transaction.creation || "Not recorded"}`),
       );
+      if (transaction.order_summary) {
+        const order = transaction.order_summary;
+        output.append(text("h4", "Associated order"),
+          text("p", `${order.name} · ${order.status} · Payment: ${order.payment_status}`),
+          text("p", `Order total: ${order.currency} ${order.total} · Placed: ${order.order_datetime}`));
+      }
       if (transaction.failure_description) {
         output.append(text("p", `Failure details: ${transaction.failure_description}`));
       }
@@ -197,9 +207,10 @@ export function initPaymentDashboard() {
         output.append(diagnostics);
       }
       const reconcile = text("button", "Check with Safaricom");
-      reconcile.className = "primary-button";
+      reconcile.className = "smarto-button";
       reconcile.type = "button";
       reconcile.addEventListener("click", async () => {
+        if (reconcile.disabled) return;
         reconcile.disabled = true;
         try {
           await post("payments.reconcile_payment", { payment_name: name });
@@ -210,7 +221,8 @@ export function initPaymentDashboard() {
           reconcile.disabled = false;
         }
       });
-      detail.replaceChildren(output, reconcile);
+      detail.replaceChildren(output);
+      if (transaction.can_reconcile) detail.append(reconcile);
     } catch (error) {
       feedback.textContent = error.message;
     }
@@ -228,5 +240,5 @@ export function initPaymentDashboard() {
   window.addEventListener("hashchange", () => {
     if (window.location.hash === "#payment-dashboard") load();
   });
-  if (window.location.hash === "#payment-dashboard") load();
+  if (window.location.hash === "#payment-dashboard" || document.querySelector("[data-finance-workspace]")) load();
 }

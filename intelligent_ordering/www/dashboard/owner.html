@@ -14,8 +14,8 @@
     <button id="role-dashboard-refresh" class="smarto-button smarto-button-secondary" type="button">Refresh dashboard</button>
   </header>
   <nav class="smarto-admin-shortcuts" aria-label="Business workspace">
-    <a href="/store#admin-dashboard">Business reports</a>
-    <a href="/store#payment-dashboard">Payment reports</a>
+    <a href="#workspace-reports-heading">Business reports</a>
+    <a href="/dashboard/sales#payment-dashboard">Payment overview</a>
     <a href="/dashboard/sales">Sales workspace</a>
     <a href="/dashboard/orders">Order management</a>
   </nav>
@@ -38,7 +38,7 @@
         <p class="smarto-eyebrow">Verified M-Pesa payments</p>
         <h2 id="owner-sales-heading">Sales performance</h2>
       </div>
-      <a class="smarto-text-link" href="/store#admin-dashboard">Open detailed reports <span aria-hidden="true">→</span></a>
+      <a class="smarto-text-link" href="#workspace-reports-heading">Open reports <span aria-hidden="true">→</span></a>
     </div>
     <p class="smarto-dashboard-note">Sales reflect successful payments, not order placement.</p>
     <div class="smarto-admin-chart-grid">
@@ -56,6 +56,11 @@
       </article>
     </div>
   </section>
+  {% include "templates/includes/management_activity.html" %}
+  {% include "templates/includes/customer_workspace.html" %}
+  {% include "templates/includes/workspace_reports.html" %}
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/role-dashboard.js"></script>
+<script type="module" src="/assets/intelligent_ordering/js/management-activity.js"></script>
+<script type="module" src="/assets/intelligent_ordering/js/customer-workspace.js"></script>
 {% endblock %}

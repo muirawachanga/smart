@@ -1,0 +1,20 @@
+<section class="smarto-admin-section" data-customer-workspace aria-labelledby="customer-workspace-heading">
+  <h2 id="customer-workspace-heading">Customers and order history</h2>
+  <form id="customer-workspace-search" class="smarto-catalog-form">
+    <label>Name, email, phone or customer reference
+      <input name="search" type="search" maxlength="100">
+    </label>
+    <button class="smarto-button" type="submit">Search customers</button>
+  </form>
+  <p id="customer-workspace-feedback" role="status" aria-live="polite"></p>
+  <div id="customer-workspace-results" class="smarto-cart-items"></div>
+  <nav class="smarto-pagination" aria-label="Customer pages">
+    <button id="customer-workspace-previous" class="smarto-button smarto-button-secondary" type="button" disabled>Previous</button>
+    <button id="customer-workspace-next" class="smarto-button smarto-button-secondary" type="button" disabled>Next</button>
+  </nav>
+  <section id="customer-workspace-detail" aria-live="polite"></section>
+  <nav id="customer-history-pagination" class="smarto-pagination" aria-label="Customer order history pages" hidden>
+    <button id="customer-history-previous" class="smarto-button smarto-button-secondary" type="button" disabled>Previous orders</button>
+    <button id="customer-history-next" class="smarto-button smarto-button-secondary" type="button" disabled>More orders</button>
+  </nav>
+</section>

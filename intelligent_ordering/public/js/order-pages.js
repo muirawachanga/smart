@@ -114,7 +114,11 @@ function renderDetail(order) {
     addStatusForm(card, order);
     addCancellationReview(card, order);
   }
-  else if (mode === "support") card.append(text("p", "Read-only customer support view."));
+  else if (mode === "support") {
+    card.append(text("p", "Read-only customer support view."));
+    if (order.cancellation_request_status) card.append(text("p",
+      `Cancellation: ${order.cancellation_request_status} · ${order.cancellation_reason || ""} · ${order.cancellation_response || ""}`));
+  }
   else {
     const updatePayment = mountOrderPayment(card, order);
     addCustomerTracking(card, order, (result) => {
@@ -122,6 +126,21 @@ function renderDetail(order) {
       paymentStatus.textContent = `Payment status: ${result.payment_status}`;
       updatePayment({ status: result.order_status, payment_status: result.payment_status });
     });
+  }
+  if (staff) {
+    card.append(text("h3", "Order history"));
+    for (const entry of order.history || []) card.append(text("p",
+      `${entry.event_datetime} · ${entry.responsible_user} · ${entry.event_type}: ${entry.details}`));
+    if (!order.history?.length) card.append(text("p", "No recorded status changes."));
+    for (const delivery of order.deliveries || []) {
+      card.append(text("p",
+        `${delivery.name} · ${delivery.status} · Rider: ${delivery.assigned_delivery_person || "Unassigned"} · ${delivery.scheduled_delivery_date || "Not scheduled"}`));
+    }
+    if (mode === "staff" && order.status === "Ready for Delivery") {
+      const link = text("a", "Assign or monitor delivery", "smarto-button smarto-button-secondary");
+      link.href = "/dashboard/delivery";
+      card.append(link);
+    }
   }
   detail.replaceChildren(card);
 }
@@ -232,6 +251,7 @@ function addCancellationReview(card, order) {
       });
       if (request === detailRequest) renderDetail(updated);
       loadOrders();
+      loadOrderOverview();
     } catch (error) {
       feedback.textContent = error.message;
       save.disabled = false;
@@ -263,8 +283,9 @@ function addStatusForm(card, order) {
     const request = detailRequest;
     try {
       const updated = await post("orders.update_order_status", { order_name: order.name, status: select.value });
-      if (request === detailRequest) renderDetail(updated);
+      if (request === detailRequest) await loadDetail(updated.name);
       loadOrders();
+      loadOrderOverview();
     } catch (error) {
       if (request === detailRequest) {
         feedback.textContent = `Status could not be updated: ${error.message}`;
@@ -286,4 +307,21 @@ previous.addEventListener("click", () => { if (page > 1) { page -= 1; loadOrders
 next.addEventListener("click", () => { if (hasMore) { page += 1; loadOrders(); } });
 const warning = document.querySelector("#smarto-page-script-warning");
 if (warning) warning.hidden = true;
-loadOrders();
+loadOrders().then(() => {
+  const requestedOrder = new URLSearchParams(window.location?.search || "").get("order");
+  if (staff && requestedOrder) loadDetail(requestedOrder);
+});
+const overview = document.querySelector("#order-workspace-metrics");
+function loadOrderOverview() {
+  if (!overview) return;
+  get("orders.order_overview").then((result) => {
+    const counts = new Map(result.statuses.map((row) => [row.status, row.count]));
+    overview.replaceChildren(...["Pending", "Confirmed", "Processing", "Ready for Delivery", "Completed", "Cancelled"]
+      .map((value) => {
+        const card = text("article", "", "smarto-admin-metric");
+        card.append(text("span", value), text("strong", counts.get(value) || 0));
+        return card;
+      }));
+  }).catch((error) => { status.textContent = `Order overview could not be loaded: ${error.message}`; });
+}
+loadOrderOverview();

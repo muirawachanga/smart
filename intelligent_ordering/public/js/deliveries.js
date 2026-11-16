@@ -79,6 +79,7 @@ export function initDeliveryDashboard() {
   let dashboard = { manager: false, personnel: [], areas: [] };
 
   async function act(control, operation) {
+    if (control.disabled) return;
     control.disabled = true;
     feedback.textContent = "";
     try {
@@ -98,6 +99,11 @@ export function initDeliveryDashboard() {
     renderMetrics({ ...summary, manager: dashboard.manager });
     document.querySelector("#delivery-delayed").textContent =
       `${dashboard.delayed_deliveries || 0} delayed ${dashboard.delayed_deliveries === 1 ? "delivery" : "deliveries"}.`;
+    const heading = document.querySelector("#delivery-workspace-heading");
+    if (heading) heading.textContent = dashboard.manager ? "Delivery management" : "My deliveries";
+    const completion = document.querySelector("#delivery-completion-rate");
+    if (completion) completion.textContent = dashboard.manager
+      ? `${dashboard.completion_rate}% of all deliveries completed.` : "";
     manager.hidden = !dashboard.manager;
     if (!dashboard.manager) return;
     document.querySelector("#delivery-workloads").replaceChildren(
@@ -105,12 +111,15 @@ export function initDeliveryDashboard() {
         text("p", `${person.full_name} (${person.name}): ${person.workload} active deliveries`)),
     );
     const performance = document.querySelector("#delivery-performance");
-    performance.replaceChildren(...dashboard.personnel_performance.map((person) =>
-      text("p", `${person.rider}: ${person.completed} completed · ${person.failed} failed · ${person.total} total`)));
+    performance.replaceChildren(...dashboard.personnel_performance.map((person) => {
+      const rate = Number(person.total) ? (100 * Number(person.completed) / Number(person.total)).toFixed(1) : "0.0";
+      return text("p", `${person.rider}: ${person.completed} completed · ${person.failed} failed · ${person.total} total · ${rate}% completion`);
+    }));
     if (!dashboard.personnel_performance.length) {
       performance.append(text("p", "No delivery performance history."));
     }
-    document.querySelector("#delivery-area-management").hidden = !dashboard.can_manage_areas;
+    document.querySelector("#delivery-area-management").hidden = false;
+    areaForm.hidden = !dashboard.can_manage_areas;
     readyPrevious.disabled = readyPage === 1;
     readyNext.disabled = !dashboard.has_more;
     readyOrders.replaceChildren(...dashboard.ready_orders.map((order) => {
@@ -275,9 +284,11 @@ export function initDeliveryDashboard() {
       const status = document.createElement("select");
       status.add(new Option("Add a note without changing status", delivery.status));
       for (const allowed of delivery.allowed_statuses) {
-        const label = allowed === "Picked Up" ? "Start delivery / pick up order"
+        const label = allowed === "Preparing" ? "Start delivery preparation"
+          : allowed === "Picked Up" ? "Start delivery / pick up order"
           : allowed === "In Transit" ? "Mark in transit"
-            : allowed === "Delivered" ? "Mark delivered" : allowed;
+            : allowed === "Delivered" ? "Mark delivered"
+              : allowed === "Failed" ? "Report failed delivery" : allowed;
         status.add(new Option(label, allowed));
       }
       field(update, "Delivery action", status);

@@ -117,14 +117,18 @@ test("payment button stays disabled until payment history is loaded", async (t) 
 test("staff can filter and update an order through existing APIs", async (t) => {
   const nodes = install(t, "staff");
   const calls = [];
+  let currentStatus = "Pending";
   t.mock.method(globalThis, "fetch", async (url, options) => {
     calls.push({ url: String(url), options });
     if (url.includes("orders.list_orders")) return response({
       orders: [{ ...order, customer_name_snapshot: "Customer", customer_phone_snapshot: "123" }],
       has_more: false,
     });
-    if (url.includes("orders.get_order")) return response(order);
-    if (url.includes("orders.update_order_status")) return response({ ...order, status: "Confirmed" });
+    if (url.includes("orders.get_order")) return response({ ...order, status: currentStatus });
+    if (url.includes("orders.update_order_status")) {
+      currentStatus = "Confirmed";
+      return response({ ...order, status: currentStatus });
+    }
     throw new Error(`Unexpected request: ${url}`);
   });
   await import(`../../intelligent_ordering/public/js/order-pages.js?staff=${Date.now()}`);

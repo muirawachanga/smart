@@ -16,6 +16,7 @@ from intelligent_ordering.utils.validation import validate_pagination
 
 
 PAYMENT_STAFF = {"System Manager", "Business Admin", "Store Manager", "Order Manager", "Finance Manager"}
+RECONCILIATION_ROLES = {"System Manager", "Business Admin", "Finance Manager"}
 FINAL_FAILURE_CODES = {1, 17, 26, 1032, 1037, 2001}
 PUBLIC_FIELDS = [
     "name", "order", "phone_number", "amount", "payment_method", "status",
@@ -323,9 +324,7 @@ def _reconcile(payment):
 @frappe.whitelist(methods=["POST"])
 def reconcile_payment(payment_name):
     _staff()
-    if frappe.session.user != "Administrator" and not (
-        {"System Manager", "Business Admin", "Finance Manager"} & set(frappe.get_roles())
-    ):
+    if not _can_reconcile():
         frappe.throw("Finance reconciliation access is required.", frappe.PermissionError)
     payment = _locked_payment(payment_name)
     _reconcile(payment)
@@ -336,6 +335,12 @@ def reconcile_payment(payment_name):
         f"Current status: {payment.status}; order {payment.order}",
     )
     return _public(payment)
+
+
+def _can_reconcile():
+    return frappe.session.user == "Administrator" or bool(
+        RECONCILIATION_ROLES.intersection(frappe.get_roles(frappe.session.user))
+    )
 
 
 @frappe.whitelist()
@@ -362,6 +367,7 @@ def list_transactions(search="", status="", page=1, page_size=20):
         "Payment Transaction", fields=PUBLIC_FIELDS,
         filters={"status": status} if status else {},
         or_filters=[
+            ["name", "like", f"%{search}%"],
             ["order", "like", f"%{search}%"],
             ["mpesa_receipt_number", "like", f"%{search}%"],
         ] if search else [],
@@ -381,7 +387,66 @@ def get_transaction(payment_name):
         **_public(payment), "checkout_request_id": payment.checkout_request_id,
         "merchant_request_id": payment.merchant_request_id,
         "callback_response": payment.callback_response, "query_response": payment.query_response,
+        "can_reconcile": _can_reconcile(),
+        "order_summary": frappe.db.get_value(
+            "Sales Order", payment.order,
+            ["name", "status", "payment_status", "currency", "total", "order_datetime"],
+            as_dict=True,
+        ),
     }
+
+
+@frappe.whitelist()
+def finance_overview():
+    _staff()
+    if frappe.session.user != "Administrator" and not (
+        {"System Manager", "Business Admin", "Store Manager", "Finance Manager"}
+        & set(frappe.get_roles(frappe.session.user))
+    ):
+        frappe.throw("Finance overview access is required.", frappe.PermissionError)
+    payments = frappe.db.sql(
+        """
+        SELECT o.currency,
+          COALESCE(SUM(CASE WHEN p.status = 'Successful' THEN p.amount ELSE 0 END), 0) AS collected,
+          COALESCE(SUM(CASE WHEN p.status IN ('Initiated','Pending') THEN p.amount ELSE 0 END), 0) AS pending,
+          COALESCE(SUM(CASE WHEN p.status = 'Failed' THEN p.amount ELSE 0 END), 0) AS failed,
+          COALESCE(SUM(CASE WHEN p.status = 'Reversed' THEN p.amount ELSE 0 END), 0) AS reversed,
+          COALESCE(SUM(CASE WHEN p.status = 'Successful'
+            AND DATE(p.transaction_date) = CURDATE() THEN p.amount ELSE 0 END), 0) AS daily_revenue,
+          COALESCE(SUM(CASE WHEN p.status = 'Successful'
+            AND YEARWEEK(p.transaction_date, 3) = YEARWEEK(CURDATE(), 3)
+            THEN p.amount ELSE 0 END), 0) AS weekly_revenue,
+          COALESCE(SUM(CASE WHEN p.status = 'Successful'
+            AND DATE_FORMAT(p.transaction_date, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')
+            THEN p.amount ELSE 0 END), 0) AS monthly_revenue
+        FROM `tabPayment Transaction` p
+        INNER JOIN `tabSales Order` o ON o.name = p.`order`
+        GROUP BY o.currency ORDER BY o.currency
+        """, as_dict=True,
+    )
+    outstanding = frappe.db.sql(
+        """
+        SELECT o.currency, SUM(GREATEST(o.total - COALESCE(p.collected, 0), 0)) AS outstanding
+        FROM `tabSales Order` o
+        LEFT JOIN (
+          SELECT `order`, SUM(amount) AS collected
+          FROM `tabPayment Transaction` WHERE status = 'Successful' GROUP BY `order`
+        ) p ON p.`order` = o.name
+        WHERE o.status != 'Cancelled'
+        GROUP BY o.currency ORDER BY o.currency
+        """, as_dict=True,
+    )
+    methods = frappe.db.sql(
+        """
+        SELECT p.payment_method, p.status, o.currency,
+          COUNT(*) AS transactions, SUM(p.amount) AS amount
+        FROM `tabPayment Transaction` p
+        INNER JOIN `tabSales Order` o ON o.name = p.`order`
+        GROUP BY p.payment_method, p.status, o.currency
+        ORDER BY p.payment_method, o.currency, p.status
+        """, as_dict=True,
+    )
+    return {"payments": payments, "outstanding": outstanding, "methods": methods}
 
 
 @frappe.whitelist()
@@ -389,9 +454,12 @@ def payment_summary():
     _staff()
     return frappe.db.sql(
         """
-        SELECT environment, status, COUNT(*) AS transactions, SUM(amount) AS amount
-        FROM `tabPayment Transaction`
-        GROUP BY environment, status ORDER BY environment, status
+        SELECT p.environment, p.status, o.currency,
+          COUNT(*) AS transactions, SUM(p.amount) AS amount
+        FROM `tabPayment Transaction` p
+        INNER JOIN `tabSales Order` o ON o.name = p.`order`
+        GROUP BY p.environment, p.status, o.currency
+        ORDER BY p.environment, o.currency, p.status
         """, as_dict=True,
     )
 

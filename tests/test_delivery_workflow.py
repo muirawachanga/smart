@@ -161,10 +161,35 @@ class TestDeliveryWorkflow(unittest.TestCase):
 
     def test_reassignment_after_dispatch_is_rejected(self):
         self.frappe.get_roles.return_value = ["Delivery Staff"]
-        for status in ("Dispatched", "In Transit", "Delivered", "Cancelled"):
+        for status in ("Picked Up", "Dispatched", "In Transit", "Delivered", "Cancelled"):
             self.delivery.status = status
             with self.assertRaisesRegex(DeliveryError, "cannot be assigned"):
                 self.service.assign_delivery("DEL-1", "second@example.test", "2026-01-11", "Shift change")
+
+    def test_replacement_rider_must_accept_even_when_original_rider_accepted(self):
+        self.frappe.get_roles.return_value = ["Delivery Staff"]
+        for status in ("Assigned", "Accepted", "Preparing", "Ready for Dispatch"):
+            with self.subTest(status=status):
+                self.delivery.status = status
+                self.delivery.assigned_delivery_person = "driver@example.test"
+                self.service.assign_delivery("DEL-1", "second@example.test", "2026-01-11", "Shift change")
+                self.assertEqual(self.delivery.status, "Assigned")
+                self.assertEqual(self.delivery.assigned_delivery_person, "second@example.test")
+                self.assertEqual(self.save.call_args.args[2], status)
+
+    def test_delayed_filter_keeps_rider_scope_and_excludes_terminal_work(self):
+        self.as_driver()
+        self.frappe.get_list.return_value = []
+        self.service.list_deliveries(delayed="1")
+        filters = self.frappe.get_list.call_args.kwargs["filters"]
+        self.assertEqual(filters["assigned_delivery_person"], "driver@example.test")
+        self.assertEqual(filters["scheduled_delivery_date"], ["<", date(2026, 1, 10)])
+        self.assertEqual(filters["status"], ["not in", ["Delivered", "Failed", "Cancelled"]])
+        for value in ("yes", "2"):
+            with self.subTest(value=value), self.assertRaises(DeliveryError):
+                self.service.list_deliveries(delayed=value)
+        with self.assertRaises(DeliveryError):
+            self.service.list_deliveries(status="Delivered", delayed="1")
 
     def test_paid_explicit_confirmation_completes_only_assigned_order(self):
         self.as_driver()

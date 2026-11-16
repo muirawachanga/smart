@@ -24,3 +24,20 @@ def require_staff_page(context, page):
         frappe.throw("You are not authorized to access this workspace.", frappe.PermissionError)
     context.no_cache = 1
     context.can_manage_users = user == "Administrator" or "System Manager" in roles
+    context.workspace_reports = {
+        "admin": [("sales", "Verified sales"), ("orders", "Orders"), ("customers", "Customers"),
+                  ("payments", "Payments"), ("inventory", "Inventory"), ("deliveries", "Deliveries")],
+        "owner": [("sales", "Verified sales"), ("orders", "Orders"), ("customers", "Customers"),
+                  ("deliveries", "Deliveries")],
+        "sales": [("sales", "Verified sales")],
+        "orders": [("orders", "Orders"), ("deliveries", "Deliveries")],
+        "inventory": [("inventory", "Current inventory")],
+        "delivery": [("deliveries", "Deliveries")] if (
+            user == "Administrator" or roles & (PAGE_ROLES["delivery"] - {"Delivery Staff"})
+        ) else [],
+        "support": [],
+    }[page]
+    if page == "sales" and (
+        user == "Administrator" or roles & {"System Manager", "Business Admin", "Finance Manager"}
+    ):
+        context.workspace_reports.append(("payments", "Payment transactions"))

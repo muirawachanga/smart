@@ -77,7 +77,7 @@ route-aware page labels.
 | `/dashboard/orders` | Role-protected order search, details and status updates |
 | `/dashboard/inventory` | Role-protected inventory workspace |
 | `/dashboard/delivery` | Role-protected delivery workspace |
-| `/dashboard/support` | Read-only order enquiries and customer-profile access |
+| `/dashboard/support` | Read-only customer search, profiles, order history and enquiries |
 | `/store` | Existing database-backed storefront and staff workflows |
 
 Adding a product keeps the customer on the catalogue so they can continue
@@ -527,8 +527,10 @@ role rather than System Manager; no other test account receives either role.
 Inventory Manager can create/edit Product records in Desk and perform existing
 ledger-backed stock operations, but cannot read payment transactions.
 Customer Support can read customer profiles and orders, not mutate either or
-access payment management. Customer support deliberately uses Desk's existing
-customer list rather than gaining access to administration/financial reports.
+access payment management. Its page searches the existing Customer Profile
+records and opens paginated order history through the role-checked
+`administration.list_customers` and `administration.customer_activity` APIs.
+Support customer-search responses omit collected-payment aggregates.
 
 Matching existing accounts are reused without changing passwords or roles.
 Conflicting roles, role profiles, disabled accounts, or non-System Users abort
@@ -631,15 +633,59 @@ balance/movement history before submitting the same receipt again.
 The `/dashboard/delivery` page uses the existing `deliveries` APIs for
 permission-scoped delivery listing/detail, manager assignment and scheduling,
 delivery-area management, and assigned-staff status updates. Only managers can
-create deliveries from ready orders or change delivery areas/assignments.
+create deliveries from ready orders or change assignments. Delivery Managers
+can view routing areas; only System Manager, Business Admin, Store Manager and
+Order Manager can change area rates.
 Delivery staff see only their assigned deliveries and can confirm completion
 only for an assigned delivery after verified payment. Delivery updates do not
 deduct inventory a second time. Manager and staff API checks remain
 authoritative even when a page is accessible.
 
-Inventory, delivery, sales, and owner workspaces link to the existing
-role-checked reporting dashboard at `/store#admin-dashboard`; the analytics and
-exports continue to use real Frappe records and existing report permissions.
+The page separates rider and manager overviews, displays per-rider completion
+rates, and filters delayed active deliveries with `list_deliveries(delayed="1")`.
+The delayed filter preserves rider ownership. Reassigning before pickup resets
+the delivery to Assigned so the replacement rider must accept it; picked-up
+deliveries cannot be reassigned. Completion requires the assigned rider's
+explicit confirmation, private proof photo, and verified payment, with existing
+activity records retaining actors and timestamps.
+
+Inventory, delivery-management, order, finance, owner and administrator pages
+offer CSV/XLSX exports directly on the page using the existing
+`administration.export_report` API. Rider and Support pages do not expose
+reports. Report permissions remain authoritative on the server.
+
+### Role-page integration
+
+`/dashboard/sales` embeds the same transaction component used by the legacy
+store view. It provides payment-reference/order/receipt search, status filters,
+timestamps, associated order status and totals, and authorized reconciliation.
+Reconciliation controls follow the backend's `can_reconcile` flag; Store and
+Order Managers cannot reconcile payments.
+
+`payments.finance_overview` calculates collected, pending, failed and reversed
+amounts, plus daily, ISO-week and monthly verified revenue. Currency balances
+are never added together. Outstanding balances exclude cancelled orders and
+subtract only Successful transactions, clamped at zero; pending attempts do
+not reduce outstanding balances. Reversed payments are not presented as
+successful revenue or as a refund-request workflow. Finance also sees
+payment-method transaction counts and amounts grouped by method, status and
+currency; payment summaries never aggregate different currencies together.
+
+`/dashboard/orders` displays counts for the existing statuses, immutable order
+details, cancellation review, order-specific audit history, and linked delivery
+assignments. Its delivery link opens the authorized delivery workspace.
+
+Owner and administrator pages display customer search/history and
+`administration.management_activity`: low-stock alerts, paid product
+performance, rider completion/delays, and append-only staff audit records.
+Store Managers can read aggregate inventory health but do not gain inventory
+adjustment permissions. Administrator shortcuts reuse native Frappe user,
+role, permission, product, customer and system-settings pages.
+
+This integration intentionally preserves the existing lifecycles. It does
+not introduce complaints/escalations, refund requests, delivery OTPs, or a
+Rejected order status. Those require separately defined business rules and
+persisted workflows. Pending orders remain the existing new-order queue.
 
 ## M-Pesa configuration and operations
 
@@ -797,10 +843,11 @@ are exposed through
 | `dashboard` | Business, inventory, and delivery counts | Store, finance, inventory, or delivery staff |
 | `sales_analytics` | Daily/weekly/monthly/yearly verified sales and product/category/area breakdowns | Store or finance staff |
 | `filter_options` | Product and category selectors | Store or finance staff |
-| `list_customers` / `customer_activity` | Customer profiles, aggregate activity, order history | Store staff |
+| `list_customers` / `customer_activity` | Customer profiles and order history; financial aggregates omitted for Support | Store staff and Customer Support |
 | `product_performance` | Product units and item sales from paid orders | Store staff |
 | `admin_order_detail` | Order snapshots plus payment and delivery history | Store staff |
 | `audit_events` | Search administrative audit history | System Manager, Business Admin, Store Manager |
+| `management_activity` | Stock alerts, product/rider performance and staff activity | System Manager, Business Admin, Store Manager |
 | `export_report` | CSV or XLSX sales, order, customer, payment, stock, or delivery report | Role-scoped by report |
 
 Sales are defined as the sum of verified successful Payment Transaction

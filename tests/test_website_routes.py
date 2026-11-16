@@ -165,10 +165,10 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
                 self.assertTrue((WWW / f"dashboard/{controller}.py").is_file())
 
     def test_reporting_is_linked_from_authorized_workspaces(self):
-        for page in ("sales", "owner", "inventory", "delivery"):
+        for page in ("sales", "owner", "inventory", "delivery", "orders", "admin"):
             with self.subTest(page=page):
                 source = (WWW / f"dashboard/{page}.html").read_text()
-                self.assertIn("/store#admin-dashboard", source)
+                self.assertIn('include "templates/includes/workspace_reports.html"', source)
 
     def test_admin_dashboard_uses_real_data_and_preserves_native_management_routes(self):
         source = (WWW / "dashboard/admin.html").read_text()

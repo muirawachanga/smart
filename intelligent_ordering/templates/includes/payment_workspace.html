@@ -1,0 +1,25 @@
+<section id="payment-dashboard" class="smarto-admin-section" aria-labelledby="payments-heading">
+  <h2 id="payments-heading">Payment transactions</h2>
+  <p>Search payment references, review associated orders, and reconcile uncertain transactions with Safaricom. Pending attempts are not collected revenue.</p>
+  <div id="payment-summary" class="smarto-admin-metrics" aria-label="Payment totals by environment and status"></div>
+  <form id="payment-filters" class="smarto-catalog-form">
+    <label>Payment reference, order number or M-Pesa receipt
+      <input name="search" type="search" maxlength="140">
+    </label>
+    <label>Status
+      <select name="status">
+        <option value="">All statuses</option>
+        <option>Initiated</option><option>Pending</option><option>Successful</option>
+        <option>Failed</option><option>Cancelled</option><option>Reversed</option>
+      </select>
+    </label>
+    <button class="smarto-button" type="submit">Search payments</button>
+  </form>
+  <p id="payment-feedback" role="status" aria-live="polite"></p>
+  <div id="payment-transactions" class="smarto-cart-items"></div>
+  <nav class="smarto-pagination" aria-label="Payment pages">
+    <button id="payments-previous" class="smarto-button smarto-button-secondary" type="button" disabled>Previous</button>
+    <button id="payments-next" class="smarto-button smarto-button-secondary" type="button" disabled>Next</button>
+  </nav>
+  <div id="payment-detail" aria-live="polite"></div>
+</section>
