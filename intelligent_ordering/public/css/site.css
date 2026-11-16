@@ -31,7 +31,7 @@
 .smarto-header-inner,
 .smarto-main,
 .smarto-footer-inner {
-  width: min(100% - 2rem, 76rem);
+  width: calc(100% - 2rem);
   margin-inline: auto;
 }
 
@@ -168,7 +168,7 @@
 
 #smarto-session-error,
 #smarto-unexpected-error {
-  width: min(100% - 2rem, 76rem);
+  width: calc(100% - 2rem);
   margin: 1rem auto 0;
 }
 

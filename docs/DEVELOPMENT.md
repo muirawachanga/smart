@@ -124,6 +124,10 @@ The public website uses native Frappe `www` routes and a shared Jinja layout;
 it does not add a JavaScript framework. The shared layout provides the SmartO
 header, responsive navigation, breadcrumbs, account links, footer, and
 route-aware page labels.
+The shared SmartO layout uses Frappe's full-width mode without its standard
+website sidebar. Header, content and footer use the available width with
+one-rem side gutters instead of stacking centered desktop width limits;
+individual forms and readable text retain their own width constraints.
 
 | Route | Current page |
 | --- | --- |
