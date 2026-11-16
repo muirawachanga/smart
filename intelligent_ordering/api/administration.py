@@ -498,7 +498,7 @@ def admin_order_detail(order_name):
 
 
 @frappe.whitelist()
-def audit_events(search="", page=1, page_size=50):
+def audit_events(search="", page=1, page_size=5):
     _require("audit")
     if not isinstance(search, str) or len(search) > 140:
         frappe.throw("Audit search must be at most 140 characters.", frappe.ValidationError)
@@ -543,7 +543,7 @@ def management_activity():
         "inventory_alerts": alerts,
         "products": product_performance(page_size=5)["products"],
         "delivery": delivery_dashboard(page_size=5),
-        "events": audit_events(page_size=20)["events"],
+        "events": audit_events(page_size=5)["events"],
     }
 
 

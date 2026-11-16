@@ -11,8 +11,29 @@ class Element {
     this.hidden = false;
     this.dataset = {};
   }
-  append(...nodes) { this.children.push(...nodes); }
-  replaceChildren(...nodes) { this.children = nodes; }
+  append(...nodes) {
+    for (const node of nodes) {
+      node.remove();
+      node.parent = this;
+      this.children.push(node);
+    }
+  }
+  prepend(...nodes) {
+    for (const node of [...nodes].reverse()) {
+      node.remove();
+      node.parent = this;
+      this.children.unshift(node);
+    }
+  }
+  remove() {
+    if (this.parent) this.parent.children = this.parent.children.filter((node) => node !== this);
+    this.parent = null;
+  }
+  replaceChildren(...nodes) {
+    for (const node of this.children) node.parent = null;
+    this.children = [];
+    this.append(...nodes);
+  }
   add(node) { this.children.push(node); }
   addEventListener(name, handler) { this.listeners[name] = handler; }
   setAttribute(name, value) { this[name] = value; }
@@ -76,6 +97,7 @@ test("customer history uses owner-only detail and shows payment status", async (
   await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
   await tick();
   const orderCard = nodes.get("#orders-list").children[0];
+  assert.equal(nodes.get("#order-detail").parent, orderCard);
   assert.equal(orderCard.children[0].children[1].dataset.status, "pending");
   assert.ok(calls.some((url) => url.includes("orders.get_my_order?")));
   const card = nodes.get("#order-detail").children[0];
@@ -89,6 +111,29 @@ test("guest sees login and no customer records", async (t) => {
   await tick();
   assert.equal(nodes.get("#orders-login").hidden, false);
   assert.equal(nodes.get("#orders-list").children.length, 0);
+});
+
+test("order details move to the selected card and detach when filtering it out", async (t) => {
+  const nodes = install(t, "support");
+  let visibleOrders = [order, { ...order, name: "SO-2" }];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("orders.list_orders")) return response({ orders: visibleOrders, has_more: false });
+    const name = new URL(url, "https://example.test").searchParams.get("order_name");
+    return response({ ...order, name });
+  });
+  await import(`../../intelligent_ordering/public/js/order-pages.js?inline=${Date.now()}`);
+  await tick();
+  const [first, second] = nodes.get("#orders-list").children;
+  await first.children.at(-1).listeners.click();
+  assert.equal(nodes.get("#order-detail").parent, first);
+  await second.children.at(-1).listeners.click();
+  assert.equal(nodes.get("#order-detail").parent, second);
+  assert.ok(!first.children.includes(nodes.get("#order-detail")));
+  visibleOrders = [order];
+  nodes.get("#orders-filters").listeners.submit({ preventDefault() {} });
+  await tick();
+  assert.equal(nodes.get("#order-detail").parent, null);
+  assert.equal(nodes.get("#order-detail").children.length, 0);
 });
 
 test("payment button stays disabled until payment history is loaded", async (t) => {

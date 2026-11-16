@@ -54,7 +54,7 @@ class TestAuthentication(unittest.TestCase):
             ("Store Manager", "/dashboard/owner"), ("Finance Manager", "/dashboard/sales"),
             ("Order Manager", "/dashboard/orders"), ("Inventory Manager", "/dashboard/inventory"),
             ("Delivery Manager", "/dashboard/delivery"), ("Delivery Staff", "/dashboard/delivery"),
-            ("Customer Support", "/dashboard/support"), ("Customer", "/account"),
+            ("Customer Support", "/dashboard/support"), ("Customer", "/"),
         ):
             self.frappe.get_roles.return_value = [role]
             self.assertEqual(self.auth.login_destination(), destination)
@@ -69,7 +69,10 @@ class TestAuthentication(unittest.TestCase):
             "https://evil.test", "//evil.test", "/%2f%2fevil.test", "/\\evil.test",
             "/dashboard/admin", "/app", "/login", "/%0aevil",
         ):
-            self.assertEqual(self.auth.login_destination(requested), "/account")
+            self.assertEqual(self.auth.login_destination(requested), "/")
+        self.assertEqual(self.auth.login_destination("/"), "/")
+        self.assertEqual(self.auth.login_destination("/account"), "/account")
+        self.assertEqual(self.auth.login_destination("/account/payments"), "/account/payments")
         self.assertEqual(self.auth.login_destination("/checkout"), "/checkout")
         self.assertEqual(self.auth.login_destination("/payment?order=SO-1"), "/payment?order=SO-1")
         self.frappe.get_roles.return_value = ["Inventory Manager"]

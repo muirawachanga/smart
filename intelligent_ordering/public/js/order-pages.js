@@ -23,11 +23,26 @@ let hasMore = false;
 let listRequest = 0;
 let detailRequest = 0;
 let trackingTimer = null;
+let selectedOrder = null;
+const orderCards = new Map();
+
+function clearDetail() {
+  selectedOrder = null;
+  detailRequest += 1;
+  if (trackingTimer !== null) {
+    window.clearInterval(trackingTimer);
+    trackingTimer = null;
+  }
+  detail.replaceChildren();
+  detail.remove();
+}
 
 async function loadOrders() {
   const request = ++listRequest;
   status.textContent = "Loading orders...";
   pagination.hidden = true;
+  detail.remove();
+  orderCards.clear();
   list.replaceChildren();
   const parameters = { page: String(page), page_size: "20" };
   if (staff) {
@@ -39,11 +54,13 @@ async function loadOrders() {
     const result = await get(staff ? "orders.list_orders" : "orders.get_my_orders", parameters);
     if (request !== listRequest) return;
     if (result.requires_login) {
+      clearDetail();
       document.querySelector("#orders-login").hidden = false;
       status.textContent = "Sign in to view your orders.";
       return;
     }
     hasMore = result.has_more;
+    if (!result.orders.some((order) => order.name === selectedOrder)) clearDetail();
     status.textContent = result.orders.length ? "" : "No orders found.";
     list.replaceChildren(...result.orders.map(orderCard));
     previous.disabled = page <= 1;
@@ -51,12 +68,16 @@ async function loadOrders() {
     pageLabel.textContent = `Page ${page}`;
     pagination.hidden = page === 1 && !hasMore;
   } catch (error) {
-    if (request === listRequest) status.textContent = `Orders could not be loaded: ${error.message}`;
+    if (request === listRequest) {
+      clearDetail();
+      status.textContent = `Orders could not be loaded: ${error.message}`;
+    }
   }
 }
 
 function orderCard(order) {
   const card = text("article", "", "smarto-order-item");
+  orderCards.set(order.name, card);
   const heading = text("div", "", "smarto-order-item-heading");
   const badge = text("span", order.status, "smarto-status-badge");
   badge.dataset.status = order.status.toLowerCase().replaceAll(" ", "-");
@@ -68,10 +89,15 @@ function orderCard(order) {
   button.type = "button";
   button.addEventListener("click", () => loadDetail(order.name));
   card.append(button);
+  if (selectedOrder === order.name) card.append(detail);
   return card;
 }
 
 async function loadDetail(name) {
+  selectedOrder = name;
+  const selectedCard = orderCards.get(name);
+  if (selectedCard) selectedCard.append(detail);
+  else list.prepend(detail);
   if (trackingTimer !== null) {
     window.clearInterval(trackingTimer);
     trackingTimer = null;
@@ -299,8 +325,7 @@ function addStatusForm(card, order) {
 if (filters) filters.addEventListener("submit", (event) => {
   event.preventDefault();
   page = 1;
-  detailRequest += 1;
-  detail.replaceChildren();
+  clearDetail();
   loadOrders();
 });
 previous.addEventListener("click", () => { if (page > 1) { page -= 1; loadOrders(); } });

@@ -6,6 +6,7 @@ from frappe.utils import getdate, now_datetime
 
 from intelligent_ordering.api.administration import (
     customer_activity,
+    audit_events,
     dashboard,
     export_report,
     list_customers,
@@ -186,6 +187,18 @@ class TestAdministrationAnalytics(FrappeTestCase):
             management_activity()
         with self.assertRaises(frappe.PermissionError):
             export_report("payments", "csv")
+
+    def test_audit_history_defaults_to_five_and_allows_explicit_larger_pages(self):
+        events = [{"name": f"EVENT-{index}"} for index in range(8)]
+        with patch.object(frappe, "get_list", return_value=events) as listing:
+            result = audit_events()
+            self.assertEqual(len(result["events"]), 5)
+            self.assertTrue(result["has_more"])
+            self.assertEqual(listing.call_args.kwargs["limit_page_length"], 6)
+            expanded = audit_events(page_size=50)
+            self.assertEqual(len(expanded["events"]), 8)
+            self.assertFalse(expanded["has_more"])
+            self.assertEqual(listing.call_args.kwargs["limit_page_length"], 51)
 
     def _make_user(self, email, role):
         user = frappe.get_doc({

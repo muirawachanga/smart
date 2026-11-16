@@ -54,7 +54,9 @@ class TestAuthentication(FrappeTestCase):
         self.assertFalse(record.marketing_consent)
         frappe.set_user(self.email)
         self.assertEqual(login_destination("/checkout"), "/checkout")
-        self.assertEqual(login_destination("/dashboard/admin"), "/account")
+        self.assertEqual(login_destination("/dashboard/admin"), "/")
+        self.assertEqual(login_destination(), "/")
+        self.assertEqual(login_destination("/account"), "/account")
         with self.assertRaises(frappe.PermissionError):
             require_staff_page(frappe._dict(), "admin")
 

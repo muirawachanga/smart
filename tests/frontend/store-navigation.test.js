@@ -15,6 +15,13 @@ function install(t, hash) {
           this.children.push(child);
         }
       },
+      prepend(...children) {
+        for (const child of [...children].reverse()) {
+          child.remove?.();
+          child.parent = this;
+          this.children.unshift(child);
+        }
+      },
       replaceChildren(...children) {
         for (const child of this.children) child.parent = null;
         this.children = [];
@@ -169,6 +176,7 @@ test("finance workspace loads without a legacy hash and limits reconciliation co
   permitted = true;
   await view.listeners.click();
   assert.ok(node("#payment-detail").children.some((child) => child.textContent === "Check with Safaricom"));
+  assert.equal(node("#payment-detail").children[0].textContent, "Check with Safaricom");
 });
 
 test("view payment shows loading feedback and a visible error when detail access fails", async (t) => {

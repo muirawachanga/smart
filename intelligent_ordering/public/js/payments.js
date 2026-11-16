@@ -250,7 +250,7 @@ export function initPaymentDashboard() {
         }
       });
       detail.replaceChildren(output);
-      if (transaction.can_reconcile) detail.append(reconcile);
+      if (transaction.can_reconcile) detail.prepend(reconcile);
     } catch (error) {
       if (request !== detailRequest) return;
       const message = text("p", error.message);

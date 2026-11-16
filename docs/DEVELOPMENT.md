@@ -293,7 +293,10 @@ Frappe sends the password setup email when email delivery is configured.
 Without an outgoing email account, registration explicitly asks the customer to
 contact the store; it does not pretend that an email was sent. Native `/login`,
 password recovery, and session logout remain the authentication authority.
-Customer's default role-homepage hook points to `/account`, without replacing
+Customers land on the storefront homepage (`/`) after login by default.
+My account remains available at `/account`; explicit authorized return links
+to checkout, payments or account pages are preserved. The Customer
+default role-homepage hook points to `/`, without replacing
 any explicitly configured Frappe role/portal homepage.
 
 Customer pages are `/account` (orders, payments for an order, and tracking),
@@ -331,6 +334,9 @@ Order details poll persisted order/payment/delivery state every 15 seconds while
 the page is visible, with an explicit refresh button. No GPS position is
 invented. New orders and subsequent order, delivery, payment, or cancellation
 updates create native Frappe Notification Log records for the owning customer.
+Order-list **View details** expands within the selected order card, including
+on staff/support pages and the combined store view, rather than below the full
+list. Selecting another order moves the detail view to that card.
 The notification list and mark-read operation are recipient-scoped. SMS is an
 independent, optional delivery channel described below; historical notification
 events are not backfilled.
@@ -1019,7 +1025,8 @@ Payment endpoints use the prefix
 Payment staff are Business Admin, Store Manager, Order Manager, Finance
 Manager, and System Manager. They can
 open **View payment** to display details inside the selected transaction card.
-Authorized reconciliation uses **Check with Safaricom** in that same card;
+Authorized reconciliation uses **Check with Safaricom** at the top of the
+expanded details, before the transaction fields and technical diagnostics;
 there is no separate detail panel to scroll down to. Loading and detail-request
 errors are shown inline, and refreshing the list retains the selected card's
 details while that payment remains in the results. They can
@@ -1139,6 +1146,10 @@ and reconciliation requests, stock receipts/issues/adjustments/returns,
 delivery creation/status/assignment/scheduling, and user creation/profile/
 role changes. Detailed stock movement and delivery activity remain in their
 existing append-only ledger/activity records as well.
+Dashboard staff-activity previews show at most five events. The store audit
+browser defaults to five entries per page; select 50 and submit the search to
+browse more, or follow the full-history link to Frappe Desk. Pagination and
+search retain access to older records without loading the complete log at once.
 
 The standalone validation suite includes date/filter/period/report filename
 and spreadsheet formula-injection tests. Database-backed dashboard, chart,

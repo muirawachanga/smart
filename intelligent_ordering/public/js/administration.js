@@ -439,8 +439,9 @@ export function initAdministrationDashboard() {
 
   async function loadAudit() {
     const search = String(new FormData(auditForm).get("search") || "");
+    const pageSize = String(new FormData(auditForm).get("page_size") || "5");
     const result = await get("administration.audit_events", {
-      search, page: String(auditPage), page_size: "50",
+      search, page: String(auditPage), page_size: pageSize,
     });
     document.querySelector("#admin-audit-previous").disabled = auditPage <= 1;
     document.querySelector("#admin-audit-next").disabled = !result.has_more;

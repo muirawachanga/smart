@@ -124,8 +124,10 @@ test("management workspace displays persisted stock, products, deliveries and st
       products: [{ product_name: "Milk", units_sold: 4, orders: 2, item_sales: 100, currency: "KES" }],
       delivery: { completion_rate: 75, delayed_deliveries: 1, available_riders: 2,
         personnel_performance: [{ rider: "rider@example.test", completed: 3, failed: 1, total: 4 }] },
-      events: [{ event_datetime: "Today", responsible_user: "staff@example.test",
-        event_type: "Order status changed", reference_name: "SO-1", details: "Pending -> Confirmed" }],
+      events: Array.from({ length: 8 }, (_, index) => ({
+        event_datetime: "Today", responsible_user: "staff@example.test",
+        event_type: "Order status changed", reference_name: `SO-${index + 1}`, details: "Pending -> Confirmed",
+      })),
     });
   });
   await import(`../../intelligent_ordering/public/js/management-activity.js?activity=${Date.now()}`);
@@ -134,6 +136,8 @@ test("management workspace displays persisted stock, products, deliveries and st
   assert.match(nodes.get("#management-product-performance").textContent, /4 units.*2 paid orders/);
   assert.match(nodes.get("#management-delivery-performance").textContent, /75% completed.*3 completed/);
   assert.match(nodes.get("#management-staff-activity").textContent, /staff@example.test.*SO-1/);
+  assert.equal(nodes.get("#management-staff-activity").children.length, 5);
+  assert.doesNotMatch(nodes.get("#management-staff-activity").textContent, /SO-6/);
 });
 
 function install(t, role) {

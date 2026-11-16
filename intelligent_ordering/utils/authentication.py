@@ -43,7 +43,7 @@ def login_destination(requested=""):
         ({"Inventory Manager"}, "/dashboard/inventory"),
         ({"Delivery Manager", "Delivery Staff"}, "/dashboard/delivery"),
         ({"Customer Support"}, "/dashboard/support"),
-        ({"Customer"}, "/account"),
+        ({"Customer"}, "/"),
     ):
         if roles & allowed:
             return path

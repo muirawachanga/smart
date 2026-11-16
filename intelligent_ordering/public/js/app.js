@@ -785,6 +785,7 @@ function appendOrderCards(container, orders, staffMode) {
     viewButton.type = "button";
     viewButton.textContent = "View details";
     viewButton.addEventListener("click", () => {
+      card.append(staffMode ? staffOrderDetail : customerOrderDetail);
       loadOrderDetail(order.name, staffMode);
     });
     card.append(viewButton);
@@ -816,7 +817,6 @@ async function loadOrderDetail(orderName, staffMode) {
       return;
     }
     renderOrderDetail(target, order, staffMode);
-    target.scrollIntoView({ behavior: "smooth", block: "nearest" });
   } catch (error) {
     target.textContent = "Order details could not be loaded.";
     showFeedback(feedbackElement, error.message);

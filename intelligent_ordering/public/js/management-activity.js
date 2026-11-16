@@ -27,7 +27,7 @@ if (document.querySelector("[data-management-activity]")) {
         "No rider performance records.");
       document.querySelector("#management-delivery-performance").prepend(
         text("p", `${delivery.completion_rate}% completed · ${delivery.delayed_deliveries} delayed · ${delivery.available_riders} available riders`));
-      display("#management-staff-activity", result.events,
+      display("#management-staff-activity", result.events.slice(0, 5),
         (row) => text("p", `${row.event_datetime} · ${row.responsible_user} · ${row.event_type} · ${row.reference_name}: ${row.details}`),
         "No staff activity recorded.");
       feedback.textContent = "Operations updated from live records.";
