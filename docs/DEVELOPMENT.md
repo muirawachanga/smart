@@ -311,6 +311,16 @@ by the portal's profile/address/cancellation forms.
 The customer API is `intelligent_ordering.api.customers`. It derives profiles
 from the authenticated user, validates address and order ownership before
 mutation, and exposes only selected public payment/delivery fields.
+At `/account/payments`, signed-in customers can search only their own orders'
+payments using a full M-Pesa payment phone number or a full recorded M-Pesa
+receipt reference. Phone input accepts local or international Kenyan formats;
+receipt matching is case-normalized. Search filters persist through pagination
+and refresh; Clear search returns to the first unfiltered page.
+`payment_history` accepts optional `search` and `search_by` (`phone` or
+`receipt`) parameters. Matching is exact and always constrained by order
+ownership, even if customers use the same payment phone number. This reads
+existing records, does not query Daraja, and cannot discover a missing callback
+or verify a pending payment merely from a customer-entered receipt.
 Customers retain read-only DocType permissions; scoped workflow methods perform
 validated profile/address changes. Order totals and historical contact/address
 snapshots remain unchanged. Addresses referenced by orders cannot be deleted.
@@ -1008,6 +1018,11 @@ Payment endpoints use the prefix
 
 Payment staff are Business Admin, Store Manager, Order Manager, Finance
 Manager, and System Manager. They can
+open **View payment** to display details inside the selected transaction card.
+Authorized reconciliation uses **Check with Safaricom** in that same card;
+there is no separate detail panel to scroll down to. Loading and detail-request
+errors are shown inline, and refreshing the list retains the selected card's
+details while that payment remains in the results. They can
 inspect raw callback/query records but cannot edit statuses through generic
 DocType writes. Receipt and checkout IDs are unique. There is no browser
 "confirm payment" API and no PIN collection. Reversed is reserved in the schema;

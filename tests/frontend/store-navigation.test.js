@@ -8,9 +8,26 @@ function install(t, hash) {
   function node(selector) {
     if (!nodes.has(selector)) nodes.set(selector, {
       children: [], dataset: {}, listeners: {}, textContent: "", hidden: false,
-      append(...children) { this.children.push(...children); },
-      replaceChildren(...children) { this.children = children; },
+      append(...children) {
+        for (const child of children) {
+          child.remove?.();
+          child.parent = this;
+          this.children.push(child);
+        }
+      },
+      replaceChildren(...children) {
+        for (const child of this.children) child.parent = null;
+        this.children = [];
+        this.append(...children);
+      },
       addEventListener(event, handler) { this.listeners[event] = handler; },
+      setAttribute(name, value) { this[name] = value; },
+      focus() { this.focused = true; },
+      scrollIntoView() { this.scrolledIntoView = true; },
+      remove() {
+        if (this.parent) this.parent.children = this.parent.children.filter((child) => child !== this);
+        this.parent = null;
+      },
     });
     return nodes.get(selector);
   }
@@ -119,6 +136,9 @@ test("payment details emphasize transaction fields and keep provider diagnostics
   assert.match(content, /SO-1.*Successful.*KES 1,250\.00/);
   assert.match(content, /254700000000.*ABC123/);
   assert.match(content, /Technical transaction data[\s\S]*CHECKOUT-1[\s\S]*ResultCode/);
+  assert.ok(node("#payment-transactions").children[0].children.includes(node("#payment-detail")));
+  assert.notEqual(node("#payment-detail").scrolledIntoView, true);
+  assert.equal(view.disabled, false);
 });
 
 test("finance workspace loads without a legacy hash and limits reconciliation controls", async (t) => {
@@ -149,4 +169,76 @@ test("finance workspace loads without a legacy hash and limits reconciliation co
   permitted = true;
   await view.listeners.click();
   assert.ok(node("#payment-detail").children.some((child) => child.textContent === "Check with Safaricom"));
+});
+
+test("view payment shows loading feedback and a visible error when detail access fails", async (t) => {
+  const { node } = install(t, "#payment-dashboard");
+  let rejectDetails;
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (String(url).includes("payments.get_transaction")) {
+      return new Promise((resolve) => { rejectDetails = () => resolve({
+        ok: false, status: 403, json: async () => ({}),
+      }); });
+    }
+    return { ok: true, json: async () => ({ message: String(url).includes("payment_summary") ? [] : {
+      transactions: [{ name: "PAY-1", order: "SO-1", status: "Pending", amount: 4 }], has_more: false,
+    } }) };
+  });
+  initPaymentDashboard();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const view = node("#payment-transactions").children[0].children.find(
+    (child) => child.textContent === "View payment",
+  );
+  const opening = view.listeners.click();
+  assert.equal(view.disabled, true);
+  assert.equal(view.textContent, "Opening payment...");
+  assert.match(displayedText(node("#payment-detail")), /Loading payment details/);
+  rejectDetails();
+  await opening;
+  assert.match(displayedText(node("#payment-detail")), /permission.*HTTP 403/);
+  assert.equal(node("#payment-detail").children[0].role, "alert");
+  assert.equal(view.disabled, false);
+  assert.equal(view.textContent, "View payment");
+});
+
+test("details follow the selected payment and reconciliation stays within its refreshed card", async (t) => {
+  const { node } = install(t, "#payment-dashboard");
+  const payments = [
+    { name: "PAY-1", order: "SO-1", status: "Pending", amount: 4 },
+    { name: "PAY-2", order: "SO-2", status: "Pending", amount: 8 },
+  ];
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    const target = String(url);
+    let message;
+    if (target.includes("get_transaction")) {
+      const id = new URL(target, "https://example.test").searchParams.get("payment_name");
+      message = { ...payments.find((payment) => payment.name === id), can_reconcile: true };
+    } else if (target.includes("reconcile_payment")) {
+      message = {};
+    } else if (target.includes("payment_summary")) {
+      message = [];
+    } else {
+      message = { transactions: payments, has_more: false };
+    }
+    return { ok: true, json: async () => ({ message }) };
+  });
+  initPaymentDashboard();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const first = node("#payment-transactions").children[0];
+  const second = node("#payment-transactions").children[1];
+  const view = (card) => card.children.find((child) => child.textContent === "View payment");
+  await view(first).listeners.click();
+  assert.equal(node("#payment-detail").parent, first);
+  await view(second).listeners.click();
+  assert.equal(node("#payment-detail").parent, second);
+  assert.ok(!first.children.includes(node("#payment-detail")));
+  const reconcile = node("#payment-detail").children.find((child) => child.textContent === "Check with Safaricom");
+  await reconcile.listeners.click();
+  const call = calls.find((item) => item.url.includes("reconcile_payment"));
+  assert.equal(call.options.body.get("payment_name"), "PAY-2");
+  assert.equal(node("#payment-detail").parent, node("#payment-transactions").children[1]);
+  assert.match(displayedText(node("#payment-detail")), /SO-2/);
+  assert.notEqual(node("#payment-detail").scrolledIntoView, true);
 });

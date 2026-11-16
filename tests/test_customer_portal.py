@@ -1,4 +1,5 @@
 import importlib.util
+import sqlite3
 from html import escape
 import sys
 import types
@@ -144,6 +145,44 @@ class TestCustomerPortal(unittest.TestCase):
         self.assertEqual(params, ("OWN-PROFILE", 11, 10))
         with self.assertRaises(AccessError):
             self.api.payment_history(page=0)
+
+    def test_payment_search_normalizes_values_and_cannot_find_another_customers_payment(self):
+        database = sqlite3.connect(":memory:")
+        self.addCleanup(database.close)
+        database.row_factory = sqlite3.Row
+        database.executescript("""
+            CREATE TABLE `tabSales Order` (name TEXT, customer TEXT, currency TEXT);
+            CREATE TABLE `tabPayment Transaction` (
+                name TEXT, `order` TEXT, amount NUMERIC, payment_method TEXT, status TEXT,
+                phone_number TEXT, mpesa_receipt_number TEXT, transaction_date TEXT, creation TEXT
+            );
+            INSERT INTO `tabSales Order` VALUES ('OWN', 'OWN-PROFILE', 'KES'), ('OTHER', 'OTHER-PROFILE', 'KES');
+            INSERT INTO `tabPayment Transaction` VALUES
+                ('PENDING', 'OWN', 4, 'M-Pesa', 'Pending', '254712345678', '', NULL, '2026-11-16'),
+                ('PAID', 'OWN', 4, 'M-Pesa', 'Successful', '254712345678', 'TEST1234567', '2026-11-15', '2026-11-15'),
+                ('PRIVATE', 'OTHER', 4, 'M-Pesa', 'Successful', '254712345678', 'OTHER123456', '2026-11-16', '2026-11-16');
+        """)
+        self.frappe.db.sql.side_effect = lambda query, params, **kwargs: [
+            dict(row) for row in database.execute(query.replace("%s", "?"), params)
+        ]
+        with patch.object(self.api, "_profile", return_value=types.SimpleNamespace(name="OWN-PROFILE")):
+            result = self.api.payment_history(search="0712 345 678", page_size=1)
+            self.assertEqual([row["name"] for row in result["transactions"]], ["PENDING"])
+            self.assertTrue(result["has_more"])
+            second = self.api.payment_history(search="+254712345678", page=2, page_size=1)
+            self.assertEqual([row["name"] for row in second["transactions"]], ["PAID"])
+            receipt = self.api.payment_history(search="test1234567", search_by="receipt")
+            self.assertEqual([row["name"] for row in receipt["transactions"]], ["PAID"])
+            self.assertEqual(self.api.payment_history(search="OTHER123456", search_by="receipt")["transactions"], [])
+        self.assertNotIn("callback_response", repr(result))
+
+    def test_invalid_payment_search_never_queries_transactions(self):
+        with patch.object(self.api, "_profile", return_value=types.SimpleNamespace(name="OWN")):
+            for args in ({"search": "bad"}, {"search": "%", "search_by": "receipt"},
+                         {"search": "x" * 41}, {"search": []}, {"search_by": "unknown"}):
+                with self.subTest(args=args), self.assertRaises(AccessError):
+                    self.api.payment_history(**args)
+        self.frappe.db.sql.assert_not_called()
 
     def test_tracking_and_cancellation_cannot_load_an_unowned_order(self):
         self.frappe.db.exists.return_value = False

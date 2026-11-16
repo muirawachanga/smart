@@ -114,6 +114,8 @@ export function initPaymentDashboard() {
   const results = document.querySelector("#payment-transactions");
   const detail = document.querySelector("#payment-detail");
   const feedback = document.querySelector("#payment-feedback");
+  let detailRequest = 0;
+  let selectedPayment = null;
   let page = 1;
   let hasMore = false;
   const previous = document.querySelector("#payments-previous");
@@ -126,6 +128,15 @@ export function initPaymentDashboard() {
         get("payments.list_transactions", { ...values, page: String(page) }),
         get("payments.payment_summary"),
       ]);
+      const selectedVisible = selectedPayment && listing.transactions.some(
+        (transaction) => transaction.name === selectedPayment,
+      );
+      detail.remove();
+      if (!selectedVisible) {
+        selectedPayment = null;
+        detailRequest += 1;
+        detail.replaceChildren();
+      }
       summary.replaceChildren(...totals.map((row) => {
         const card = document.createElement("article");
         card.className = "smarto-admin-metric";
@@ -152,8 +163,20 @@ export function initPaymentDashboard() {
         const view = text("button", "View payment");
         view.type = "button";
         view.className = "smarto-button smarto-button-secondary";
-        view.addEventListener("click", () => showDetail(transaction.name));
+        view.addEventListener("click", async () => {
+          selectedPayment = transaction.name;
+          card.append(detail);
+          view.disabled = true;
+          view.textContent = "Opening payment...";
+          try {
+            await showDetail(transaction.name);
+          } finally {
+            view.disabled = false;
+            view.textContent = "View payment";
+          }
+        });
         card.append(view);
+        if (transaction.name === selectedPayment) card.append(detail);
         return card;
       }));
       hasMore = listing.has_more;
@@ -161,14 +184,19 @@ export function initPaymentDashboard() {
       next.disabled = !hasMore;
       feedback.textContent = listing.transactions.length ? "" : "No matching payments.";
     } catch (error) {
+      selectedPayment = null;
+      detailRequest += 1;
       results.replaceChildren();
       detail.replaceChildren();
       feedback.textContent = error.message;
     }
   }
   async function showDetail(name) {
+    const request = ++detailRequest;
+    detail.replaceChildren(text("p", "Loading payment details..."));
     try {
       const transaction = await get("payments.get_transaction", { payment_name: name });
+      if (request !== detailRequest) return;
       const output = document.createElement("article");
       output.className = "smarto-order-item";
       const heading = document.createElement("div");
@@ -224,6 +252,10 @@ export function initPaymentDashboard() {
       detail.replaceChildren(output);
       if (transaction.can_reconcile) detail.append(reconcile);
     } catch (error) {
+      if (request !== detailRequest) return;
+      const message = text("p", error.message);
+      message.setAttribute("role", "alert");
+      detail.replaceChildren(message);
       feedback.textContent = error.message;
     }
   }

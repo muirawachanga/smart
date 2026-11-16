@@ -13,6 +13,8 @@ let page = 1;
 let busy = false;
 let requestId = 0;
 let hasMore = false;
+const paymentSearch = document.querySelector("#customer-payment-search");
+let paymentFilters = { search: "", search_by: "phone" };
 
 function showError(error) {
   feedback.textContent = error.message;
@@ -81,6 +83,7 @@ function renderPayments(transactions) {
       heading,
       text("p", `${payment.payment_method} · ${payment.status} · ${formatPrice(payment.amount, payment.currency)}`),
       text("p", `${payment.transaction_date || payment.creation || ""} · Receipt: ${payment.mpesa_receipt_number || "Not available"}`),
+      text("p", `Payment phone: ${payment.phone_number || "Not recorded"}`),
     );
     return card;
   }));
@@ -144,12 +147,14 @@ async function load() {
     }
     const result = await get(kind === "payments" ? "customers.payment_history" : "customers.notifications", {
       page: String(page), page_size: "20",
+      ...(kind === "payments" ? paymentFilters : {}),
     });
     if (request !== requestId) return;
     const rows = kind === "payments" ? result.transactions : result.notifications;
     if (kind === "payments") renderPayments(rows);
     else renderNotifications(rows);
-    status.textContent = rows.length ? "" : `No ${kind} found.`;
+    status.textContent = rows.length ? "" : kind === "payments" && paymentFilters.search
+      ? "No matching payments for your orders." : `No ${kind} found.`;
     hasMore = result.has_more;
     previous.disabled = page <= 1;
     next.disabled = !hasMore;
@@ -158,6 +163,7 @@ async function load() {
   } catch (error) {
     if (request !== requestId) return;
     status.textContent = "This account page could not be loaded.";
+    if (kind === "payments") list.replaceChildren();
     showError(error);
   }
 }
@@ -188,6 +194,23 @@ if (form) form.addEventListener("submit", async (event) => {
     busy = false;
     button.disabled = false;
   }
+});
+
+paymentSearch?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!paymentSearch.reportValidity()) return;
+  paymentFilters = {
+    search: paymentSearch.elements.search.value.trim(),
+    search_by: paymentSearch.elements.search_by.value,
+  };
+  page = 1;
+  load();
+});
+document.querySelector("#customer-payment-clear")?.addEventListener("click", () => {
+  paymentSearch.reset();
+  paymentFilters = { search: "", search_by: "phone" };
+  page = 1;
+  load();
 });
 
 if (kind === "addresses") document.querySelector("#address-new").addEventListener("click", () => {

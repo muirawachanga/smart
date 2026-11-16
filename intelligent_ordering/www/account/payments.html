@@ -14,6 +14,22 @@
   <p id="customer-status" class="smarto-inline-status" role="status" aria-live="polite">Loading payment history...</p>
   <p id="customer-feedback" role="alert"></p>
   <a id="customer-login" class="smarto-button" href="/login?redirect-to=%2Faccount%2Fpayments" hidden>Sign in to view payments</a>
+  <form id="customer-payment-search" class="smarto-catalog-form">
+    <label for="customer-payment-search-by">Search my payments by
+      <select id="customer-payment-search-by" name="search_by">
+        <option value="phone">M-Pesa phone number</option>
+        <option value="receipt">M-Pesa receipt reference</option>
+      </select>
+    </label>
+    <label for="customer-payment-search-value">Phone number or receipt reference
+      <input id="customer-payment-search-value" name="search" maxlength="40" type="text">
+    </label>
+    <button class="smarto-button" type="submit">Search my payments</button>
+    <button id="customer-payment-clear" class="smarto-button smarto-button-secondary" type="button">Clear search</button>
+  </form>
+  <p>Only payments for your own orders are searched. Enter the full payment phone number or receipt reference.
+    A receipt search cannot discover payments that have not yet been recorded here.
+    Searching or refreshing does not query Safaricom or initiate a charge.</p>
   <button id="customer-refresh" class="smarto-button smarto-button-secondary" type="button">Refresh payments</button>
   <div id="customer-list" class="smarto-cart-items"></div>
   <nav id="customer-pagination" class="smarto-pagination" aria-label="Payment pages" hidden>

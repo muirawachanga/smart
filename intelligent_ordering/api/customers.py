@@ -1,3 +1,5 @@
+import re
+
 import frappe
 from frappe.rate_limiter import rate_limit
 from frappe.utils import escape_html, now_datetime, validate_email_address
@@ -9,6 +11,7 @@ from intelligent_ordering.utils.checkout import (
     validate_address, validate_customer_name, validate_phone,
 )
 from intelligent_ordering.utils.validation import validate_pagination
+from intelligent_ordering.utils.mpesa import normalize_phone
 
 
 ADDRESS_FIELDS = [
@@ -179,17 +182,37 @@ def delete_address(address_name):
 
 
 @frappe.whitelist()
-def payment_history(page=1, page_size=20):
+def payment_history(page=1, page_size=20, search="", search_by="phone"):
     profile = _profile()
     page, page_size = _page(page, page_size)
+    if search_by not in ("phone", "receipt"):
+        frappe.throw("Choose phone number or M-Pesa receipt search.", frappe.ValidationError)
+    search = _text(search, "payment search", 40)
+    predicate = ""
+    params = [profile.name if profile else None]
+    if search:
+        if search_by == "phone":
+           try:
+               search = normalize_phone(search)
+           except ValueError as error:
+               frappe.throw(str(error), frappe.ValidationError)
+           predicate = " AND p.phone_number = %s"
+        else:
+           search = search.upper()
+           if not re.fullmatch(r"[A-Z0-9]{10,20}", search):
+               frappe.throw("Enter a valid M-Pesa receipt reference (10-20 letters or digits).",
+                            frappe.ValidationError)
+           predicate = " AND p.mpesa_receipt_number = %s"
+        params.append(search)
+    params.extend([page_size + 1, (page - 1) * page_size])
     rows = frappe.db.sql(
         """SELECT p.name, p.`order`, p.amount, p.payment_method, p.status,
-                  p.mpesa_receipt_number, p.transaction_date, p.creation, o.currency
+                  p.phone_number, p.mpesa_receipt_number, p.transaction_date, p.creation, o.currency
            FROM `tabPayment Transaction` p
            INNER JOIN `tabSales Order` o ON o.name = p.`order`
-           WHERE o.customer = %s
+           WHERE o.customer = %s""" + predicate + """
            ORDER BY p.creation DESC, p.name DESC LIMIT %s OFFSET %s""",
-        (profile.name, page_size + 1, (page - 1) * page_size), as_dict=True,
+        tuple(params), as_dict=True,
     ) if profile else []
     return {"transactions": rows[:page_size], "has_more": len(rows) > page_size, "page": page}
 
