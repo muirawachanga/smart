@@ -1,5 +1,9 @@
+import importlib
+import sys
+import types
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from intelligent_ordering.hooks import (
     app_include_css,
@@ -39,6 +43,33 @@ SHELL_ROUTES = {
 
 
 class TestSmartOWebsiteRoutes(unittest.TestCase):
+    def test_account_and_nested_controllers_import_as_a_guarded_package(self):
+        customer_pages = types.ModuleType("intelligent_ordering.utils.customer_pages")
+        customer_pages.require_customer_page = Mock()
+        auth_pages = types.ModuleType("intelligent_ordering.utils.auth_pages")
+        guarded = Mock(side_effect=lambda function: function)
+        auth_pages.guard_website = guarded
+        prefix = "intelligent_ordering.www.account"
+        with patch.dict(sys.modules, {
+            customer_pages.__name__: customer_pages,
+            auth_pages.__name__: auth_pages,
+        }):
+            for name in list(sys.modules):
+                if name == prefix or name.startswith(prefix + "."):
+                    del sys.modules[name]
+            importlib.invalidate_caches()
+            account = importlib.import_module(prefix)
+            self.assertTrue(hasattr(account, "__path__"))
+            context = types.SimpleNamespace()
+            for suffix in ("", ".profile", ".addresses", ".payments", ".notifications"):
+                with self.subTest(route="/account" + suffix.replace(".", "/")):
+                    controller = importlib.import_module(prefix + suffix)
+                    controller.get_context(context)
+            self.assertEqual(guarded.call_count, 5)
+            self.assertEqual(customer_pages.require_customer_page.call_count, 5)
+            customer_pages.require_customer_page.assert_called_with(context)
+            self.assertTrue((WWW / "account.py").is_file())
+
     def test_role_pages_and_auth_include_script_startup_warning(self):
         routes = [
             "dashboard/admin.html", "dashboard/owner.html", "dashboard/sales.html",

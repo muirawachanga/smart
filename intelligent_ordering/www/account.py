@@ -1,7 +1,2 @@
-from intelligent_ordering.utils.customer_pages import require_customer_page
-from intelligent_ordering.utils.auth_pages import guard_website
-
-
-@guard_website
-def get_context(context):
-    require_customer_page(context)
+# Keep the sibling controller file for Frappe's /account route discovery.
+from intelligent_ordering.www.account import get_context

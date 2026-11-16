@@ -299,6 +299,11 @@ any explicitly configured Frappe role/portal homepage.
 Customer pages are `/account` (orders, payments for an order, and tracking),
 `/account/profile`, `/account/addresses`, `/account/payments`, and
 `/account/notifications`. Signed-in non-customers are denied these pages.
+The `www/account/` directory must retain its `__init__.py`: it makes the
+account controller importable as a package for nested routes. The sibling
+`www/account.py` is retained for Frappe's `/account` controller discovery.
+After deploying a package-layout change, restart web processes and clear the
+site cache so a previously imported controller module is not reused.
 Guest pages show a sign-in action; backend customer methods require a Customer
 session. Customer IDs, roles, payment statuses, and order totals are not accepted
 by the portal's profile/address/cancellation forms.
