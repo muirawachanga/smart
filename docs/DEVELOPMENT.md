@@ -203,7 +203,11 @@ and browser back/forward update the view and refresh its data. This presentation
 filter does not change backend role checks or grant access to either dashboard.
 
 Staff dashboards and the two `/store` management views use a shared vertical
-sidebar. Navigation retains the existing role-filtered destinations; shopping
+sidebar. Navigation includes role-filtered quick access matching the administrator
+dashboard: setup, reports, payments, orders, stock, deliveries, delivery areas,
+products, customers and audit logs. Account, role, permission and system-setting
+shortcuts remain Administrator/System Manager-only. Desk destinations are
+identified explicitly; website pages open their dedicated workspaces. Shopping
 and customer-account pages keep their normal header navigation and a staff
 workspace link when authorized. The sidebar collapses to labeled-by-tooltip
 icons on desktop and opens as a focus-contained drawer on screens up to 850px.

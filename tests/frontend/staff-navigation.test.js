@@ -34,6 +34,10 @@ test("each staff role sees only authorized navigation and its own workspace", as
       "#staff-orders-link", "#payments-link", "#deliveries-link", "#admin-dashboard-link",
       "#inventory-dashboard-link", "#support-dashboard-link",
     ]],
+    ["Business Admin", "/dashboard/admin", [
+      "#staff-orders-link", "#payments-link", "#deliveries-link", "#admin-dashboard-link",
+      "#inventory-dashboard-link", "#support-dashboard-link",
+    ]],
     ["Store Manager", "/dashboard/owner", [
       "#staff-orders-link", "#payments-link", "#deliveries-link", "#admin-dashboard-link",
       "#support-dashboard-link",
@@ -46,6 +50,7 @@ test("each staff role sees only authorized navigation and its own workspace", as
     ["Delivery Manager", "/dashboard/delivery", ["#deliveries-link", "#admin-dashboard-link"]],
     ["Finance Manager", "/dashboard/sales", ["#payments-link", "#admin-dashboard-link"]],
     ["Delivery Staff", "/dashboard/delivery", ["#deliveries-link"]],
+    ["Customer", "/account", []],
   ]) {
     const nodes = new Map();
     const document = {
@@ -54,12 +59,17 @@ test("each staff role sees only authorized navigation and its own workspace", as
         if (!nodes.has(selector)) {
           const link = new Element();
           const paths = {
+            "#smarto-workspace-link": "/account",
+            "#smarto-staff-entry-link": "/account",
             "#staff-orders-link": "/dashboard/orders",
             "#payments-link": "/store#payment-dashboard",
             "#deliveries-link": "/dashboard/delivery",
             "#admin-dashboard-link": "/store#admin-dashboard",
             "#inventory-dashboard-link": "/dashboard/inventory",
             "#support-dashboard-link": "/dashboard/support",
+            "#staff-delivery-areas-link": "/dashboard/delivery-areas",
+            "#staff-products-link": "/dashboard/products",
+            "#staff-accounts-link": "/dashboard/accounts",
           };
           if (paths[selector]) link.href = paths[selector];
           nodes.set(selector, link);
@@ -85,7 +95,7 @@ test("each staff role sees only authorized navigation and its own workspace", as
     assert.equal(nodes.get("#smarto-workspace-link").href, destination);
     assert.equal(nodes.get("#smarto-staff-entry-link").href, destination);
     assert.equal(nodes.get("#smarto-workspace-link").hidden,
-      ["/dashboard/orders", "/dashboard/inventory", "/dashboard/delivery", "/dashboard/support"]
+      ["/account", "/dashboard/orders", "/dashboard/inventory", "/dashboard/delivery", "/dashboard/support"]
         .includes(destination));
     for (const selector of [
       "#staff-orders-link", "#payments-link", "#deliveries-link",
@@ -93,6 +103,20 @@ test("each staff role sees only authorized navigation and its own workspace", as
     ]) {
       assert.equal(nodes.get(selector).hidden, !visible.includes(selector), `${role}: ${selector}`);
     }
+    const admin = ["Administrator", "System Manager"].includes(role);
+    for (const selector of [
+      "#staff-accounts-link", "#staff-users-link", "#staff-roles-link",
+      "#staff-permissions-link", "#staff-settings-link",
+    ]) assert.equal(nodes.get(selector).hidden, !admin, `${role}: ${selector}`);
+    for (const selector of ["#staff-setup-link", "#staff-reports-link"]) {
+      assert.equal(nodes.get(selector).hidden, !(admin || role === "Business Admin"), `${role}: ${selector}`);
+    }
+    assert.equal(nodes.get("#staff-delivery-areas-link").hidden,
+      !["Administrator", "System Manager", "Business Admin", "Store Manager", "Order Manager", "Delivery Manager"]
+        .includes(role), `${role}: delivery areas`);
+    assert.equal(nodes.get("#staff-products-link").hidden,
+      !["Administrator", "System Manager", "Business Admin", "Store Manager", "Order Manager", "Inventory Manager"]
+        .includes(role), `${role}: products`);
     t.mock.restoreAll();
   }
 });

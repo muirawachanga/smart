@@ -34,8 +34,12 @@ export function initStaffSidebar(hasStaffLinks) {
     toggle.hidden = !active;
     setOpen(false);
     const links = [...navigation.querySelectorAll("a")];
-    const target = `${path}${path === "/store" ? window.location.hash : ""}`;
-    const current = links.find((link) => !link.hidden && link.getAttribute("href") === target);
+    const target = `${path}${window.location.hash || ""}`;
+    const current = links.find((link) => !link.hidden && link.getAttribute("href") === target)
+      || (path !== "/store" && links.find((link) => !link.hidden
+        && link.getAttribute("href") === path))
+      || (path !== "/store" && links.find((link) => !link.hidden
+        && link.getAttribute("href")?.split("#")[0] === path));
     for (const link of links) {
       if (link === current) link.setAttribute("aria-current", "page");
       else link.removeAttribute("aria-current");

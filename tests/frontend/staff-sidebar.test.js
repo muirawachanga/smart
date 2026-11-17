@@ -77,6 +77,27 @@ test("desktop sidebar collapses and highlights the current authorized workspace"
   assert.equal(node("#smarto-sidebar-collapse").getAttribute("aria-expanded"), "true");
 });
 
+test("dashboard section shortcuts highlight exactly and unknown sections retain the workspace highlight", (t) => {
+  const { links, node, window, events } = install(t, "/dashboard/admin", "#workspace-reports-heading");
+  const reports = node("reports");
+  reports.setAttribute("href", "/dashboard/admin#workspace-reports-heading");
+  links.push(reports);
+  initStaffSidebar(true);
+  assert.equal(reports.getAttribute("aria-current"), "page");
+  assert.equal(links[0].getAttribute("aria-current"), null);
+  window.location.hash = "#other-section";
+  events.hashchange();
+  assert.equal(reports.getAttribute("aria-current"), null);
+  assert.equal(links[0].getAttribute("aria-current"), "page");
+});
+
+test("payments shortcut stays highlighted on its dedicated workspace without a hash", (t) => {
+  const { links } = install(t, "/dashboard/sales");
+  links[2].setAttribute("href", "/dashboard/sales#payment-dashboard");
+  initStaffSidebar(true);
+  assert.equal(links[2].getAttribute("aria-current"), "page");
+});
+
 test("mobile drawer contains focus and closes through Escape, backdrop and close button", (t) => {
   const { node, events, document, brand, links } = install(t, "/dashboard/orders", "", true);
   initStaffSidebar(true);

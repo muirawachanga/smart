@@ -108,6 +108,17 @@ function setupAccountNavigation(user) {
 
   const staffNavigation = document.querySelector("#smarto-staff-navigation");
   const staffControls = [
+    ["#staff-setup-link", ["System Manager", "Business Admin"]],
+    ["#staff-reports-link", ["System Manager", "Business Admin"]],
+    ["#staff-delivery-areas-link", ["System Manager", "Business Admin", "Store Manager", "Order Manager", "Delivery Manager"]],
+    ["#staff-products-link", ["System Manager", "Business Admin", "Store Manager", "Order Manager", "Inventory Manager"]],
+    ["#staff-customers-link", ["System Manager", "Business Admin", "Store Manager", "Customer Support"]],
+    ["#staff-accounts-link", ["System Manager"]],
+    ["#staff-users-link", ["System Manager"]],
+    ["#staff-roles-link", ["System Manager"]],
+    ["#staff-permissions-link", ["System Manager"]],
+    ["#staff-settings-link", ["System Manager"]],
+    ["#staff-audit-link", ["System Manager", "Business Admin", "Store Manager"]],
     ["#staff-orders-link", ["System Manager", "Business Admin", "Store Manager", "Order Manager"]],
     ["#payments-link", ["System Manager", "Business Admin", "Store Manager", "Order Manager", "Finance Manager"]],
     ["#deliveries-link", ["System Manager", "Business Admin", "Store Manager", "Order Manager", "Delivery Manager", "Delivery Staff"]],

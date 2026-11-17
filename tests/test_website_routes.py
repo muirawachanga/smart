@@ -46,6 +46,23 @@ SHELL_ROUTES = {
 
 
 class TestSmartOWebsiteRoutes(unittest.TestCase):
+    def test_sidebar_matches_administrator_quick_access_destinations(self):
+        import re
+
+        shortcuts = (WWW / "dashboard/admin.html").read_text().split(
+            'aria-label="Administration shortcuts">', 1,
+        )[1].split("</nav>", 1)[0]
+        sidebar = (APP_ROOT / "templates/includes/staff_sidebar.html").read_text()
+        for href in re.findall(r'href="([^"]+)"', shortcuts):
+            target = "/dashboard/admin" + href if href.startswith("#") else href
+            with self.subTest(target=target):
+                if target == "/dashboard/sales#payment-dashboard":
+                    self.assertIn(target, (APP_ROOT / "public/js/site.js").read_text())
+                elif target == "/dashboard/admin":
+                    self.assertIn(target, (APP_ROOT / "public/js/site.js").read_text())
+                else:
+                    self.assertIn(f'href="{target}"', sidebar)
+
     def test_delivery_area_shortcuts_open_the_dedicated_workspace(self):
         for template in ("admin.html", "setup.html"):
             source = (WWW / "dashboard" / template).read_text()
