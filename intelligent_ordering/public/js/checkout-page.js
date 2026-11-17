@@ -27,6 +27,7 @@ let uncertain = false;
 const cashOnDelivery = form.querySelector('input[name="payment_method"][value="Cash on Delivery"]');
 
 function syncPaymentOptions(currency) {
+  if (!cashOnDelivery) return;
   const unavailable = currency !== "KES";
   cashOnDelivery.disabled = unavailable;
   cashOnDelivery.closest("label").hidden = unavailable;

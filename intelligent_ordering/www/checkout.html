@@ -19,9 +19,9 @@
   <nav class="smarto-checkout-steps" aria-label="Checkout progress">
     <a href="/cart"><span>1</span> Cart</a>
     <span aria-hidden="true">—</span>
-    <span aria-current="step"><span>2</span> Delivery</span>
+    <span aria-current="step"><span>2</span> Delivery and payment method</span>
     <span aria-hidden="true">—</span>
-    <span><span>3</span> M-Pesa payment</span>
+    <span><span>3</span> Order confirmation</span>
   </nav>
   <p id="checkout-status" class="smarto-inline-status" role="status" aria-live="polite">Loading checkout...</p>
   <p id="checkout-feedback" role="alert"></p>
@@ -69,6 +69,17 @@
           <input name="postal_code" maxlength="40" autocomplete="postal-code">
         </label>
       </fieldset>
+      <fieldset>
+        <legend>Payment method</legend>
+        <label>
+          <input type="radio" name="payment_method" value="M-Pesa" checked required>
+          M-Pesa - pay securely before dispatch
+        </label>
+        <label>
+          <input type="radio" name="payment_method" value="Cash on Delivery" required>
+          Cash on Delivery - pay the rider at handover; finance confirms collection
+        </label>
+      </fieldset>
       <button id="checkout-submit" class="smarto-button" type="submit" disabled>Place order</button>
     </form>
     <aside class="smarto-checkout-summary" aria-labelledby="checkout-summary-heading">
@@ -79,7 +90,7 @@
         <p>Delivery <strong id="checkout-delivery-fee">Select a delivery area</strong></p>
         <p class="smarto-total-row">Total <strong id="checkout-total">Select a delivery area</strong></p>
       </div>
-      <p class="smarto-summary-note">After your order is placed, you will be prompted to pay securely with M-Pesa.</p>
+      <p class="smarto-summary-note">Choose M-Pesa or Cash on Delivery. Cash on Delivery is available for KES orders and is due to the rider at handover.</p>
       <p><a href="/refund-policy">Refund Policy</a> &middot; <a href="/delivery-policy">Delivery Policy</a></p>
     </aside>
   </div>
