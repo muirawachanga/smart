@@ -58,12 +58,12 @@ def _owned_order(name):
 
 @contextmanager
 def _processing():
-    previous = getattr(frappe.flags, "processing_mpesa", False)
-    frappe.flags.processing_mpesa = True
+    previous = getattr(frappe.flags, "processing_payment", False)
+    frappe.flags.processing_payment = True
     try:
         yield
     finally:
-        frappe.flags.processing_mpesa = previous
+        frappe.flags.processing_payment = previous
 
 
 def _save(doc):
@@ -72,6 +72,22 @@ def _save(doc):
             doc.insert(ignore_permissions=True)
         else:
             doc.save(ignore_permissions=True)
+
+
+def create_cod_transaction(order):
+    """Create the outstanding COD payment record during trusted checkout."""
+    payment = frappe.get_doc({
+        "doctype": "Payment Transaction",
+        "order": order.name,
+        "customer": order.customer,
+        "phone_number": order.customer_phone_snapshot,
+        "amount": order.total,
+        "payment_method": "Cash on Delivery",
+        "environment": "Not Applicable",
+        "status": "Pending",
+    })
+    _save(payment)
+    return payment
 
 
 def _lock_order(name):
@@ -127,6 +143,8 @@ def initiate_payment(order_name, phone):
         frappe.throw(str(error), frappe.ValidationError)
     if order.currency != "KES" or order.status in {"Cancelled", "Completed"}:
         frappe.throw("This order is not eligible for M-Pesa payment.", frappe.ValidationError)
+    if order.get("payment_method") != "M-Pesa":
+        frappe.throw("This order uses Cash on Delivery.", frappe.ValidationError)
     if order.payment_status == "Paid":
         frappe.throw("This order is already paid.", frappe.ValidationError)
     active = _active_payment(order.name)
@@ -253,6 +271,8 @@ def _validate_callback(payment, parsed):
 
 
 def _reconcile(payment):
+    if payment.payment_method != "M-Pesa":
+        frappe.throw("Only M-Pesa transactions can be reconciled with Safaricom.", frappe.ValidationError)
     if payment.status in {"Successful", "Failed", "Cancelled", "Reversed"}:
         return
     if not payment.checkout_request_id:
@@ -337,6 +357,60 @@ def reconcile_payment(payment_name):
     return _public(payment)
 
 
+@frappe.whitelist(methods=["POST"])
+def confirm_cod_payment(payment_name):
+    """Finance confirms rider-reported COD collection; riders cannot settle payments."""
+    _staff()
+    if not _can_reconcile():
+        frappe.throw("Finance reconciliation access is required.", frappe.PermissionError)
+    payment = _locked_payment(payment_name)
+    if payment.payment_method != "Cash on Delivery":
+        frappe.throw("This is not a Cash on Delivery transaction.", frappe.ValidationError)
+    if payment.status != "Pending":
+        frappe.throw("Only an outstanding COD transaction can be confirmed.", frappe.ValidationError)
+    order = frappe.get_doc("Sales Order", payment.order, for_update=True)
+    if order.status in {"Cancelled", "Completed"} or order.payment_status == "Paid":
+        frappe.throw("This order is not eligible for COD payment confirmation.", frappe.ValidationError)
+
+    delivery_name = frappe.db.get_value("Delivery", {"order": order.name}, "name")
+    if not delivery_name:
+        frappe.throw("The delivery has not been completed.", frappe.ValidationError)
+    frappe.db.sql(
+        "SELECT name FROM `tabDelivery` WHERE name = %s FOR UPDATE", delivery_name
+    )
+    delivery = frappe.get_doc("Delivery", delivery_name)
+    if (
+        delivery.status != "Delivered"
+        or not delivery.cash_collected
+        or delivery.cash_collected_amount != payment.amount
+        or payment.amount != order.total
+        or not delivery.cash_collected_at
+        or not delivery.cash_collected_by
+    ):
+        frappe.throw("The rider has not recorded matching cash collection for this delivery.", frappe.ValidationError)
+
+    payment.status = "Successful"
+    payment.transaction_date = delivery.cash_collected_at
+    payment.failure_description = ""
+    _save(payment)
+    order.db_set("payment_status", "Paid", update_modified=True)
+    order.reload()
+    was_processing_delivery = getattr(frappe.flags, "processing_delivery", False)
+    frappe.flags.processing_delivery = True
+    try:
+        order.status = "Completed"
+        order.save(ignore_permissions=True)
+    finally:
+        frappe.flags.processing_delivery = was_processing_delivery
+    record_admin_event(
+        "Cash on delivery payment confirmed",
+        "Payment Transaction",
+        payment.name,
+        f"Order {order.name}; {payment.amount} {order.currency}; collected by {delivery.cash_collected_by}.",
+    )
+    return _public(payment)
+
+
 def _can_reconcile():
     return frappe.session.user == "Administrator" or bool(
         RECONCILIATION_ROLES.intersection(frappe.get_roles(frappe.session.user))
@@ -383,11 +457,28 @@ def get_transaction(payment_name):
     _identifier(payment_name)
     payment = frappe.get_doc("Payment Transaction", payment_name)
     payment.check_permission("read")
+    delivery = frappe.db.get_value(
+        "Delivery", {"order": payment.order},
+        ["status", "cash_collected", "cash_collected_amount", "cash_collected_at", "cash_collected_by"],
+        as_dict=True,
+    )
     return {
         **_public(payment), "checkout_request_id": payment.checkout_request_id,
         "merchant_request_id": payment.merchant_request_id,
         "callback_response": payment.callback_response, "query_response": payment.query_response,
-        "can_reconcile": _can_reconcile(),
+        "can_reconcile": payment.payment_method == "M-Pesa" and _can_reconcile(),
+        "cash_collection": delivery,
+        "can_confirm_cod": bool(
+            payment.payment_method == "Cash on Delivery"
+            and payment.status == "Pending"
+            and _can_reconcile()
+            and delivery
+            and delivery.status == "Delivered"
+            and delivery.cash_collected
+            and delivery.cash_collected_amount == payment.amount
+            and delivery.cash_collected_at
+            and delivery.cash_collected_by
+        ),
         "order_summary": frappe.db.get_value(
             "Sales Order", payment.order,
             ["name", "status", "payment_status", "currency", "total", "order_datetime"],

@@ -24,6 +24,14 @@ let quote = null;
 let quoteRequest = 0;
 let submitting = false;
 let uncertain = false;
+const cashOnDelivery = form.querySelector('input[name="payment_method"][value="Cash on Delivery"]');
+
+function syncPaymentOptions(currency) {
+  const unavailable = currency !== "KES";
+  cashOnDelivery.disabled = unavailable;
+  cashOnDelivery.closest("label").hidden = unavailable;
+  if (unavailable) form.elements.payment_method.value = "M-Pesa";
+}
 
 function goToOrder(orderName) {
   try {
@@ -75,6 +83,7 @@ async function initialize() {
       feedback.textContent = `${cart.removed_products.length} unavailable item(s) were removed from your cart.`;
     }
     revision = checkout.cart_revision;
+    syncPaymentOptions(checkout.cart.currency);
     form.elements.customer_name.value = checkout.customer_name || "";
     form.elements.phone.value = checkout.phone || "";
     const addresses = checkout.saved_addresses || [];
@@ -135,6 +144,7 @@ async function refreshQuote() {
     if (request !== quoteRequest) return;
     if (checkout.requires_login) throw new Error("Sign in again before checking out.");
     revision = checkout.cart_revision;
+    syncPaymentOptions(checkout.cart.currency);
     quote = checkout.delivery_quote;
     showCart(checkout);
     deliveryFee.textContent = formatPrice(checkout.delivery_fee, checkout.currency);

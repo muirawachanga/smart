@@ -261,7 +261,7 @@ password-strength, and password-reset contracts. Verify compatibility with the
 installed Frappe release before deploying to production.
 
 In Desk, System Manager or Business Admin can open **SmartO Policy Version**.
-Migration adds four **unpublished** drafts with version `smarto-operations-1`,
+Migration adds four **unpublished** drafts with version `smarto-operations-2`,
 even when a site already has older policy versions. Existing records are not
 changed. Review each draft against your business's legal identity and contacts,
 applicable law, provider and data-retention practices, and actual delivery and
@@ -1157,6 +1157,7 @@ Payment endpoints use the prefix
 | GET | `get_transaction(payment_name)` | Payment staff |
 | GET | `payment_summary` | Payment staff, grouped by environment/status |
 | POST | `reconcile_payment(payment_name)` | Payment staff, authenticated STK status query |
+| POST | `confirm_cod_payment(payment_name)` | Finance reconciliation roles, after rider-recorded cash collection |
 | POST | `expire_unpaid_order(order_name)` | Staff-only configured expiry/cancellation |
 
 Payment staff are Business Admin, Store Manager, Order Manager, Finance
@@ -1168,9 +1169,15 @@ there is no separate detail panel to scroll down to. Loading and detail-request
 errors are shown inline, and refreshing the list retains the selected card's
 details while that payment remains in the results. They can
 inspect raw callback/query records but cannot edit statuses through generic
-DocType writes. Receipt and checkout IDs are unique. There is no browser
-"confirm payment" API and no PIN collection. Reversed is reserved in the schema;
-this module does not initiate reversals or manufacture reversal confirmations.
+DocType writes. Receipt and checkout IDs are unique. M-Pesa cannot be manually
+marked paid and the app never collects a PIN. Cash on Delivery (KES only) creates
+an outstanding transaction at checkout. The assigned rider records collection
+at handover as delivery evidence but cannot change payment status. Finance
+Manager, Business Admin, or System Manager can confirm only a delivered COD
+order with matching rider, amount, and collection timestamp; this records the
+payment audit event and completes the order. Pending COD amounts are outstanding,
+not revenue. Reversed is reserved in the schema; this module does not initiate
+reversals or manufacture reversal confirmations.
 
 Only positive whole KES order totals up to KES 250,000 are accepted; fractional
 totals are rejected, never rounded into a different charge. The customer may
@@ -1192,8 +1199,11 @@ staff must resolve it with the customer outside this module.
 
 Successful payment marks only `payment_status = Paid`. Staff still confirm
 orders and inventory still reserves on confirmation and dispatches at Ready
-for Delivery. Unpaid orders cannot be completed. Failed attempts do not change
-the order or automatically release reservations. Cancellation remains a staff
+for Delivery. For COD, the rider can dispatch and deliver while the order remains
+unpaid only after recording cash collection and private proof of delivery.
+Finance confirmation then marks it paid and completes the order. Other unpaid
+orders cannot be dispatched or completed. Failed attempts do not change the
+order or automatically release reservations. Cancellation remains a staff
 action through existing order status rules. Expiry is disabled (`0`) by
 default; an administrator may set a positive integer `payment_expiry_minutes`,
 after which staff can explicitly call `expire_unpaid_order` for an unpaid,

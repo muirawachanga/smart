@@ -141,6 +141,29 @@ class TestCheckoutPageEndpoints(unittest.TestCase):
             )
         self.frappe.get_doc.assert_not_called()
 
+    def test_order_rejects_unsupported_payment_method(self):
+        self.frappe.db.get_value.return_value = None
+        with self.assertRaisesRegex(AccessError, "supported payment method"):
+            self.checkout.create_order(
+                customer_name="Customer", phone="+254700000000",
+                address_line_1="1 Main Road", city="Nairobi", request_token=str(uuid4()),
+                cart_revision="0" * 64, payment_method="Manual Paid",
+            )
+        self.checkout.get_cart.assert_not_called()
+        self.frappe.get_doc.assert_not_called()
+
+    def test_cod_is_rejected_for_non_kes_carts(self):
+        self.frappe.db.get_value.return_value = None
+        self.checkout.get_cart.return_value = {"items": [{"product": "SKU-1"}], "currency": "USD"}
+        with self.assertRaisesRegex(AccessError, "KES orders only"):
+            self.checkout.create_order(
+                customer_name="Customer", phone="+254700000000",
+                address_line_1="1 Main Road", city="Nairobi", request_token=str(uuid4()),
+                cart_revision="0" * 64, payment_method="Cash on Delivery",
+            )
+        self.checkout.validate_checkout_stock.assert_not_called()
+        self.frappe.get_doc.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

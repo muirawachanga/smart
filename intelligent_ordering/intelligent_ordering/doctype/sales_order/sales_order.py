@@ -80,6 +80,9 @@ class SalesOrder(Document):
             )
         self.status = "Pending"
         self.payment_status = "Unpaid"
+        self.payment_method = self.payment_method or "M-Pesa"
+        if self.payment_method not in {"M-Pesa", "Cash on Delivery"}:
+            frappe.throw("Select a supported payment method.", frappe.ValidationError)
         self.order_datetime = now_datetime()
         self.checkout_token = self.checkout_token or str(uuid4())
 
@@ -202,6 +205,7 @@ class SalesOrder(Document):
             "delivery_address_snapshot",
             "delivery_area",
             "delivery_fee",
+            "payment_method",
             "order_datetime",
             "checkout_token",
             "payment_status",

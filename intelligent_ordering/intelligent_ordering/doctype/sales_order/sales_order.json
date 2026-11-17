@@ -5,7 +5,7 @@
   "autoname": "naming_series:",
   "naming_rule": "By \"Naming Series\" field",
   "engine": "InnoDB",
-  "field_order": ["naming_series", "order_datetime", "customer", "customer_name_snapshot", "customer_phone_snapshot", "delivery_address", "delivery_address_snapshot", "delivery_area", "delivery_fee", "status", "payment_status", "currency", "subtotal", "items", "total", "checkout_token", "cancellation_request_status", "cancellation_reason", "cancellation_requested_at", "cancellation_resolved_at", "cancellation_resolved_by", "cancellation_response"],
+  "field_order": ["naming_series", "order_datetime", "customer", "customer_name_snapshot", "customer_phone_snapshot", "delivery_address", "delivery_address_snapshot", "delivery_area", "delivery_fee", "status", "payment_method", "payment_status", "currency", "subtotal", "items", "total", "checkout_token", "cancellation_request_status", "cancellation_reason", "cancellation_requested_at", "cancellation_resolved_at", "cancellation_resolved_by", "cancellation_response"],
   "fields": [
     {"default": "SO-.YYYY.-.#####", "fieldname": "naming_series", "fieldtype": "Select", "label": "Naming Series", "options": "SO-.YYYY.-.#####", "reqd": 1},
     {"fieldname": "order_datetime", "fieldtype": "Datetime", "label": "Order Date and Time", "read_only": 1, "in_list_view": 1},
@@ -17,6 +17,7 @@
     {"fieldname": "delivery_area", "fieldtype": "Link", "label": "Delivery Area", "options": "Delivery Area", "read_only": 1},
     {"fieldname": "delivery_fee", "fieldtype": "Currency", "label": "Delivery Fee", "options": "currency", "default": "0", "read_only": 1},
     {"default": "Pending", "fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Pending\nConfirmed\nProcessing\nReady for Delivery\nCompleted\nCancelled", "reqd": 1, "in_list_view": 1},
+    {"default": "M-Pesa", "fieldname": "payment_method", "fieldtype": "Select", "label": "Payment Method", "options": "M-Pesa\nCash on Delivery", "reqd": 1, "read_only": 1},
     {"default": "Unpaid", "fieldname": "payment_status", "fieldtype": "Select", "label": "Payment Status", "options": "Unpaid\nPending\nPaid\nFailed\nRefunded", "reqd": 1, "read_only": 1},
     {"default": "KES", "fieldname": "currency", "fieldtype": "Data", "label": "Currency", "reqd": 1, "read_only": 1},
     {"fieldname": "subtotal", "fieldtype": "Currency", "label": "Subtotal", "options": "currency", "reqd": 1, "default": "0", "read_only": 1},

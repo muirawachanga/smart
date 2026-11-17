@@ -26,6 +26,10 @@ export function mountOrderPayment(container, order) {
   if (order.payment_status === "Paid" || ["Cancelled", "Completed"].includes(order.status)) {
     return (current) => { paymentStatus.textContent = `Payment: ${current.payment_status}`; };
   }
+  if (order.payment_method === "Cash on Delivery") {
+    container.append(text("p", "Cash on Delivery selected. Pay the rider at handover. Finance will confirm payment after the rider records collection."));
+    return (current) => { paymentStatus.textContent = `Payment: ${current.payment_status}`; };
+  }
   const form = document.createElement("form");
   form.className = "status-update-form";
   const label = text("label", "M-Pesa mobile number");
@@ -156,7 +160,7 @@ export function initPaymentDashboard() {
         card.append(
           heading,
           text("p", `Payment reference: ${transaction.name}`),
-          text("p", `${formatCurrency(transaction.amount)} · ${transaction.phone_number || "No phone number"}`),
+          text("p", `${formatCurrency(transaction.amount)} · ${transaction.payment_method || "M-Pesa"}`),
           text("p", `Receipt: ${transaction.mpesa_receipt_number || "Not received"} · ` +
             `${transaction.transaction_date || "No transaction date"}`),
         );
@@ -206,11 +210,19 @@ export function initPaymentDashboard() {
         heading,
         text("p", `Payment reference: ${transaction.name}`),
         text("p", `Amount: ${formatCurrency(transaction.amount)}`),
-        text("p", `Method: ${transaction.payment_method || "M-Pesa"} · Phone: ${transaction.phone_number || "Not recorded"}`),
+        text("p", transaction.payment_method === "Cash on Delivery"
+          ? "Method: Cash on Delivery"
+          : `Method: ${transaction.payment_method || "M-Pesa"} · Phone: ${transaction.phone_number || "Not recorded"}`),
         text("p", `Receipt: ${transaction.mpesa_receipt_number || "Not received"} · ` +
           `Transaction date: ${transaction.transaction_date || "Not recorded"}`),
         text("p", `Created: ${transaction.creation || "Not recorded"}`),
       );
+      if (transaction.payment_method === "Cash on Delivery" && transaction.cash_collection) {
+        const collection = transaction.cash_collection;
+        output.append(text("p",
+          `Rider cash collection: ${collection.cash_collected ? `${formatCurrency(collection.cash_collected_amount)} recorded` : "Not recorded"}` +
+          (collection.cash_collected_at ? ` · ${collection.cash_collected_at} by ${collection.cash_collected_by}` : "")));
+      }
       if (transaction.order_summary) {
         const order = transaction.order_summary;
         output.append(text("h4", "Associated order"),
@@ -234,23 +246,45 @@ export function initPaymentDashboard() {
         );
         output.append(diagnostics);
       }
-      const reconcile = text("button", "Check with Safaricom");
-      reconcile.className = "smarto-button";
-      reconcile.type = "button";
-      reconcile.addEventListener("click", async () => {
-        if (reconcile.disabled) return;
-        reconcile.disabled = true;
-        try {
-          await post("payments.reconcile_payment", { payment_name: name });
-          await showDetail(name);
-          await load();
-        } catch (error) {
-          feedback.textContent = error.message;
-          reconcile.disabled = false;
-        }
-      });
       detail.replaceChildren(output);
-      if (transaction.can_reconcile) detail.prepend(reconcile);
+      if (transaction.can_reconcile) {
+        const reconcile = text("button", "Check with Safaricom");
+        reconcile.className = "smarto-button";
+        reconcile.type = "button";
+        reconcile.addEventListener("click", async () => {
+          if (reconcile.disabled) return;
+          reconcile.disabled = true;
+          try {
+            await post("payments.reconcile_payment", { payment_name: name });
+            await showDetail(name);
+            await load();
+          } catch (error) {
+            feedback.textContent = error.message;
+            reconcile.disabled = false;
+          }
+        });
+        detail.prepend(reconcile);
+      }
+      if (transaction.can_confirm_cod) {
+        const confirm = text("button", "Confirm cash received");
+        confirm.className = "smarto-button";
+        confirm.type = "button";
+        confirm.addEventListener("click", async () => {
+          if (!window.confirm(
+            `Confirm ${formatCurrency(transaction.amount)} cash for ${transaction.order}? This records payment and completes the order.`,
+          )) return;
+          confirm.disabled = true;
+          try {
+            await post("payments.confirm_cod_payment", { payment_name: name });
+            await showDetail(name);
+            await load();
+          } catch (error) {
+            feedback.textContent = error.message;
+            confirm.disabled = false;
+          }
+        });
+        detail.prepend(confirm);
+      }
     } catch (error) {
       if (request !== detailRequest) return;
       const message = text("p", error.message);

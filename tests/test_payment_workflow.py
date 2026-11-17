@@ -49,13 +49,16 @@ class TestPaymentWorkflow(unittest.TestCase):
         self.payment = Mock(
             name="PAY-1", order="SO-1", customer="customer",
             phone_number="254712345678", amount=250, environment="Sandbox",
+            payment_method="M-Pesa",
             status="Pending", checkout_request_id="checkout-1",
             merchant_request_id="merchant-1", callback_response=json.dumps(success_callback()),
         )
         self.payment.get.side_effect = lambda field: getattr(self.payment, field, None)
         self.payment.name = "PAY-1"
-        self.order = Mock(total=250, currency="KES", payment_status="Unpaid", status="Pending")
+        self.order = Mock(total=250, currency="KES", payment_status="Unpaid", status="Pending",
+                          payment_method="M-Pesa")
         self.order.name = "SO-1"
+        self.order.get.side_effect = lambda field: getattr(self.order, field, None)
         self.frappe.get_doc.return_value = self.order
         self.client = Mock()
         self.client.config = CONFIG
@@ -92,10 +95,12 @@ class TestPaymentWorkflow(unittest.TestCase):
             CREATE TABLE `tabPayment Transaction` (`order` TEXT, status TEXT, amount NUMERIC, transaction_date TEXT, payment_method TEXT);
             INSERT INTO `tabSales Order` VALUES
                 ('PAID', 'Completed', 'KES', 100), ('OPEN', 'Pending', 'KES', 80),
-                ('CANCELLED', 'Cancelled', 'KES', 200), ('FOREIGN', 'Pending', 'USD', 10);
+                ('COD', 'Ready for Delivery', 'KES', 30), ('CANCELLED', 'Cancelled', 'KES', 200),
+                ('FOREIGN', 'Pending', 'USD', 10);
             INSERT INTO `tabPayment Transaction` VALUES
                 ('PAID', 'Successful', 100, '2026-11-15', 'M-Pesa'),
                 ('OPEN', 'Pending', 80, '2026-11-15', 'M-Pesa'),
+                ('COD', 'Pending', 30, NULL, 'Cash on Delivery'),
                 ('OPEN', 'Failed', 80, '2026-11-15', 'M-Pesa'),
                 ('OPEN', 'Reversed', 25, '2026-11-15', 'M-Pesa'),
                 ('CANCELLED', 'Successful', 20, '2026-10-01', 'M-Pesa'),
@@ -107,15 +112,19 @@ class TestPaymentWorkflow(unittest.TestCase):
         result = self.service.finance_overview()
         totals = {row["currency"]: row for row in result["payments"]}
         self.assertEqual(totals["KES"], {
-            "currency": "KES", "collected": 120, "pending": 80, "failed": 80, "reversed": 25,
+            "currency": "KES", "collected": 120, "pending": 110, "failed": 80, "reversed": 25,
             "daily_revenue": 100, "weekly_revenue": 100, "monthly_revenue": 100,
         })
         self.assertEqual(totals["USD"]["collected"], 3)
         self.assertEqual({row["currency"]: row["outstanding"] for row in result["outstanding"]},
-                         {"KES": 80, "USD": 7})
+                         {"KES": 110, "USD": 7})
         self.assertIn({
             "payment_method": "M-Pesa", "status": "Successful",
             "currency": "KES", "transactions": 2, "amount": 120,
+        }, result["methods"])
+        self.assertIn({
+            "payment_method": "Cash on Delivery", "status": "Pending",
+            "currency": "KES", "transactions": 1, "amount": 30,
         }, result["methods"])
 
     def test_finance_overview_rejects_unrelated_roles_before_querying_records(self):
@@ -145,6 +154,26 @@ class TestPaymentWorkflow(unittest.TestCase):
         self.order.db_set.assert_called_once_with("payment_status", "Paid", update_modified=True)
         self.order.save.assert_not_called()
         self.assertEqual(self.order.status, "Pending")
+
+    def test_cod_checkout_creates_an_outstanding_non_mpesa_transaction(self):
+        created = Mock()
+        self.frappe.get_doc.return_value = created
+        result = self.service.create_cod_transaction(self.order)
+        payload = self.frappe.get_doc.call_args.args[0]
+        self.assertEqual(payload["payment_method"], "Cash on Delivery")
+        self.assertEqual(payload["environment"], "Not Applicable")
+        self.assertEqual(payload["status"], "Pending")
+        self.assertEqual(payload["amount"], self.order.total)
+        self.save.assert_called_once_with(created)
+        self.assertIs(result, created)
+
+    def test_cod_orders_cannot_start_an_mpesa_attempt(self):
+        self.order.payment_method = "Cash on Delivery"
+        with patch.object(self.service, "_owned_order", return_value=self.order):
+            with self.assertRaisesRegex(PaymentError, "uses Cash on Delivery"):
+                self.service.initiate_payment("SO-1", "0712345678")
+        self.client.initiate.assert_not_called()
+        self.save.assert_not_called()
 
     def test_query_success_without_callback_does_not_mark_paid(self):
         self.payment.callback_response = ""
@@ -193,6 +222,56 @@ class TestPaymentWorkflow(unittest.TestCase):
         self.service._reconcile(self.payment)
         self.order.db_set.assert_called_once()
         self.client.query.assert_called_once()
+
+    def test_cod_confirmation_requires_finance_and_rider_collection(self):
+        payment = Mock(
+            name="PAY-COD", order="SO-1", amount=250, payment_method="Cash on Delivery",
+            status="Pending", get=lambda field: getattr(payment, field, None),
+        )
+        delivery = Mock(
+            name="DEL-1", status="Delivered", cash_collected=1,
+            cash_collected_amount=250, cash_collected_at=datetime.now(),
+            cash_collected_by="driver@example.test",
+        )
+        self.order.status = "Ready for Delivery"
+        self.frappe.get_doc.side_effect = lambda doctype, *args, **kwargs: (
+            self.order if doctype == "Sales Order" else delivery
+        )
+        self.frappe.db.get_value.return_value = "DEL-1"
+        self.frappe.session.user = "finance@example.test"
+        self.frappe.get_roles.return_value = ["Finance Manager"]
+        with patch.object(self.service, "_locked_payment", return_value=payment), \
+             patch.object(self.service, "record_admin_event") as audit:
+            result = self.service.confirm_cod_payment("PAY-COD")
+        self.assertEqual(result["status"], "Successful")
+        self.assertEqual(payment.transaction_date, delivery.cash_collected_at)
+        self.order.db_set.assert_called_once_with("payment_status", "Paid", update_modified=True)
+        self.order.save.assert_called_once_with(ignore_permissions=True)
+        self.assertEqual(self.order.status, "Completed")
+        self.save.assert_called_once_with(payment)
+        audit.assert_called_once()
+
+    def test_cod_confirmation_rejects_unverified_cash_collection(self):
+        payment = Mock(
+            name="PAY-COD", order="SO-1", amount=250, payment_method="Cash on Delivery",
+            status="Pending",
+        )
+        delivery = Mock(
+            name="DEL-1", status="Delivered", cash_collected=0,
+            cash_collected_amount=0, cash_collected_at=None, cash_collected_by=None,
+        )
+        self.order.status = "Ready for Delivery"
+        self.frappe.get_doc.side_effect = lambda doctype, *args, **kwargs: (
+            self.order if doctype == "Sales Order" else delivery
+        )
+        self.frappe.db.get_value.return_value = "DEL-1"
+        self.frappe.session.user = "finance@example.test"
+        self.frappe.get_roles.return_value = ["Finance Manager"]
+        with patch.object(self.service, "_locked_payment", return_value=payment):
+            with self.assertRaisesRegex(PaymentError, "matching cash collection"):
+                self.service.confirm_cod_payment("PAY-COD")
+        self.save.assert_not_called()
+        self.order.db_set.assert_not_called()
 
     def test_conflicting_callback_and_query_remain_unresolved(self):
         payload = success_callback()

@@ -2,6 +2,7 @@ import unittest
 
 from intelligent_ordering.utils.checkout import (
     checkout_cart_revision,
+    validate_payment_method,
     validate_address,
     validate_customer_name,
     validate_order_status_transition,
@@ -43,6 +44,13 @@ class TestCheckoutValidation(unittest.TestCase):
         self.assertEqual(validate_request_token(token), token)
         with self.assertRaises(ValueError):
             validate_request_token("not-a-token")
+
+    def test_payment_method_accepts_only_supported_choices(self):
+        self.assertEqual(validate_payment_method("M-Pesa"), "M-Pesa")
+        self.assertEqual(validate_payment_method("Cash on Delivery"), "Cash on Delivery")
+        for value in ("", "cash", "Paid", None):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                validate_payment_method(value)
 
     def test_order_status_transitions_are_sequential_and_terminal(self):
         self.assertEqual(

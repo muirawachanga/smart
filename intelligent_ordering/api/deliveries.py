@@ -30,6 +30,7 @@ DELIVERY_FIELDS = [
     "name", "order", "customer_name", "customer_phone", "delivery_address",
     "delivery_area", "assigned_delivery_person", "currency", "delivery_fee",
     "scheduled_delivery_date", "dispatch_date", "completion_date", "completed_by",
+    "cash_collected", "cash_collected_amount", "cash_collected_at", "cash_collected_by",
     "status", "delivery_notes", "location_set", "latitude", "longitude",
 ]
 MANAGE_DELIVERY_AREA_ROLES = {"System Manager", "Business Admin", "Store Manager", "Order Manager"}
@@ -100,9 +101,10 @@ def _serialize(delivery, detail=False):
     data = {field: delivery.get(field) for field in DELIVERY_FIELDS}
     if detail:
         order = frappe.db.get_value(
-            "Sales Order", delivery.order, ["payment_status"], as_dict=True
+            "Sales Order", delivery.order, ["payment_status", "payment_method"], as_dict=True
         )
         data["payment_status"] = order.payment_status if order else None
+        data["payment_method"] = order.payment_method if order else None
         data["items"] = frappe.get_all(
             "Sales Order Item",
             filters={"parent": delivery.order, "parenttype": "Sales Order"},
@@ -662,7 +664,7 @@ def my_delivery_route():
 
 
 @frappe.whitelist(methods=["POST"])
-def update_delivery(delivery_name, status, notes="", confirmation=0):
+def update_delivery(delivery_name, status, notes="", confirmation=0, cash_collected=0):
     _require_access()
     notes = _text(notes, "Delivery notes", 1000)
     delivery, order = _delivery_locked(delivery_name)
@@ -680,7 +682,18 @@ def update_delivery(delivery_name, status, notes="", confirmation=0):
         frappe.throw("Assign a delivery person first.", frappe.ValidationError)
     if status in {"Failed", "Cancelled"} and not notes:
         frappe.throw("A reason is required for failed or cancelled deliveries.", frappe.ValidationError)
-    if status in {"Picked Up", "Dispatched", "In Transit", "Delivered"} and order.payment_status != "Paid":
+    is_cod = (
+        order.get("payment_method") == "Cash on Delivery"
+        and frappe.db.exists(
+            "Payment Transaction",
+            {"order": order.name, "payment_method": "Cash on Delivery", "status": "Pending"},
+        )
+    )
+    if (
+        status in {"Picked Up", "Dispatched", "In Transit", "Delivered"}
+        and order.payment_status != "Paid"
+        and not is_cod
+    ):
         frappe.throw("Verified payment is required before dispatch or delivery.", frappe.ValidationError)
     if status == "Delivered":
         if str(confirmation) != "1":
@@ -689,6 +702,23 @@ def update_delivery(delivery_name, status, notes="", confirmation=0):
             frappe.throw("Only the assigned delivery person can confirm receipt.", frappe.PermissionError)
         if not _proof_files(delivery.name):
             frappe.throw("Upload a private proof-of-delivery photo before completing delivery.",
+                         frappe.ValidationError)
+        if is_cod:
+            if str(cash_collected) != "1":
+                frappe.throw("Confirm cash was collected from the customer before completing this COD delivery.",
+                             frappe.ValidationError)
+            delivery.cash_collected = 1
+            delivery.cash_collected_amount = order.total
+            delivery.cash_collected_at = now_datetime()
+            delivery.cash_collected_by = frappe.session.user
+            notes = " ".join(
+                part for part in (
+                    notes,
+                    f"Rider recorded cash collection of {order.currency} {order.total}; finance confirmation is pending.",
+                ) if part
+            )
+        elif str(cash_collected) == "1":
+            frappe.throw("Cash collection confirmation is only valid for Cash on Delivery orders.",
                          frappe.ValidationError)
     previous_status, previous_person = delivery.status, delivery.assigned_delivery_person
     delivery.status = status
@@ -700,7 +730,7 @@ def update_delivery(delivery_name, status, notes="", confirmation=0):
         delivery.completion_date = now_datetime()
         delivery.completed_by = frappe.session.user
     _save(delivery, order, previous_status, previous_person, notes)
-    if status == "Delivered":
+    if status == "Delivered" and order.payment_status == "Paid":
         with _workflow():
             order.status = "Completed"
             order.save(ignore_permissions=True)

@@ -50,9 +50,13 @@ async function loadOrder() {
         ? "This order is paid."
         : ["Cancelled", "Completed"].includes(order.status)
           ? "This order is closed; no new payment can be initiated."
-          : "Order placed. Pay using M-Pesa below. Payment is confirmed only after server verification.";
+          : order.payment_method === "Cash on Delivery"
+            ? "Order placed with Cash on Delivery. Pay the rider at handover; finance confirms collection."
+            : "Order placed. Pay using M-Pesa below. Payment is confirmed only after server verification.";
     } else {
-      const payLink = text("a", "Continue to M-Pesa payment", "smarto-button");
+      const payLink = text("a",
+        order.payment_method === "Cash on Delivery" ? "View Cash on Delivery details" : "Continue to payment",
+        "smarto-button");
       payLink.href = orderPaymentUrl(order.name);
       target.append(payLink);
       status.textContent = "Order details";

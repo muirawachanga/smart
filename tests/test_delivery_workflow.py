@@ -61,6 +61,7 @@ class TestDeliveryWorkflow(unittest.TestCase):
         self.delivery.get.side_effect = lambda field: getattr(self.delivery, field, None)
         self.order = Mock(
             status="Ready for Delivery", payment_status="Paid", total=350, currency="KES",
+            payment_method="M-Pesa",
             customer="CUSTOMER-1", customer_name_snapshot="Test Customer",
             customer_phone_snapshot="+254712345678",
             delivery_address_snapshot="1 Test Road, Nairobi", delivery_area="Central",
@@ -77,7 +78,10 @@ class TestDeliveryWorkflow(unittest.TestCase):
                     return self.frappe.db.get_value.return_value
                 return "SO-1"
             if doctype == "Sales Order":
-                return types.SimpleNamespace(payment_status=self.order.payment_status)
+                return types.SimpleNamespace(
+                    payment_status=self.order.payment_status,
+                    payment_method=self.order.payment_method,
+                )
             return "SO-1"
 
         self.frappe.db.get_value.return_value = None
@@ -172,6 +176,26 @@ class TestDeliveryWorkflow(unittest.TestCase):
         with self.assertRaisesRegex(DeliveryError, "Ready for Delivery"):
             self.service.create_delivery("SO-1")
         self.save.assert_not_called()
+
+    def test_cod_rider_records_cash_and_leaves_payment_confirmation_to_finance(self):
+        self.as_driver()
+        self.order.payment_status = "Unpaid"
+        self.order.payment_method = "Cash on Delivery"
+        self.delivery.status = "In Transit"
+        self.frappe.db.exists.return_value = "PAY-COD"
+        with patch.object(self.service, "_proof_files", return_value=[{"name": "FILE-1"}]):
+            with self.assertRaisesRegex(DeliveryError, "Confirm cash was collected"):
+                self.service.update_delivery("DEL-1", "Delivered", confirmation="1")
+            result = self.service.update_delivery(
+                "DEL-1", "Delivered", confirmation="1", cash_collected="1",
+            )
+        self.assertEqual(result["status"], "Delivered")
+        self.assertEqual(self.delivery.cash_collected, 1)
+        self.assertEqual(self.delivery.cash_collected_amount, self.order.total)
+        self.assertEqual(self.delivery.cash_collected_by, "driver@example.test")
+        self.assertEqual(self.order.payment_status, "Unpaid")
+        self.order.save.assert_not_called()
+        self.assertIn("finance confirmation is pending", self.save.call_args.args[4])
 
     def test_legacy_order_routing_does_not_add_fee_or_change_total(self):
         self.frappe.db.get_value.return_value = None

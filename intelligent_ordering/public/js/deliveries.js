@@ -238,7 +238,10 @@ export function initDeliveryDashboard() {
       text("p", `${delivery.customer_name} - ${delivery.customer_phone}`),
       text("p", `${delivery.delivery_address} (${delivery.delivery_area})`),
       text("p", `Delivery fee: ${delivery.currency} ${delivery.delivery_fee}`),
-      text("p", `Payment status: ${delivery.payment_status || "Unavailable"}`),
+      text("p", `Payment: ${delivery.payment_method || "Unavailable"} · ${delivery.payment_status || "Unavailable"}`),
+      ...(delivery.payment_method === "Cash on Delivery" ? [
+        text("p", `Cash collected: ${delivery.cash_collected ? `${delivery.currency} ${delivery.cash_collected_amount} · ${delivery.cash_collected_at} by ${delivery.cash_collected_by}` : "Not recorded; finance confirmation required after delivery"}`),
+      ] : []),
       text("p", `Assignment date: ${delivery.assignment_date || "Not recorded"}`),
       text("p", `Assigned: ${delivery.assigned_delivery_person || "Awaiting assignment"}`),
       text("p", `Scheduled: ${delivery.scheduled_delivery_date || "Not scheduled"}`),
@@ -387,6 +390,8 @@ export function initDeliveryDashboard() {
       notes.maxLength = 1000;
       const confirmation = field(update, "I confirm the customer received this delivery", input("checkbox"));
       confirmation.closest("label").hidden = true;
+      const cashConfirmation = field(update, "I confirm I collected the full order amount in cash", input("checkbox"));
+      cashConfirmation.closest("label").hidden = true;
       const proofInput = document.createElement("input");
       proofInput.type = "file";
       proofInput.accept = "image/png,image/jpeg,image/webp";
@@ -396,6 +401,9 @@ export function initDeliveryDashboard() {
         confirmation.closest("label").hidden = status.value !== "Delivered";
         confirmation.required = status.value === "Delivered";
         confirmation.checked = false;
+        cashConfirmation.closest("label").hidden = delivery.payment_method !== "Cash on Delivery" || status.value !== "Delivered";
+        cashConfirmation.required = delivery.payment_method === "Cash on Delivery" && status.value === "Delivered";
+        cashConfirmation.checked = false;
         proof.closest("label").hidden = status.value !== "Delivered";
         proof.required = status.value === "Delivered";
       });
@@ -420,6 +428,7 @@ export function initDeliveryDashboard() {
           await post("deliveries.update_delivery", {
             delivery_name: name, status: status.value,
             notes: notes.value, confirmation: confirmation.checked ? "1" : "0",
+            cash_collected: cashConfirmation.checked ? "1" : "0",
           });
           await loadDashboard();
           await loadList();

@@ -4,7 +4,7 @@ from frappe.model.document import Document
 
 class PaymentTransaction(Document):
     def validate(self):
-        if not getattr(frappe.flags, "processing_mpesa", False):
+        if not getattr(frappe.flags, "processing_payment", False):
             frappe.throw(
                 "Payments can only be updated by verified payment workflows.",
                 frappe.PermissionError,

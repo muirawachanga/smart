@@ -117,6 +117,17 @@
           <input name="postal_code" type="text" maxlength="40" autocomplete="postal-code">
         </label>
       </fieldset>
+      <fieldset>
+        <legend>Payment method</legend>
+        <label>
+          <input type="radio" name="payment_method" value="M-Pesa" checked required>
+          M-Pesa - pay securely before dispatch
+        </label>
+        <label>
+          <input type="radio" name="payment_method" value="Cash on Delivery" required>
+          Cash on Delivery - pay the rider at handover; finance confirms collection
+        </label>
+      </fieldset>
       <div class="checkout-actions">
         <button id="submit-order" class="primary-button" type="submit" disabled>
           Place order

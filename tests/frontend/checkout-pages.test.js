@@ -39,11 +39,18 @@ function install(t) {
   const nodes = new Map(ids.map((id) => [`#${id}`, new Element()]));
   nodes.get("#checkout-submit").disabled = true;
   const form = nodes.get("#checkout-form");
+  const cashOnDelivery = new Element();
+  const cashOnDeliveryLabel = new Element();
+  cashOnDelivery.closest = (selector) => selector === "label" ? cashOnDeliveryLabel : null;
+  const paymentChoice = { value: "M-Pesa" };
+  form.querySelector = (selector) => selector === 'input[name="payment_method"][value="Cash on Delivery"]'
+    ? cashOnDelivery : null;
   form.elements = {
     customer_name: new Element(),
     phone: new Element(),
     address_line_1: new Element(), address_line_2: new Element(),
     city: new Element(), region: new Element(), postal_code: new Element(),
+    payment_method: paymentChoice,
   };
   const session = new Map();
   const local = new Map();
@@ -82,6 +89,7 @@ function install(t) {
       yield ["phone", form.elements.phone.value];
       yield ["address_line_1", "1 Main Road"];
       yield ["city", "Nairobi"];
+      yield ["payment_method", paymentChoice.value];
     }
   });
   return { nodes, session, local, events, locations };
@@ -207,6 +215,7 @@ test("retry uses the same checkout token and accepts an existing order", async (
     }
     throw new Error(`Unexpected request: ${url}`);
   });
+
   await import(`../../intelligent_ordering/public/js/checkout-page.js?retry=${Date.now()}`);
   await tick();
   nodes.get("#checkout-area").value = "Central";
@@ -221,6 +230,29 @@ test("retry uses the same checkout token and accepts an existing order", async (
   assert.equal(tokens.length, 2);
   assert.equal(tokens[0], tokens[1]);
   assert.equal(locations.at(-1), "/payment?order=SO-1");
+});
+
+test("checkout submits the selected Cash on Delivery method", async (t) => {
+  const { nodes } = install(t);
+  let submitted;
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (url.includes("cart.get_cart")) return response(cart);
+    if (url.includes("checkout.get_checkout")) return response(String(url).includes("delivery_area=")
+      ? { ...checkout, delivery_fee: 10, currency: "KES", total: 110, delivery_quote: "quote-1" }
+      : checkout);
+    if (url.includes("checkout.create_order")) {
+      submitted = options.body.get("payment_method");
+      return response({ order: { name: "SO-COD-1" } });
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/checkout-page.js?cod=${Date.now()}`);
+  await tick();
+  nodes.get("#checkout-area").value = "Central";
+  await nodes.get("#checkout-area").listeners.change();
+  nodes.get("#checkout-form").elements.payment_method.value = "Cash on Delivery";
+  await nodes.get("#checkout-form").listeners.submit({ preventDefault() {} });
+  assert.equal(submitted, "Cash on Delivery");
 });
 
 test("a definitive validation rejection allows a corrected new submission", async (t) => {
@@ -374,6 +406,27 @@ test("payment page loads an owned order and initiates only the existing M-Pesa A
   assert.equal(call.options.body.get("phone"), "+254700000000");
   assert.equal(call.options.body.has("amount"), false);
   assert.equal(form.children[1].disabled, true);
+});
+
+test("Cash on Delivery order shows handover instructions without an M-Pesa prompt", async (t) => {
+  const { nodes } = install(t);
+  window.location.pathname = "/payment";
+  window.location.search = "?order=SO-COD";
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("orders.get_my_order")) return response({
+      name: "SO-COD", status: "Pending", payment_status: "Unpaid",
+      payment_method: "Cash on Delivery", customer_name: "Customer",
+      customer_phone: "+254700000000", delivery_address: "Road",
+      items: [{ ...item, line_total: 100 }], subtotal: 100, total: 110, delivery_fee: 10, currency: "KES",
+    });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/order-confirmation.js?cod-payment=${Date.now()}`);
+  await tick();
+  const content = nodes.get("#order-detail").children.map((node) => node.textContent).join(" ");
+  assert.match(content, /Cash on Delivery selected/);
+  assert.match(content, /Pay the rider at handover/);
+  assert.equal(nodes.get("#order-detail").children.some((node) => node.className === "status-update-form"), false);
 });
 
 test("payment page preserves its order-specific login return without exposing guest data", async (t) => {

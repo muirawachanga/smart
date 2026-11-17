@@ -23,6 +23,7 @@ STATUS_TRANSITIONS = {
 }
 
 PHONE_PATTERN = re.compile(r"^\+?[0-9][0-9\s().-]{6,19}$")
+PAYMENT_METHODS = {"M-Pesa", "Cash on Delivery"}
 
 
 def validate_customer_name(value):
@@ -56,6 +57,12 @@ def validate_request_token(value):
         return str(uuid.UUID(value))
     except (ValueError, AttributeError):
         raise ValueError("A valid checkout request token is required.") from None
+
+
+def validate_payment_method(value):
+    if not isinstance(value, str) or value not in PAYMENT_METHODS:
+        raise ValueError("Select a supported payment method.")
+    return value
 
 
 def validate_order_status_transition(current, requested):

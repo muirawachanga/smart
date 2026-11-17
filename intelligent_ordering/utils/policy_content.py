@@ -1,5 +1,5 @@
 REVIEW_NOTICE = "UNAPPROVED BUSINESS REVIEW DRAFT"
-POLICY_DRAFT_VERSION = "smarto-operations-1"
+POLICY_DRAFT_VERSION = "smarto-operations-2"
 REVIEW_INSTRUCTIONS = (
     f"{REVIEW_NOTICE}\n"
     "Before publishing, confirm the seller's legal name and contact details, applicable law, "
@@ -17,8 +17,8 @@ Provide accurate contact and delivery details. Keep passwords and password-setup
 3. Orders and prices
 Review the items, quantities, currency, delivery fee and total at checkout. Submitting an order does not by itself confirm availability, payment or dispatch. Follow the order status in your account. If the business cannot supply an item as ordered, it will explain the options. A substitution or higher charge requires your agreement. If money was collected for goods that cannot be supplied, the Refund Policy and applicable law govern the remedy.
 
-4. M-Pesa payments
-Authorize only the amount displayed at checkout. An STK prompt or pending transaction is not confirmation of receipt; a verified payment and order acceptance are separate events. If your wallet was debited but the order shows unpaid, contact support with the order number and receipt before paying again. Never share a PIN, password or payment authorization code.
+4. Payment methods
+Use the method and total shown at checkout. For M-Pesa, an STK prompt or pending transaction is not confirmation of receipt; payment is recorded only after verification. For Cash on Delivery, pay the full displayed amount to the rider at handover. The rider records collection and authorized staff confirm it in the order record. If you have already paid cash or your wallet was debited but the order still shows unpaid, contact support with the order number before paying again. Never share a PIN, password or payment authorization code.
 
 5. Delivery, cancellations and assistance
 See the Delivery Policy for coverage, fees and handover. Request cancellation through the order page where available or contact support promptly. A request must be reviewed and is not confirmation of cancellation or a refund. Transactional messages may be delayed. Optional AI suggestions can be inaccurate and cannot independently place or pay for an order.
@@ -65,7 +65,7 @@ Checkout lists the enabled delivery areas for the cart currency. Select the area
 Provide a complete address, useful access instructions and a reachable phone number. Review saved addresses and report corrections promptly; a change may not be possible after dispatch. Estimated delivery times depend on availability, preparation, traffic and access. Contact support if your order is late. Applicable rights concerning delay and non-delivery still apply.
 
 3. Updates and handover
-Use your account to check recorded status. Transactional SMS may be available but can be delayed or undelivered. Tracking does not promise live GPS or a guaranteed route. Be available to receive the order or arrange an authorized recipient where appropriate. Riders may record notes, timestamps or proof of handover. Never share a payment PIN, password or payment authorization code as proof.
+Use your account to check recorded status. Transactional SMS may be available but can be delayed or undelivered. Tracking does not promise live GPS or a guaranteed route. Be available to receive the order or arrange an authorized recipient where appropriate. For Cash on Delivery, pay the full displayed order amount at handover. The rider records collection and proof of handover; authorized staff confirm the payment afterward. The order may continue to show unpaid until that confirmation. Contact support if it does. Riders cannot change order totals or payment status. Never share a payment PIN, password or payment authorization code as proof.
 
 4. Failed delivery and problems
 If a rider cannot reach the address or recipient, or handover is unsafe, the business will review the failed attempt and explain the next step. Redelivery, collection, cancellation or any proposed extra fee depends on the circumstances and applicable law. Report non-delivery, damage or incorrect items to support with your order number. The Refund Policy explains remedies; riders cannot change your order total or payment status.

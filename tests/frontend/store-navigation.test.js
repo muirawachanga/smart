@@ -53,7 +53,7 @@ function install(t, hash) {
     createElement: () => node(Symbol()),
   });
   global("window", {
-    location: { hash }, frappe: {},
+    location: { hash }, frappe: {}, confirm: () => true,
     addEventListener(event, handler) { (events[event] ||= []).push(handler); },
   });
   global("FormData", class { *[Symbol.iterator]() { yield ["search", ""]; yield ["status", ""]; } });
@@ -164,6 +164,7 @@ test("finance workspace loads without a legacy hash and limits reconciliation co
       },
     }) };
   });
+
   initPaymentDashboard();
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(node("#payment-transactions").children.length, 1, node("#payment-feedback").textContent);
@@ -177,6 +178,44 @@ test("finance workspace loads without a legacy hash and limits reconciliation co
   await view.listeners.click();
   assert.ok(node("#payment-detail").children.some((child) => child.textContent === "Check with Safaricom"));
   assert.equal(node("#payment-detail").children[0].textContent, "Check with Safaricom");
+});
+
+test("finance can confirm COD only when the server reports rider cash collection", async (t) => {
+  const { node } = install(t, "#payment-dashboard");
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    const target = String(url);
+    calls.push(target);
+    const message = target.includes("payments.get_transaction")
+      ? {
+        name: "PAY-COD", order: "SO-COD", status: "Pending", amount: 250,
+        payment_method: "Cash on Delivery", can_reconcile: false, can_confirm_cod: true,
+        cash_collection: {
+          status: "Delivered", cash_collected: 1, cash_collected_amount: 250,
+          cash_collected_at: "2026-11-17 12:00:00", cash_collected_by: "rider@example.test",
+        },
+        order_summary: { name: "SO-COD", status: "Ready for Delivery", payment_status: "Unpaid", total: 250, currency: "KES" },
+      }
+      : target.includes("payment_summary")
+        ? []
+        : target.includes("payments.list_transactions")
+          ? { transactions: [{ name: "PAY-COD", order: "SO-COD", status: "Pending", amount: 250, payment_method: "Cash on Delivery" }], has_more: false }
+          : {};
+    return { ok: true, json: async () => ({ message }) };
+  });
+  initPaymentDashboard();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const view = node("#payment-transactions").children[0].children.find(
+    (child) => child.textContent === "View payment",
+  );
+  await view.listeners.click();
+  const confirm = node("#payment-detail").children.find(
+    (child) => child.textContent === "Confirm cash received",
+  );
+  assert.ok(confirm);
+  await confirm.listeners.click();
+  assert.ok(calls.some((url) => url.includes("payments.confirm_cod_payment")));
+  assert.ok(!calls.some((url) => url.includes("payments.reconcile_payment")));
 });
 
 test("view payment shows loading feedback and a visible error when detail access fails", async (t) => {

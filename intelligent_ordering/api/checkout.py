@@ -11,6 +11,7 @@ from intelligent_ordering.utils.checkout import (
     checkout_cart_revision,
     validate_address,
     validate_customer_name,
+    validate_payment_method,
     validate_phone,
     validate_request_token,
 )
@@ -91,6 +92,7 @@ def create_order(
     postal_code="",
     delivery_area="",
     delivery_quote="",
+    payment_method="M-Pesa",
 ):
     user = _require_customer()
     try:
@@ -122,6 +124,7 @@ def create_order(
     try:
         customer_name = validate_customer_name(customer_name)
         phone = validate_phone(phone)
+        payment_method = validate_payment_method(payment_method)
         address = validate_address(
             address_line_1,
             city,
@@ -140,6 +143,8 @@ def create_order(
     cart = get_cart()
     if not cart["items"]:
         frappe.throw("Your cart is empty.", frappe.ValidationError)
+    if payment_method == "Cash on Delivery" and cart["currency"] != "KES":
+        frappe.throw("Cash on Delivery is currently available for KES orders only.", frappe.ValidationError)
     validate_checkout_stock(cart["items"])
     locked_items = []
     for item in cart["items"]:
@@ -207,6 +212,7 @@ def create_order(
             "delivery_area": quote["delivery_area"],
             "status": "Pending",
             "payment_status": "Unpaid",
+            "payment_method": payment_method,
             "items": [
                 {
                     "product": item["product"],
@@ -225,6 +231,11 @@ def create_order(
         order.insert(ignore_permissions=True)
     finally:
         frappe.flags.creating_checkout_order = was_creating_checkout_order
+
+    if payment_method == "Cash on Delivery":
+        from intelligent_ordering.api.payments import create_cod_transaction
+
+        create_cod_transaction(order)
 
     shopping_cart_name = frappe.db.get_value(
         "Shopping Cart", {"user": user}, "name"
@@ -306,6 +317,7 @@ def _serialize_order(order):
         "order_datetime": order.order_datetime,
         "status": order.status,
         "payment_status": order.payment_status,
+        "payment_method": order.get("payment_method") or "M-Pesa",
         "customer_name": order.customer_name_snapshot,
         "customer_phone": order.customer_phone_snapshot,
         "delivery_address": order.delivery_address_snapshot,
