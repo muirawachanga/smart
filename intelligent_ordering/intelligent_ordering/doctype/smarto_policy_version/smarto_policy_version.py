@@ -2,6 +2,8 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
+from intelligent_ordering.utils.policy_content import REVIEW_NOTICE
+
 
 class SmartOPolicyVersion(Document):
     def validate(self):
@@ -19,6 +21,9 @@ class SmartOPolicyVersion(Document):
         }):
             frappe.throw("This policy version already exists.", frappe.ValidationError)
         if self.status == "Published":
+            if REVIEW_NOTICE in self.content:
+                frappe.throw("Approve the policy and remove its review notice before publishing.",
+                             frappe.ValidationError)
             if self.version == "review-draft":
                 frappe.throw("Replace the review draft with approved content and a new version before publishing.",
                              frappe.ValidationError)

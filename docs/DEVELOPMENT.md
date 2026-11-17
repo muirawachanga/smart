@@ -261,9 +261,13 @@ password-strength, and password-reset contracts. Verify compatibility with the
 installed Frappe release before deploying to production.
 
 In Desk, System Manager or Business Admin can open **SmartO Policy Version**.
-Migration creates four **unpublished** review drafts; they are not legally
-approved policies. Replace each review brief with approved plain-text content,
-choose a distinct version (not `review-draft`), and set Status to Published.
+Migration adds four **unpublished** drafts with version `smarto-operations-1`,
+even when a site already has older policy versions. Existing records are not
+changed. Review each draft against your business's legal identity and contacts,
+applicable law, provider and data-retention practices, and actual delivery and
+refund commitments. After approval, edit the plain text, remove the review
+notice and instructions, and set Status to Published. Keep the seeded version
+identifier on these records so future migrations do not recreate them.
 Registration remains blocked until both Terms and Conditions and Privacy Policy
 are published. Drafts are never displayed publicly. Publication time is assigned
 by the server, and public pages show the latest published version.

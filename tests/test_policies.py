@@ -52,6 +52,48 @@ class TestPolicies(unittest.TestCase):
         api.require_acceptance("T", "P", "1", "1")
         self.assertEqual(self.frappe.get_all.call_args.kwargs["filters"]["status"], "Published")
 
+    def test_migration_adds_review_drafts_without_replacing_existing_versions(self):
+        api = self.load(ROOT / "api/policies.py")
+        existing = {("Terms and Conditions", "published-v1"), ("Privacy Policy", "review-draft")}
+        created = []
+        original = existing.copy()
+
+        def insert(values):
+            created.append(values)
+            existing.add((values["policy_type"], values["version"]))
+
+        self.frappe.db.exists.side_effect = lambda doctype, filters: any(
+            kind == filters["policy_type"] and version == filters.get("version", version)
+            for kind, version in existing
+        )
+        self.frappe.get_doc.side_effect = lambda values: types.SimpleNamespace(
+            insert=lambda **kwargs: insert(values),
+        )
+        api.ensure_policy_drafts()
+        api.ensure_policy_drafts()
+        self.assertEqual(len(created), 4)
+        self.assertEqual({doc["policy_type"] for doc in created}, set(api.POLICIES.values()))
+        self.assertTrue(all(doc["status"] == "Draft" and not doc.get("published_at") for doc in created))
+        self.assertTrue(original.issubset(existing))
+
+    def test_policy_requires_review_before_publication(self):
+        api = self.load(ROOT / "api/policies.py")
+        folder = ROOT / "intelligent_ordering/doctype"
+        cls = self.load(folder / "smarto_policy_version/smarto_policy_version.py").SmartOPolicyVersion
+        policy = cls()
+        policy.name = "terms"
+        policy.policy_type = api.POLICIES["terms"]
+        policy.version = api.POLICY_DRAFT_VERSION
+        policy.status = "Published"
+        policy.get_doc_before_save = lambda: types.SimpleNamespace(status="Draft")
+        self.frappe.db.exists.return_value = False
+        policy.content = api.REVIEW_INSTRUCTIONS + api.POLICY_CONTENT[policy.policy_type]
+        with self.assertRaisesRegex(Invalid, "remove its review notice"):
+            policy.validate()
+        policy.content = api.POLICY_CONTENT[policy.policy_type]
+        policy.validate()
+        self.assertEqual(policy.published_at, "2026-11-15 19:00:00")
+
     def test_published_policies_and_acceptance_records_cannot_be_changed_or_deleted(self):
         folder = ROOT / "intelligent_ordering/doctype"
         policy_class = self.load(folder / "smarto_policy_version/smarto_policy_version.py").SmartOPolicyVersion

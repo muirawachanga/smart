@@ -1,5 +1,7 @@
 import frappe
 
+from intelligent_ordering.utils.policy_content import POLICY_CONTENT, POLICY_DRAFT_VERSION, REVIEW_INSTRUCTIONS
+
 
 POLICIES = {
     "terms": "Terms and Conditions",
@@ -43,21 +45,10 @@ def require_acceptance(terms_version, privacy_version, accept_terms, acknowledge
 
 def ensure_policy_drafts():
     for kind in POLICIES.values():
-        if frappe.db.exists("SmartO Policy Version", {"policy_type": kind}):
+        if frappe.db.exists("SmartO Policy Version", {"policy_type": kind, "version": POLICY_DRAFT_VERSION}):
             continue
         frappe.get_doc({
             "doctype": "SmartO Policy Version", "policy_type": kind,
-            "title": kind, "version": "review-draft", "status": "Draft",
-            "content": (
-                f"UNPUBLISHED ADMINISTRATOR REVIEW DRAFT - {kind}\n\n"
-                "Replace this review brief with approved policy text before publishing.\n"
-                "Confirm the applicable jurisdiction, business identity, actual contact channel, "
-                "customer rights, and operational commitments. Do not invent legal approvals.\n\n"
-                + {
-                    "Terms and Conditions": "Review account eligibility, ordering, pricing, payment, cancellation, dispute handling, and applicable law.",
-                    "Privacy Policy": "Review collected data, processing purposes, payment providers, retention, customer rights, security, and optional marketing.",
-                    "Refund Policy": "Review refund eligibility, exclusions, request process, verified M-Pesa refunds, timelines, and statutory rights.",
-                    "Delivery Policy": "Review delivery areas, fees, scheduling, failed deliveries, tracking, and actual delivery commitments.",
-                }[kind]
-            ),
+            "title": kind, "version": POLICY_DRAFT_VERSION, "status": "Draft",
+            "content": REVIEW_INSTRUCTIONS + POLICY_CONTENT[kind],
         }).insert(ignore_permissions=True)
