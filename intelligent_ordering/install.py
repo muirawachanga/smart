@@ -4,13 +4,13 @@ import frappe
 APP_ROLES = {
     "Customer": False,
     "Business Admin": True,
-    "Store Manager": True,
+    "Store Manager": False,
     "Finance Manager": True,
-    "Delivery Manager": True,
-    "Order Manager": True,
-    "Inventory Manager": True,
-    "Customer Support": True,
-    "Delivery Staff": True,
+    "Delivery Manager": False,
+    "Order Manager": False,
+    "Inventory Manager": False,
+    "Customer Support": False,
+    "Delivery Staff": False,
 }
 
 
@@ -52,6 +52,11 @@ def ensure_policy_indexes():
 def ensure_roles():
     for role_name, desk_access in APP_ROLES.items():
         if frappe.db.exists("Role", role_name):
+            role = frappe.get_doc("Role", role_name)
+            if bool(role.desk_access) != desk_access:
+                role.desk_access = desk_access
+                # Frappe recalculates user types and revokes sessions on type changes.
+                role.save(ignore_permissions=True)
             continue
 
         frappe.get_doc(

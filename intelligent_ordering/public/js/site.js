@@ -118,7 +118,7 @@ function setupAccountNavigation(user) {
     ["#staff-roles-link", ["System Manager"]],
     ["#staff-permissions-link", ["System Manager"]],
     ["#staff-settings-link", ["System Manager"]],
-    ["#staff-audit-link", ["System Manager", "Business Admin", "Store Manager"]],
+    ["#staff-audit-link", ["System Manager", "Business Admin"]],
     ["#staff-orders-link", ["System Manager", "Business Admin", "Store Manager", "Order Manager"]],
     ["#payments-link", ["System Manager", "Business Admin", "Store Manager", "Order Manager", "Finance Manager"]],
     ["#deliveries-link", ["System Manager", "Business Admin", "Store Manager", "Order Manager", "Delivery Manager", "Delivery Staff"]],

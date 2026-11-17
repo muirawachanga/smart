@@ -120,6 +120,21 @@ test("denied listing leaves editing and inventory entry unavailable", async (t) 
   assert.equal(nodes.get("#products-fields").disabled, true);
 });
 
+test("website-only product staff are offered native supported image formats", async (t) => {
+  const { nodes } = install(t);
+  t.mock.method(globalThis, "fetch", async () => response({
+    ...listing, upload_image_types: ["image/png", "image/jpeg", "image/gif"],
+  }));
+  await import(`../../intelligent_ordering/public/js/products-management.js?website=${Date.now()}`);
+  await tick();
+  nodes.get("#products-list").children[0].children.at(-1).listeners.click();
+  const file = nodes.get("#products-image-file");
+  assert.equal(file.accept, "image/png,image/jpeg,image/gif");
+  file.files = [{ type: "image/webp" }];
+  await nodes.get("#products-image-form").listeners.submit({ preventDefault() {} });
+  assert.match(nodes.get("#products-image-status").textContent, /do not allow WebP/);
+});
+
 test("product images use native authenticated uploads and link only the returned file", async (t) => {
   const { nodes } = install(t);
   const calls = [];

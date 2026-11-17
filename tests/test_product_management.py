@@ -19,6 +19,7 @@ def load_api():
     frappe.get_roles = Mock(return_value=["Store Manager"])
     frappe.get_list = Mock(return_value=[])
     frappe.get_doc = Mock()
+    frappe.get_cached_value = Mock(return_value="Website User")
     frappe.has_permission = Mock(return_value=False)
     frappe.db = Mock()
     path = Path(__file__).parents[1] / "intelligent_ordering/api/products.py"
@@ -62,6 +63,11 @@ class TestProductManagement(unittest.TestCase):
         doc.insert.side_effect = ProductError("Native create denied")
         with self.assertRaisesRegex(ProductError, "Native create"):
             self.api.save_product(**self.values)
+
+    def test_native_image_upload_choices_follow_user_type(self):
+        self.assertNotIn("image/webp", self.api.list_products()["upload_image_types"])
+        self.frappe.get_cached_value.return_value = "System User"
+        self.assertIn("image/webp", self.api.list_products()["upload_image_types"])
 
     def test_category_create_respects_document_permissions(self):
         doc = self.frappe.get_doc.return_value

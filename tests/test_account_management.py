@@ -100,8 +100,14 @@ class TestAccountManagement(unittest.TestCase):
         self.api.create_account("staff@example.test", "Staff Name", "+254712345678", "Inventory Manager")
         doc = self.frappe.get_doc.call_args.args[0]
         self.assertEqual(doc["roles"], [{"role": "Inventory Manager"}])
-        self.assertEqual(doc["user_type"], "System User")
+        self.assertEqual(doc["user_type"], "Website User")
         self.modules["intelligent_ordering.api.checkout"]._save_customer_profile.assert_not_called()
+
+    def test_finance_and_business_admin_creation_retain_desk_user_type(self):
+        for role in ("Finance Manager", "Business Admin"):
+            self.role = role
+            self.api.create_account("staff@example.test", "Staff Name", "+254712345678", role)
+            self.assertEqual(self.frappe.get_doc.call_args.args[0]["user_type"], "System User")
 
     def test_cannot_grant_privileged_or_unknown_roles(self):
         for role in ("System Manager", "Administrator", "Website Manager", "unknown"):

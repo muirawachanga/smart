@@ -117,6 +117,8 @@ test("each staff role sees only authorized navigation and its own workspace", as
     assert.equal(nodes.get("#staff-products-link").hidden,
       !["Administrator", "System Manager", "Business Admin", "Store Manager", "Order Manager", "Inventory Manager"]
         .includes(role), `${role}: products`);
+    assert.equal(nodes.get("#staff-audit-link").hidden,
+      !["Administrator", "System Manager", "Business Admin"].includes(role), `${role}: Desk audit logs`);
     t.mock.restoreAll();
   }
 });

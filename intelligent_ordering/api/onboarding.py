@@ -106,12 +106,12 @@ def readiness():
         SELECT COUNT(DISTINCT u.name) FROM `tabUser` u
         INNER JOIN `tabHas Role` r ON r.parent = u.name AND r.parenttype = 'User'
         WHERE u.enabled = 1 AND u.name NOT IN ('Administrator', 'Guest')
-          AND u.user_type = 'System User'
+          AND u.user_type IN ('System User', 'Website User')
           AND r.role IN ('Business Admin', 'Store Manager', 'Order Manager', 'Inventory Manager',
                          'Finance Manager', 'Delivery Manager', 'Delivery Staff', 'Customer Support')
     """)[0][0]
     check("staff", "Named staff accounts", bool(staff),
-          "Create individual staff accounts with least-privilege roles; test each required role.", "/app/user")
+          "Create individual staff accounts with least-privilege roles; test each required role.", "/dashboard/accounts")
 
     host = frappe.conf.get("host_name")
     try:

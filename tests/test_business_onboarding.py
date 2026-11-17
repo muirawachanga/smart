@@ -133,6 +133,13 @@ class TestBusinessOnboarding(unittest.TestCase):
         self.connection.execute("UPDATE `tabProduct Category` SET enabled = 0")
         self.assertEqual(self.checks()["catalog"], "blocked")
 
+    def test_website_staff_count_as_named_staff_without_customer_role_confusion(self):
+        self.configure()
+        self.connection.execute("UPDATE `tabUser` SET user_type = 'Website User'")
+        self.assertEqual(self.checks()["staff"], "configured")
+        self.connection.execute("UPDATE `tabHas Role` SET role = 'Customer'")
+        self.assertEqual(self.checks()["staff"], "blocked")
+
     def test_cross_site_callbacks_sandbox_and_paused_scheduler_are_blocked(self):
         self.configure()
         self.frappe.conf["mpesa"]["callback_url"] = (

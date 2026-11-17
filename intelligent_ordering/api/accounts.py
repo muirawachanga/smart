@@ -106,7 +106,7 @@ def create_account(email, full_name, phone, role):
         frappe.throw("This email already has an account. Search and manage the existing account.", frappe.ValidationError)
     user = frappe.get_doc({
         "doctype": "User", "email": email, "first_name": escape_html(full_name), "mobile_no": phone,
-        "enabled": 1, "user_type": "Website User" if role == "Customer" else "System User",
+        "enabled": 1, "user_type": "System User" if APP_ROLES[role] else "Website User",
         "send_welcome_email": 0, "roles": [{"role": role}],
     })
     user.insert()

@@ -25,7 +25,15 @@ after_migrate = "intelligent_ordering.install.after_migrate"
 override_whitelisted_methods = {
     "frappe.core.doctype.user.user.sign_up": "intelligent_ordering.api.customers.sign_up",
 }
-role_home_page = {"Customer": "/"}
+role_home_page = {
+    "Customer": "/",
+    "Store Manager": "/dashboard/owner",
+    "Order Manager": "/dashboard/orders",
+    "Inventory Manager": "/dashboard/inventory",
+    "Delivery Manager": "/dashboard/delivery",
+    "Delivery Staff": "/dashboard/delivery",
+    "Customer Support": "/dashboard/support",
+}
 update_website_context = "intelligent_ordering.utils.business.update_website_context"
 
 doc_events = {

@@ -56,12 +56,13 @@ class TestDevelopmentAccounts(unittest.TestCase):
             result = self.accounts.provision()
         docs = [call.args[0] for call in self.frappe.get_doc.call_args_list]
         self.assertEqual(len(docs), 8)
-        self.assertTrue(all(doc["doctype"] == "User" and doc["user_type"] == "System User" for doc in docs))
+        self.assertTrue(all(doc["doctype"] == "User" for doc in docs))
         self.assertEqual(sum(any(row["role"] == "System Manager" for row in doc["roles"]) for doc in docs), 1)
         self.assertNotIn("Administrator", {doc["email"] for doc in docs})
         for email, _, role in self.accounts.TEST_ACCOUNTS:
             doc = next(doc for doc in docs if doc["email"] == email)
             self.assertEqual(doc["roles"], [{"role": value} for value in self.accounts._account_roles(role)])
+            self.assertEqual(doc["user_type"], "System User" if role in {"System Manager", "Finance Manager"} else "Website User")
             self.assertEqual(doc["send_welcome_email"], 0)
         self.assertNotIn("temporary-test-secret", repr(result))
 
@@ -113,7 +114,8 @@ class TestDevelopmentAccounts(unittest.TestCase):
         self.frappe.db.exists.return_value = True
         self.frappe.db.exists.side_effect = None
         self.frappe.get_doc.side_effect = lambda doctype, email: types.SimpleNamespace(
-            enabled=1, user_type="System User", role_profile_name="",
+            enabled=1, user_type="System User" if role_by_email[email] in {"System Manager", "Finance Manager"} else "Website User",
+            role_profile_name="",
             roles=[types.SimpleNamespace(role=role) for role in
                    self.accounts._account_roles(role_by_email[email])],
         )

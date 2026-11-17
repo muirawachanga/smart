@@ -47,7 +47,7 @@ def require_staff_page(context, page):
         "staff-roles-link": PAGE_ROLES["accounts"],
         "staff-permissions-link": PAGE_ROLES["accounts"],
         "staff-settings-link": PAGE_ROLES["accounts"],
-        "staff-audit-link": PAGE_ROLES["owner"],
+        "staff-audit-link": PAGE_ROLES["admin"],
     }
     context.smarto_visible_staff_links = [
         link for link, allowed in sidebar_roles.items()

@@ -4,6 +4,8 @@ from urllib.parse import urlsplit
 
 import frappe
 
+from intelligent_ordering.install import APP_ROLES
+
 
 TEST_ACCOUNTS = (
     ("admin.test@smarto.local", "Test Administrator", "System Manager"),
@@ -54,22 +56,23 @@ def _require_local_development():
 
 def provision():
     """Create local test users through Bench only; never expose as an API."""
-    return _provision(TEST_ACCOUNTS, "System User")
+    return _provision(TEST_ACCOUNTS)
 
 
 def provision_customer():
     """Create the requested Website User using a hidden password prompt."""
     return _provision(
-        (("customer.test@smarto.local", "SmartO Test Customer", "Customer"),), "Website User"
+        (("customer.test@smarto.local", "SmartO Test Customer", "Customer"),)
     )
 
 
-def _provision(accounts, user_type):
+def _provision(accounts):
     _require_local_development()
     pending = []
     result = []
     for email, full_name, role in accounts:
         expected_roles = _account_roles(role)
+        user_type = "System User" if role == "System Manager" or APP_ROLES[role] else "Website User"
         for expected_role in expected_roles:
             if not frappe.db.exists("Role", expected_role):
                 frappe.throw(f"Role {expected_role} is missing. Run migrate first.", frappe.ValidationError)
@@ -95,6 +98,7 @@ def _provision(accounts, user_type):
     frappe.db.savepoint(savepoint)
     try:
         for email, full_name, role in pending:
+            user_type = "System User" if role == "System Manager" or APP_ROLES[role] else "Website User"
             frappe.get_doc({
                 "doctype": "User",
                 "email": email,

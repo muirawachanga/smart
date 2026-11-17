@@ -53,6 +53,10 @@ def list_products(search="", page=1, page_size=20):
     return {
         "products": products[:page_size], "has_more": len(products) > page_size, "page": page,
         "categories": categories,
+        "upload_image_types": ["image/png", "image/jpeg", "image/gif"] + (
+            ["image/webp"] if frappe.session.user == "Administrator"
+            or frappe.get_cached_value("User", frappe.session.user, "user_type") == "System User" else []
+        ),
         "can_create_category": bool(frappe.has_permission("Product Category", "create")),
         "can_receive_stock": frappe.session.user == "Administrator" or bool(
             PAGE_ROLES["inventory"].intersection(

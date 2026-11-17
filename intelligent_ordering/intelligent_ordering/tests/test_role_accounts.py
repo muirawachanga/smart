@@ -5,6 +5,7 @@ from frappe.tests.utils import FrappeTestCase
 from frappe.utils.password import check_password
 
 from intelligent_ordering.api import administration, deliveries, inventory, orders, payments
+from intelligent_ordering.install import APP_ROLES, ensure_roles
 from intelligent_ordering.utils.development_accounts import TEST_ACCOUNTS, _account_roles
 from intelligent_ordering.utils.staff_pages import require_staff_page
 
@@ -33,7 +34,7 @@ class TestRoleAccounts(FrappeTestCase):
                 "email": f"{email.split('@')[0]}-{suffix}@example.test",
                 "first_name": full_name,
                 "enabled": 1,
-                "user_type": "System User",
+                "user_type": "System User" if role == "System Manager" or APP_ROLES[role] else "Website User",
                 "send_welcome_email": 0,
                 "new_password": self.password,
                 "roles": [{"role": value} for value in _account_roles(role)],
@@ -49,9 +50,50 @@ class TestRoleAccounts(FrappeTestCase):
             with self.subTest(role=role):
                 self.assertEqual(check_password(user, self.password), user)
                 frappe.set_user(user)
+                expected_type = "System User" if role == "System Manager" or APP_ROLES[role] else "Website User"
+                self.assertEqual(frappe.db.get_value("User", user, "user_type"), expected_type)
+                self.assertEqual("Desk User" in frappe.get_roles(), expected_type == "System User")
                 if role != "System Manager":
                     self.assertNotIn("System Manager", frappe.get_roles())
                     self.assertFalse(frappe.has_permission("User", "create"))
+
+    def test_role_migration_downgrades_existing_staff_without_removing_roles_or_custom_desk_grants(self):
+        role = frappe.get_doc("Role", "Inventory Manager")
+        role.desk_access = 1
+        role.save()
+        user = self.users["Inventory Manager"]
+        self.assertEqual(frappe.db.get_value("User", user, "user_type"), "System User")
+        mixed = frappe.get_doc({
+            "doctype": "User", "email": f"mixed-{frappe.generate_hash(length=8)}@example.test",
+            "first_name": "Mixed roles", "enabled": 1, "send_welcome_email": 0,
+            "roles": [{"role": "Inventory Manager"}, {"role": "Finance Manager"}],
+        }).insert()
+        ensure_roles()
+        self.assertEqual(frappe.db.get_value("User", user, "user_type"), "Website User")
+        self.assertEqual(frappe.db.get_value("User", mixed.name, "user_type"), "System User")
+        self.assertIn("Finance Manager", frappe.get_roles(mixed.name))
+        frappe.set_user(user)
+        self.assertIn("Inventory Manager", frappe.get_roles())
+        self.assertNotIn("Desk User", frappe.get_roles())
+        self.assertTrue(frappe.has_permission("Product", "create"))
+        require_staff_page(frappe._dict(), "inventory")
+        inventory.get_dashboard()
+
+    def test_website_staff_sidebars_do_not_point_to_desk(self):
+        for role, page in (
+            ("Store Manager", "owner"), ("Order Manager", "orders"),
+            ("Inventory Manager", "inventory"), ("Delivery Manager", "delivery"),
+            ("Delivery Staff", "delivery"), ("Customer Support", "support"),
+        ):
+            frappe.set_user(self.users[role])
+            context = frappe._dict()
+            require_staff_page(context, page)
+            parser = NavigationLinks()
+            parser.feed(frappe.render_template("templates/includes/staff_sidebar.html", context))
+            for attributes in parser.links.values():
+                if "hidden" not in attributes:
+                    with self.subTest(role=role, link=attributes["id"]):
+                        self.assertFalse(attributes["href"].startswith("/app/"))
 
     def test_admin_sidebar_renders_every_shortcut_visible_without_browser_scripts(self):
         for user in ("Administrator", self.users["System Manager"]):

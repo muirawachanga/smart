@@ -14,6 +14,7 @@ let page = 1;
 let search = "";
 let selected = null;
 let categories = [];
+let imageTypes = ["image/png", "image/jpeg", "image/gif"];
 let loading = false;
 let saving = false;
 let ready = false;
@@ -56,6 +57,8 @@ async function load() {
     const data = await get("products.list_products", { search, page: String(page), page_size: "20" });
     if (request !== requestId) return false;
     categories = data.categories;
+    imageTypes = data.upload_image_types || ["image/png", "image/jpeg", "image/gif"];
+    imageFile.accept = imageTypes.join(",");
     categoryOptions();
     find("category-section").hidden = !data.can_create_category;
     find("inventory-link").hidden = !data.can_receive_stock;
@@ -141,8 +144,10 @@ find("image-form").addEventListener("submit", async (event) => {
     find("image-status").textContent = "Save your product changes before uploading an image.";
     return;
   }
-  if (!file || !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
-    find("image-status").textContent = "Choose a PNG, JPEG, WebP or GIF image.";
+  if (!file || !imageTypes.includes(file.type)) {
+    find("image-status").textContent = imageTypes.includes("image/webp")
+      ? "Choose a PNG, JPEG, WebP or GIF image."
+      : "Choose a PNG, JPEG or GIF image. Native uploads do not allow WebP for website-only accounts.";
     return;
   }
   saving = true;

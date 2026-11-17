@@ -425,7 +425,7 @@ export function initAdministrationDashboard() {
       const card = document.createElement("article");
       card.className = "order-card";
       const link = document.createElement("a");
-      link.href = `/app/product/${encodeURIComponent(product.name)}`;
+      link.href = "/dashboard/products";
       link.textContent = `${product.product_name} (${product.sku})`;
       card.append(link,
         text("p", `${product.enabled ? "Enabled" : "Disabled"} · ${product.category || "Uncategorized"} · ` +

@@ -759,11 +759,26 @@ Frappe User, Role and Customer Profile records, native create/write permission
 checks, password-setup email and existing User audit hooks. It never grants
 System Manager or arbitrary roles.
 
-Give each person a named account with one intended role. Customer accounts
-are Website Users; operational staff are System Users. Available roles are
+Give each person a named account with one intended role. Customers and the
+Store Manager, Order Manager, Inventory Manager, Delivery Manager, Customer
+Support and Delivery Staff roles are Website Users with website workspaces,
+not Desk access. Finance Manager, Business Admin and System Manager remain
+System Users. Available roles are
 Customer, Business Admin, Store Manager, Finance Manager, Delivery Manager,
 Order Manager, Inventory Manager, Customer Support and Delivery Staff (Rider).
 Do not share accounts or grant System Manager merely to open a workspace.
+
+Deploy this change with `bench --site <site-name> migrate`, then clear site and
+website caches. The migration updates existing app Role documents through
+Frappe's native save lifecycle. Frappe recalculates affected users' types,
+preserves their assigned roles and document permissions, and revokes sessions
+when the user type changes. Staff must sign in again to their website workspace.
+Users with another Desk-enabled role (including custom roles) retain Desk
+access; review mixed-role accounts explicitly instead of deleting their other
+permissions automatically. Rehearse the migration and role workflows on staging.
+Website-only staff can still use their permitted APIs and product/stock/delivery
+actions. Native product-image uploads allow PNG, JPEG and GIF for these users;
+WebP remains available to Desk-enabled accounts.
 
 Configure outgoing email, email workers and the correct site URL before
 inviting anyone. Creation and resending use native Frappe welcome/password-setup
@@ -817,7 +832,8 @@ non-administrator accounts before deployment.
 ### Local development test accounts
 
 No test accounts are created during installation or migration. The following
-Bench-only command creates real Frappe System Users **only on an explicitly
+Bench-only command creates real Frappe users with role-appropriate Website/System
+User types **only on an explicitly
 confirmed local/private developer-mode site**. Never run it on production,
 an Internet-accessible site, or a local site exposed by a public tunnel.
 The built-in `Administrator` user is never changed.
@@ -853,7 +869,7 @@ entered at the hidden prompt. Keep that value in your local password manager.
 Frappe's password policy still applies. The test administrator also needs
 Business Admin because several app DocTypes grant administration through that
 role rather than System Manager; no other test account receives either role.
-Inventory Manager can create/edit Product records in Desk and perform existing
+Inventory Manager can create/edit products in the product workspace and perform existing
 ledger-backed stock operations, but cannot read payment transactions.
 Customer Support can read customer profiles and orders, not mutate either or
 access payment management. Its page searches the existing Customer Profile
@@ -862,7 +878,7 @@ records and opens paginated order history through the role-checked
 Support customer-search responses omit collected-payment aggregates.
 
 Matching existing accounts are reused without changing passwords or roles.
-Conflicting roles, role profiles, disabled accounts, or non-System Users abort
+Conflicting roles, role profiles, disabled accounts, or incorrect user types abort
 the command before creating users; review those accounts explicitly in Desk.
 New-user welcome emails are disabled. Creation errors roll back the batch
 rather than leave a partially created set. The command returns account/role

@@ -10,5 +10,9 @@
   <div id="management-delivery-performance" class="smarto-cart-items"></div>
   <h3>Recent staff activity and audit trail (latest 5)</h3>
   <div id="management-staff-activity" class="smarto-cart-items"></div>
+  {% if can_manage_users or smarto_staff_workspace == "/dashboard/admin" %}
   <p><a href="/app/admin-audit-log">View full audit history in Frappe Desk</a></p>
+  {% else %}
+  <p><a href="/store#admin-dashboard">Browse audit history in the operations overview</a></p>
+  {% endif %}
 </section>

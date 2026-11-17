@@ -142,6 +142,14 @@ Manager, Delivery Manager, Order Manager, Inventory Manager, Customer Support,
 or Delivery Staff (Rider). Existing Frappe permissions remain authoritative.
 Business Admin cannot administer accounts.
 
+Store Manager, Order Manager, Inventory Manager, Delivery Manager, Customer
+Support and Delivery Staff are website-only roles. Business Admin, Finance
+Manager and System Manager/Administrator retain Desk access. Migrate existing
+sites to update role flags; Frappe recalculates affected user types and revokes
+sessions when their type changes. Existing document permissions and assigned
+roles remain in place. A user with another Desk-enabled role keeps Desk access;
+review mixed-role accounts separately.
+
 The person receives native Frappe password-setup instructions by email; no
 password or reset link is shown to the administrator. Configure outgoing email,
 workers and the site's public URL first. Queued email does not guarantee delivery.
@@ -168,7 +176,8 @@ existing DocTypes and audit hooks; no duplicate catalog or inventory is created.
 
 Enter a unique SKU, name, enabled category, price and currency, then save.
 Existing SKUs cannot be changed through this page. After saving, upload an
-optional public PNG/JPEG/WebP/GIF image; product images are visible to shoppers.
+optional public PNG/JPEG/GIF image; product images are visible to shoppers.
+Native uploads also support WebP for Desk-enabled accounts, not website-only staff.
 Disable a product to remove it from sale without deleting its history.
 
 For incoming goods, an Inventory Manager, Business Admin or System Manager

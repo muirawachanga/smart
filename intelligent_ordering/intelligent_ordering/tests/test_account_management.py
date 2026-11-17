@@ -34,7 +34,7 @@ class TestAccountManagement(FrappeTestCase):
 
     def test_operational_role_update_and_disable_preserve_native_user_lifecycle(self):
         user = self.create("Inventory Manager")
-        self.assertEqual(user.user_type, "System User")
+        self.assertEqual(user.user_type, "Website User")
         with patch("frappe.sessions.clear_sessions") as clear:
             update_access(user.name, "Order Manager", 0, str(user.modified))
             clear.assert_called_with(user=user.name, force=True)
