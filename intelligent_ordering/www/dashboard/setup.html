@@ -51,18 +51,18 @@
   </section>
   <section class="smarto-admin-section" aria-labelledby="setup-data-heading">
     <h2 id="setup-data-heading">Initial data and staff setup</h2>
-    <p>Create categories, products, warehouses and delivery areas in Desk. Receive opening stock through the inventory workflow.
-      Create named users and assign only their intended roles.</p>
+    <p>Create categories and products in the product workspace. Configure warehouses and delivery areas in Desk,
+      then receive opening stock through the inventory workflow.
+      Administrator/System Manager can register named customers and staff in the accounts workspace.</p>
     <p>Use Frappe Data Import templates for supported master data, reviewing a small test import first.
       Do not import payment success states, stock balances or order status changes to bypass validated workflows.</p>
     <nav class="smarto-admin-shortcuts" aria-label="Business setup tools">
-      <a href="/app/product-category">Categories</a>
-      <a href="/app/product">Products</a>
+      <a href="/dashboard/products">Products and categories</a>
       <a href="/app/stock-warehouse">Warehouses</a>
       <a href="/app/delivery-area">Delivery areas</a>
       <a href="/app/smarto-policy-version">Policies</a>
       {% if can_manage_users %}
-      <a href="/app/user">Staff accounts</a>
+      <a href="/dashboard/accounts">Customer and staff accounts</a>
       <a href="/app/data-import">Data import</a>
       <a href="/app/website-settings">Website settings</a>
       {% endif %}

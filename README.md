@@ -117,8 +117,59 @@ outside the current scope.
 
 ## User workspaces
 
+### Customer and staff accounts
+
+Administrator/System Manager can open `/dashboard/accounts` (also linked from
+the admin dashboard) to register customers and staff without entering Desk.
+Select one intended role: Customer, Business Admin, Store Manager, Finance
+Manager, Delivery Manager, Order Manager, Inventory Manager, Customer Support,
+or Delivery Staff (Rider). Existing Frappe permissions remain authoritative.
+Business Admin cannot administer accounts.
+
+The person receives native Frappe password-setup instructions by email; no
+password or reset link is shown to the administrator. Configure outgoing email,
+workers and the site's public URL first. Queued email does not guarantee delivery.
+Administrators can search accounts, resend setup instructions, change an
+operational role, or enable/disable access. Access changes revoke existing
+sessions and are audited. Resolve a rider's undelivered assignments before
+disabling them or removing their rider role.
+
+Customer registration creates the existing Customer Profile, not a policy
+acceptance or marketing-consent record. Obtain any required consent through
+your actual customer process. Customer/staff conversion, your own access,
+administrator accounts, role profiles and custom/multiple-role setups must
+be managed separately through Desk. This workspace cannot grant System Manager.
+
+### Products and incoming stock
+
+Open `/dashboard/products` to create or edit products without entering Desk.
+System Manager, Business Admin, Store Manager, Order Manager and Inventory
+Manager can manage products, subject to Frappe document permissions. Category
+creation is available only to roles with category-create permission (normally
+System Manager, Business Admin and Store Manager). The backend checks these
+permissions independently of visible buttons. Products and categories use the
+existing DocTypes and audit hooks; no duplicate catalog or inventory is created.
+
+Enter a unique SKU, name, enabled category, price and currency, then save.
+Existing SKUs cannot be changed through this page. After saving, upload an
+optional public PNG/JPEG/WebP/GIF image; product images are visible to shoppers.
+Disable a product to remove it from sale without deleting its history.
+
+For incoming goods, an Inventory Manager, Business Admin or System Manager
+opens `/dashboard/inventory`, finds the product, selects an active warehouse,
+chooses **Receive stock**, enters the quantity and records the movement.
+**Initial stock** is only for a product/warehouse pair without prior movements.
+The existing ledger records the actor, quantity, time and remarks, and catalog
+availability reflects the resulting stock. Store/Order Managers do not gain
+stock-adjustment access merely by managing products.
+
+An administrator must configure an active warehouse before receipts can be
+recorded. Apply migrations after updating permissions, and rebuild assets.
+
 | User | Entry point | Responsibility |
 | --- | --- | --- |
+| Administrator / System Manager only | `/dashboard/accounts` | Register customers/staff, assign one intended operational role, enable/disable access and resend setup email |
+| Authorized product staff | `/dashboard/products` | Product creation/editing; category creation requires separate permission |
 | Customer | `/products`, `/assistant`, `/account` | Shopping and owner-scoped order history |
 | Rider (`Delivery Staff`) | `/dashboard/delivery` | Their assigned deliveries and permitted status actions, not financial management |
 | Delivery Manager | `/dashboard/delivery` | Assignment, monitoring and delivery planning |

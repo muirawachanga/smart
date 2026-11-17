@@ -37,6 +37,8 @@ SHELL_ROUTES = {
     "/dashboard/sales": "dashboard/sales.html",
     "/dashboard/orders": "dashboard/orders.html",
     "/dashboard/inventory": "dashboard/inventory.html",
+    "/dashboard/products": "dashboard/products.html",
+    "/dashboard/accounts": "dashboard/accounts.html",
     "/dashboard/delivery": "dashboard/delivery.html",
     "/dashboard/support": "dashboard/support.html",
 }
@@ -141,6 +143,8 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
             "dashboard/sales.html": "role-dashboard.js",
             "dashboard/orders.html": "order-pages.js",
             "dashboard/inventory.html": "inventory-page.js",
+            "dashboard/products.html": "products-management.js",
+            "dashboard/accounts.html": "accounts-management.js",
             "dashboard/delivery.html": "delivery-page.js",
             "dashboard/support.html": "order-pages.js",
         }
@@ -206,8 +210,7 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
         script = (APP_ROOT / "public/js/admin-dashboard.js").read_text()
         controller = (WWW / "dashboard/admin.py").read_text()
         self.assertIn("/assets/intelligent_ordering/js/admin-dashboard.js", source)
-        self.assertIn('href="/app/product"', source)
-        self.assertIn('href="/app/product-category"', source)
+        self.assertIn('href="/dashboard/products"', source)
         self.assertIn('href="/app/user"', source)
         for endpoint in (
             "administration.dashboard", "administration.sales_analytics",

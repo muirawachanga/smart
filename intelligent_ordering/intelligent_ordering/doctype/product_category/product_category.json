@@ -11,6 +11,7 @@
     {"default": "1", "fieldname": "enabled", "fieldtype": "Check", "label": "Enabled"}
   ],
   "permissions": [
+    {"role": "System Manager", "read": 1, "write": 1, "create": 1},
     {"role": "Customer", "read": 1},
     {"role": "Business Admin", "read": 1, "write": 1, "create": 1, "delete": 1},
     {"role": "Store Manager", "read": 1, "write": 1, "create": 1},

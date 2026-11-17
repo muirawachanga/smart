@@ -61,6 +61,25 @@ class TestStaffPages(unittest.TestCase):
         with self.assertRaises(PermissionDenied):
             self.pages.require_staff_page(types.SimpleNamespace(), "inventory")
 
+    def test_product_management_does_not_grant_stock_permissions(self):
+        for role in ("Store Manager", "Order Manager"):
+            self.frappe.get_roles.return_value = [role]
+            self.pages.require_staff_page(types.SimpleNamespace(), "products")
+            with self.assertRaises(PermissionDenied):
+                self.pages.require_staff_page(types.SimpleNamespace(), "inventory")
+        for role in ("Customer", "Finance Manager", "Delivery Staff", "Customer Support"):
+            self.frappe.get_roles.return_value = [role]
+            with self.subTest(role=role), self.assertRaises(PermissionDenied):
+                self.pages.require_staff_page(types.SimpleNamespace(), "products")
+
+    def test_account_workspace_is_system_manager_only(self):
+        self.frappe.get_roles.return_value = ["System Manager"]
+        self.pages.require_staff_page(types.SimpleNamespace(), "accounts")
+        for role in ("Business Admin", "Store Manager", "Customer", "Inventory Manager", "Delivery Staff"):
+            self.frappe.get_roles.return_value = [role]
+            with self.subTest(role=role), self.assertRaises(PermissionDenied):
+                self.pages.require_staff_page(types.SimpleNamespace(), "accounts")
+
     def test_report_controls_follow_workspace_and_financial_authority(self):
         for role, page, expected in (
             ("Delivery Staff", "delivery", set()),

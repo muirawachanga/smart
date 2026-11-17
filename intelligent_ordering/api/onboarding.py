@@ -97,7 +97,7 @@ def readiness():
         )
     """)[0][0]
     check("catalog", "Published product catalog", bool(catalog),
-          "Create enabled products in enabled categories with accurate prices and currencies.", "/app/product")
+          "Create enabled products in enabled categories with accurate prices and currencies.", "/dashboard/products")
     check("stock", "Saleable stock", bool(stock),
           "Receive stock through the inventory workflow in an active warehouse.", "/dashboard/inventory")
     check("areas", "Delivery areas for catalog currencies", bool(catalog) and not missing_areas,

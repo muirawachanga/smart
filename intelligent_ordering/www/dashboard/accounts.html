@@ -1,0 +1,40 @@
+{% extends "templates/smarto_base.html" %}
+{% block title %}Customer and staff accounts | SmartO{% endblock %}
+{% block smarto_content %}
+<main class="smarto-page" data-page-title="Account administration">
+  {% include "templates/includes/page_script_warning.html" %}
+  <h1>Customer and staff accounts</h1>
+  <p>Administrator/System Manager only. Create named accounts for this business and assign one intended role.
+    Rider accounts use the Delivery Staff role. No password is displayed; the person sets their password by email.</p>
+  <p>Configure outgoing email, workers and the correct site URL before inviting anyone.
+    An email queued for sending is not proof of delivery. Use separate customer and staff accounts.</p>
+  <p id="accounts-status" role="status" aria-live="polite">Loading accounts...</p>
+  <p id="accounts-error" role="alert"></p>
+  <section class="smarto-admin-section">
+    <h2>Register a customer or staff member</h2>
+    <form id="accounts-create" class="smarto-checkout-form">
+      <label>Full name <input name="full_name" maxlength="140" required></label>
+      <label>Email <input name="email" type="email" maxlength="140" autocomplete="off" required></label>
+      <label>Phone <input name="phone" type="tel" maxlength="20" required></label>
+      <label>Intended role <select id="accounts-role" name="role" required></select></label>
+      <button class="smarto-button" type="submit">Create account and email setup instructions</button>
+    </form>
+    <p>Creating a customer here creates the existing Customer Profile; it does not record policy acceptance or marketing consent.
+      Obtain any required consent through your actual customer process, never on the customer's behalf.</p>
+    <p id="accounts-create-feedback" role="status" aria-live="polite"></p>
+  </section>
+  <form id="accounts-search" class="smarto-catalog-form">
+    <label>Name or email <input name="search" type="search" maxlength="140"></label>
+    <button class="smarto-button" type="submit">Search accounts</button>
+  </form>
+  <p>Custom, multiple-role, role-profile and administrator accounts are read-only here.
+    Use Desk for advanced permissions. You cannot edit your own access or grant System Manager in this workspace.</p>
+  <div id="accounts-list" class="smarto-cart-items"></div>
+  <nav class="smarto-pagination" aria-label="Account pages">
+    <button id="accounts-previous" class="smarto-button" type="button" disabled>Previous</button>
+    <span id="accounts-page"></span>
+    <button id="accounts-next" class="smarto-button" type="button" disabled>Next</button>
+  </nav>
+</main>
+<script type="module" src="/assets/intelligent_ordering/js/accounts-management.js"></script>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "templates/smarto_base.html" %}
+{% block title %}Product management | SmartO{% endblock %}
+{% block smarto_content %}
+<main class="smarto-page" data-page-title="Product management">
+  {% include "templates/includes/page_script_warning.html" %}
+  <h1>Product management</h1>
+  <p>Create and update this business's catalog. Product availability and physical stock are separate:
+    new products need stock received by authorized inventory personnel before they can be ordered.</p>
+  <p id="products-status" role="status" aria-live="polite">Loading products...</p>
+  <p id="products-error" role="alert"></p>
+  <p><a id="products-inventory-link" href="/dashboard/inventory" hidden>Receive stock and view movement history</a></p>
+  <form id="products-search" class="smarto-catalog-form">
+    <label>Product name or SKU <input name="search" type="search" maxlength="100"></label>
+    <button class="smarto-button" type="submit">Search products</button>
+  </form>
+  <button id="products-new" class="smarto-button" type="button">Add product</button>
+  <section id="products-editor" class="smarto-admin-section" hidden>
+    <h2 id="products-editor-heading">Add product</h2>
+    <form id="products-form" class="smarto-checkout-form">
+      <fieldset id="products-fields" disabled>
+        <label>SKU <input name="sku" maxlength="140" required></label>
+        <label>Product name <input name="product_name" maxlength="140" required></label>
+        <label>Category <select name="category" required></select></label>
+        <label>Description <textarea name="description" maxlength="1000"></textarea></label>
+        <label>Price <input name="price" type="number" min="0" max="999999999.99" step="0.01" required></label>
+        <label>Currency <input name="currency" maxlength="3" value="KES" required></label>
+        <label>Availability <select name="enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></label>
+        <button class="smarto-button" type="submit">Save product</button>
+      </fieldset>
+    </form>
+    <p id="products-save-status" role="status" aria-live="polite"></p>
+    <p id="products-save-error" role="alert"></p>
+    <form id="products-image-form" class="smarto-checkout-form">
+      <label>Public product image
+        <input id="products-image-file" name="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled>
+      </label>
+      <button id="products-image-upload" class="smarto-button smarto-button-secondary" type="submit" disabled>Upload image</button>
+    </form>
+    <p>Save the product first, then upload an image. Product images are public. Uploading and saving the image reference are separate steps;
+      an error will tell you if the upload succeeded but linking it failed.</p>
+    <p id="products-image-status" role="status" aria-live="polite"></p>
+  </section>
+  <div id="products-list" class="smarto-cart-items"></div>
+  <nav class="smarto-pagination" aria-label="Product pages">
+    <button id="products-previous" class="smarto-button" type="button" disabled>Previous</button>
+    <span id="products-page"></span>
+    <button id="products-next" class="smarto-button" type="button" disabled>Next</button>
+  </nav>
+  <section id="products-category-section" class="smarto-admin-section" hidden>
+    <h2>Add category</h2>
+    <form id="products-category-form" class="smarto-checkout-form">
+      <label>Category name <input name="category_name" maxlength="140" required></label>
+      <label>Description <textarea name="description" maxlength="1000"></textarea></label>
+      <button class="smarto-button" type="submit">Save category</button>
+    </form>
+    <p id="products-category-status" role="status" aria-live="polite"></p>
+  </section>
+</main>
+<script type="module" src="/assets/intelligent_ordering/js/products-management.js"></script>
+{% endblock %}

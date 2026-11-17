@@ -41,8 +41,9 @@ bench --site <site-name> install-app intelligent_ordering
 Open the site URL printed by `bench start`. The SmartO homepage and dedicated
 catalog are available at `/` and `/products`; the existing database-backed
 ordering and staff operations remain at `/store`. Frappe's login and session
-handling provide the authentication foundation. Assign the app roles to test
-users from the Frappe Desk.
+handling provide the authentication foundation. Administrator/System Manager
+can create named customer/staff accounts at `/dashboard/accounts`; use Desk
+for advanced permissions.
 
 ## Multiple businesses: one site per business
 
@@ -71,6 +72,18 @@ cross-business checkout. Isolation depends on correct Frappe site, database,
 host, cookie, storage and administrator configuration; it is not guaranteed by
 application-level tenant filters. Validate isolation on the actual deployment
 before onboarding businesses.
+
+For example, `shop-a.example.com` and `shop-b.example.com` can run the same
+SmartO app version while maintaining separate users, products, stock ledgers,
+orders, delivery staff and payment credentials. Each business's managers use
+their own site's dashboards, and payments use that site's configured Daraja
+account and callback. Customer accounts and carts are not shared across stores.
+Business staff must not receive infrastructure-level access to other sites.
+The platform operator provisions and maintains each site; vendor self-signup,
+cross-vendor search/cart, commission calculation and split settlements are not
+implemented. A shared marketplace would require a separately designed
+ownership, permission and settlement model rather than simply adding a vendor
+field to products.
 
 ## Business onboarding and launch checks
 
@@ -157,6 +170,7 @@ individual forms and readable text retain their own width constraints.
 | `/dashboard/sales` | Role-protected sales workspace |
 | `/dashboard/orders` | Role-protected order search, details and status updates |
 | `/dashboard/inventory` | Role-protected inventory workspace |
+| `/dashboard/products` | Authorized product creation/editing and category creation |
 | `/dashboard/delivery` | Role-protected delivery workspace |
 | `/dashboard/support` | Read-only customer search, profiles, order history and enquiries |
 | `/store` | Existing database-backed storefront and staff workflows |
@@ -233,7 +247,8 @@ Registration uses Frappe User password handling and creates a Customer Profile
 in the same request transaction. Public signup cannot assign staff roles or
 bypass the policy gate. Passwords require at least 12 characters, a strength
 score of 3, and any additional configured Frappe password policy. Staff accounts
-are created in Desk by authorized administrators.
+can be created at `/dashboard/accounts` by Administrator/System Manager,
+using native Frappe password-setup email. Advanced permissions remain in Desk.
 
 Configure outgoing email for password recovery, enable the site's login
 attempt limits/password policy/reset-link expiry, and serve production traffic
@@ -588,6 +603,36 @@ selection. Product listing and detail pages add to the existing guest or
 customer cart. Cart review and checkout are available on their dedicated pages.
 Product images intended for guests must be accessible to website visitors.
 
+### Website product management
+
+At `/dashboard/products`, System Manager, Business Admin, Store Manager,
+Order Manager and Inventory Manager can list enabled/disabled products, search
+by SKU/name, create products and edit existing records. The APIs in
+`intelligent_ordering.api.products` enforce this role boundary and normal
+Frappe document create/write permissions, including custom permission
+restrictions. Edits require the loaded modification timestamp; stale writes
+must be reopened. SKUs are immutable in this workspace. The price must be
+finite and non-negative, and category/currency validation retains the existing
+Product controller. Category creation uses normal Product Category create
+permissions, so Order/Inventory Managers cannot create categories by calling
+the API directly.
+
+Images use Frappe's native authenticated file upload endpoint, attached to
+the saved Product as public files. Only public PNG/JPEG/WebP/GIF file references
+attached to that product are accepted by the product-save API. Upload and
+linking are separate operations; failures explicitly distinguish a confirmed
+upload from an unconfirmed product update. Old attachments are not deleted
+automatically. Do not upload sensitive images. Product changes and category
+creation use the existing Admin Audit Log hooks.
+
+Creating a product does not create stock. Only System Manager, Business Admin
+and Inventory Manager receive goods through `/dashboard/inventory` and the
+existing `inventory.adjust_stock` API; Store/Order Managers retain product-only
+authority unless separately assigned an inventory role. Select the product,
+active warehouse and Receipt (or Opening only for initial balances), then enter
+a whole quantity and remarks. No direct balance writes or duplicate stock
+modules are introduced. Warehouse setup remains in Desk.
+
 ## Shopping cart API
 
 Cart methods are POST-only:
@@ -674,15 +719,41 @@ as uncategorized rather than being silently reclassified.
 
 ## Personnel accounts and workspaces
 
-Provision each staff member as a separate Frappe **System User** in Desk.
-A System Manager creates the user, assigns only the required existing app
-roles, and uses Frappe's password setup and account-disable workflows. Do not
-share accounts or give staff `System Manager` solely to access SmartO.
-Role assignment and User permissions are controlled by Frappe, not by a new
-SmartO provisioning endpoint. Disable the Frappe user when access is revoked.
+Administrator/System Manager can register customers and staff from
+`/dashboard/accounts`, linked from the admin dashboard and setup workspace.
+Business Admin cannot access this page or its APIs. The page uses existing
+Frappe User, Role and Customer Profile records, native create/write permission
+checks, password-setup email and existing User audit hooks. It never grants
+System Manager or arbitrary roles.
+
+Give each person a named account with one intended role. Customer accounts
+are Website Users; operational staff are System Users. Available roles are
+Customer, Business Admin, Store Manager, Finance Manager, Delivery Manager,
+Order Manager, Inventory Manager, Customer Support and Delivery Staff (Rider).
+Do not share accounts or grant System Manager merely to open a workspace.
+
+Configure outgoing email, email workers and the correct site URL before
+inviting anyone. Creation and resending use native Frappe welcome/password-setup
+instructions, never administrator-entered passwords or exposed reset links.
+Configuration errors fail explicitly; queued email is not confirmed delivery.
+Resending can invalidate earlier setup links.
+
+Search by name/email, change an operational role, or enable/disable a managed
+account. The backend checks the loaded modification timestamp and normal User
+write permission, then saves through the native lifecycle and revokes existing
+sessions. Resolve/reassign a rider's undelivered assignments before disabling
+them or changing their role. Customer/staff conversion is not supported here.
+Self-edits, administrator accounts, role profiles and custom/multiple-role
+accounts are protected; use Desk for advanced role/permission administration.
+
+Admin-created customers receive an existing Customer Profile but no fabricated
+SmartO Policy Acceptance or marketing-consent record. Obtain any required
+customer consent through the actual customer process.
 
 | Workspace | Roles permitted to open it |
 | --- | --- |
+| `/dashboard/accounts` | Administrator/System Manager only |
+| `/dashboard/products` | System Manager, Business Admin, Store Manager, Order Manager, Inventory Manager |
 | `/dashboard/admin` | System Manager, Business Admin |
 | `/dashboard/owner` | System Manager, Business Admin, Store Manager |
 | `/dashboard/orders` | System Manager, Business Admin, Store Manager, Order Manager |
@@ -1126,7 +1197,8 @@ rows so data is not silently truncated. XLSX uses Frappe's bundled
 
 Order management reuses the Sales Order workflow and displays immutable
 customer/product/order snapshots together with payment and delivery history.
-Catalog and category editing links to the existing Frappe Desk DocTypes.
+Catalog and category editing uses `/dashboard/products` with the existing
+Product and Product Category DocTypes and native permissions.
 Products referenced by order items or stock-ledger history cannot be deleted;
 disable them instead. Inventory adjustments continue through the existing
 ledger-backed `inventory.adjust_stock` API. Delivery assignment and tracking
