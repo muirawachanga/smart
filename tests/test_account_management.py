@@ -10,13 +10,19 @@ class AccountError(Exception):
     pass
 
 
+class OutgoingEmailError(Exception):
+    pass
+
+
 def load_api():
     frappe = types.ModuleType("frappe")
     frappe.whitelist = lambda **kwargs: lambda function: function
     frappe.session = types.SimpleNamespace(user="admin@example.test")
     frappe.get_roles = Mock(return_value=["System Manager"])
     frappe.PermissionError = frappe.ValidationError = AccountError
+    frappe.OutgoingEmailError = OutgoingEmailError
     frappe.throw = Mock(side_effect=lambda message, error: (_ for _ in ()).throw(error(message)))
+    frappe.clear_messages = Mock()
     frappe.get_doc = Mock()
     frappe.get_list = Mock(return_value=[])
     frappe.get_all = Mock(return_value=[])
@@ -104,9 +110,22 @@ class TestAccountManagement(unittest.TestCase):
         self.frappe.get_doc.assert_not_called()
 
     def test_outgoing_mail_failure_is_not_reported_as_success(self):
-        self.user.send_welcome_mail_to_user.side_effect = AccountError("Outgoing email unavailable")
-        with self.assertRaisesRegex(AccountError, "Outgoing email"):
-            self.api.create_account("staff@example.test", "Staff", "+254712345678", "Inventory Manager")
+        self.user.send_welcome_mail_to_user.side_effect = OutgoingEmailError("private SMTP details")
+        for operation in (
+            lambda: self.api.create_account("staff@example.test", "Staff", "+254712345678", "Inventory Manager"),
+            lambda: self.api.send_invitation(self.user.name),
+        ):
+            with self.subTest(operation=operation), self.assertRaises(AccountError) as raised:
+                operation()
+            self.assertIn("default outgoing Email Account", str(raised.exception))
+            self.assertNotIn("private SMTP details", str(raised.exception))
+        self.assertEqual(self.frappe.clear_messages.call_count, 2)
+        self.modules["intelligent_ordering.utils.audit"].record_admin_event.assert_not_called()
+
+    def test_unexpected_mail_errors_are_not_suppressed(self):
+        self.user.send_welcome_mail_to_user.side_effect = RuntimeError("Unexpected error")
+        with self.assertRaisesRegex(RuntimeError, "Unexpected error"):
+            self.api.send_invitation(self.user.name)
 
     def test_native_permission_failures_are_not_bypassed(self):
         self.user.insert.side_effect = AccountError("No create permission")

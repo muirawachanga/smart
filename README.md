@@ -45,6 +45,11 @@ For an existing installation, back up the site, deploy the updated app, run
 `bench --site <site-name> migrate`, rebuild assets and clear the site cache.
 Rehearse upgrades and restoration on staging before production.
 
+**ERPNext compatibility:** Do not install ERPNext on an existing SmartO site
+yet. SmartO and ERPNext both define incompatible `Sales Order`,
+`Sales Order Item` and `Stock Ledger Entry` DocTypes. A data-preserving
+same-site migration and accounting integration are not yet implemented.
+
 ## Business onboarding
 
 Use **Administrator dashboard -> Business setup and launch checks**:
@@ -116,6 +121,17 @@ AI providers, dynamic pricing and advanced machine-learning models are also
 outside the current scope.
 
 ## User workspaces
+
+### Delivery areas and fees
+
+Open **Administrator dashboard -> Delivery areas and fees** to manage the
+existing Delivery Area records at `/dashboard/delivery`. Authorized rate
+managers can add areas, edit fees/currency and enable or disable them.
+Administrator/System Manager and Business Admin can permanently delete unused
+areas; areas referenced by orders or deliveries must be disabled instead.
+Other native links also block deletion. Rate changes affect new orders only;
+existing order and delivery snapshots are preserved. Apply site migrations to
+update delete permissions.
 
 ### Customer and staff accounts
 

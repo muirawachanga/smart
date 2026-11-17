@@ -19,9 +19,31 @@ from intelligent_ordering.api.catalog import personalized_recommendations
 from intelligent_ordering.api import assistant, cart
 from intelligent_ordering.api.inventory import adjust_stock
 from intelligent_ordering.api.payments import _save
+from intelligent_ordering.api.deliveries import delete_delivery_area, save_delivery_area
 
 
 class TestAdministrationAnalytics(FrappeTestCase):
+    def test_delivery_area_history_is_preserved_and_unused_area_can_be_deleted(self):
+        area = frappe.get_doc("Delivery Area", self.area.name)
+        original_fee = self.order.delivery_fee
+        save_delivery_area(area.name, 75, modified=str(area.modified))
+        area.reload()
+        self.order.reload()
+        self.assertEqual(self.order.delivery_fee, original_fee)
+        with self.assertRaises(frappe.ValidationError):
+            delete_delivery_area(area.name, str(area.modified))
+        save_delivery_area(area.name, 75, enabled=0, modified=str(area.modified))
+        area.reload()
+        self.assertEqual(area.enabled, 0)
+        name = f"Unused Area {frappe.generate_hash(length=8)}"
+        save_delivery_area(name, 10)
+        unused = frappe.get_doc("Delivery Area", name)
+        delete_delivery_area(name, str(unused.modified))
+        self.assertFalse(frappe.db.exists("Delivery Area", name))
+        self.assertTrue(frappe.db.exists("Admin Audit Log", {
+            "event_type": "Delivery area deleted", "reference_name": name,
+        }))
+
     def setUp(self):
         super().setUp()
         frappe.set_user("Administrator")

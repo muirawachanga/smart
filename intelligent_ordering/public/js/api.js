@@ -60,6 +60,9 @@ export async function readResponse(response, operation, { login = false } = {}) 
     else if (status === 401) message = "Your session may have expired. Sign in and try again.";
     else if (status === 403) message = "You do not have permission for this action, or your session has expired.";
     else if (status === 429) message = "Too many attempts. Please try again later.";
+    else if (status === 501 && ["accounts.create_account", "accounts.send_invitation"].includes(operation)) {
+      message = "Outgoing email is unavailable. Check the default outgoing Email Account in Frappe, then retry.";
+    }
     else if (status >= 500) message = "The server encountered an error. Contact your administrator.";
     else message = serverErrorMessage(payload);
     const code = Number.isInteger(status) ? `, HTTP ${status}` : "";

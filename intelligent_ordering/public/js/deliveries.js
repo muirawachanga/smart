@@ -82,6 +82,15 @@ export function initDeliveryDashboard() {
   let page = 1;
   let readyPage = 1;
   let dashboard = { manager: false, personnel: [], areas: [] };
+  let selectedArea = null;
+  const newArea = button("Add new area", () => {
+    selectedArea = null;
+    areaForm.reset();
+    areaForm.elements.area_name.readOnly = false;
+    areaForm.elements.currency.value = "KES";
+    areaForm.elements.enabled.value = "1";
+  });
+  areaForm.append(newArea);
 
   async function act(control, operation) {
     if (control.disabled) return;
@@ -160,12 +169,36 @@ export function initDeliveryDashboard() {
       row.className = "smarto-order-item";
       row.append(text("p", `${area.name}: ${area.currency} ${area.delivery_fee} (${area.enabled ? "Enabled" : "Disabled"})`));
       if (dashboard.can_manage_areas) row.append(button("Edit area", () => {
+        selectedArea = area;
         areaForm.elements.area_name.value = area.name;
+        areaForm.elements.area_name.readOnly = true;
         areaForm.elements.currency.value = area.currency;
         areaForm.elements.delivery_fee.value = area.delivery_fee;
         areaForm.elements.enabled.value = String(area.enabled);
         areaForm.scrollIntoView({ behavior: "smooth" });
       }));
+      if (dashboard.can_delete_areas) {
+        const remove = button("Delete unused area", () => {
+          if (!window.confirm(`Permanently delete ${area.name}? Areas with history must be disabled instead.`)) return;
+          act(remove, async () => {
+            const result = await post("deliveries.delete_delivery_area", {
+              area_name: area.name, modified: area.modified,
+            });
+            selectedArea = null;
+            areaForm.reset();
+            areaForm.elements.area_name.readOnly = false;
+            areaForm.elements.currency.value = "KES";
+            areaForm.elements.enabled.value = "1";
+            try {
+              await loadDashboard();
+              feedback.textContent = result.message;
+            } catch (error) {
+              feedback.textContent = `${result.message} Display refresh failed; reload before continuing. ${error.message}`;
+            }
+          });
+        });
+        row.append(remove);
+      }
       return row;
     }));
   }
@@ -501,9 +534,20 @@ export function initDeliveryDashboard() {
     event.preventDefault();
     if (!areaForm.reportValidity()) return;
     act(areaForm.querySelector('button[type="submit"]'), async () => {
-      await post("deliveries.save_delivery_area", Object.fromEntries(new FormData(areaForm)));
-      await loadDashboard();
-      feedback.textContent = "Delivery area saved. Existing orders have not changed.";
+      await post("deliveries.save_delivery_area", {
+        ...Object.fromEntries(new FormData(areaForm)), modified: selectedArea?.modified || "",
+      });
+      selectedArea = null;
+      areaForm.reset();
+      areaForm.elements.area_name.readOnly = false;
+      areaForm.elements.currency.value = "KES";
+      areaForm.elements.enabled.value = "1";
+      try {
+        await loadDashboard();
+        feedback.textContent = "Delivery area saved. Existing orders have not changed.";
+      } catch (error) {
+        feedback.textContent = `Delivery area saved, but display refresh failed; reload before continuing. ${error.message}`;
+      }
     });
   });
   filters.addEventListener("submit", (event) => { event.preventDefault(); page = 1; refresh(); });

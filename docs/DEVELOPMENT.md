@@ -45,6 +45,21 @@ handling provide the authentication foundation. Administrator/System Manager
 can create named customer/staff accounts at `/dashboard/accounts`; use Desk
 for advanced permissions.
 
+## ERPNext accounting compatibility
+
+Do not install ERPNext on an existing SmartO site. Both apps define `Sales
+Order`, `Sales Order Item` and `Stock Ledger Entry` with incompatible schemas
+and controllers. Installing or migrating both apps without first resolving
+those collisions risks existing order and stock data.
+
+Same-site ERPNext accounting is not implemented. It requires a tested,
+data-preserving migration of SmartO's conflicting DocTypes and references
+before ERPNext is installed, followed by a separately validated accounting
+integration. Rehearsal must cover backup and restore, existing order and
+stock history, permissions, payment reconciliation and duplicate-posting
+prevention on a representative isolated site. Do not post pending payments
+as received or assume that existing SmartO records have been booked in ERPNext.
+
 ## Multiple businesses: one site per business
 
 Each business must use its own Frappe site and database. Install the same app
@@ -207,11 +222,21 @@ an address in My account first.
 The delivery-area selector is populated from enabled **Delivery Area** records
 whose currency exactly matches the cart's currency. If it is empty, sign in
 with System Manager, Business Admin, Store Manager, or Order Manager, open
-**Delivery Area** in Desk, and create or enable an area with the correct
+**Delivery areas and fees** from the admin dashboard (or `/dashboard/delivery`),
+and create or enable an area with the correct
 currency (for example, KES when the cart subtotal is in KES) and a delivery fee.
 An area with another currency, or a disabled area, will not appear. After saving
 it, reload checkout. The backend verifies the selected enabled area and its
 server-side fee before accepting an order.
+
+Use **Edit area** to change its fee, currency or enabled status, and **Add new
+area** to start a separate record. Names are immutable; disable an old area
+and create a new one instead of renaming it. Saves reject stale versions.
+Administrator/System Manager and Business Admin can delete unused areas after
+confirmation. Orders, deliveries and native link checks prevent deletion of
+referenced areas; disable those areas instead. Website changes are recorded
+in Admin Audit Log. Fees already saved on orders and deliveries do not change.
+Run site migrations when deploying the updated delete permissions.
 
 Customer and staff pages reuse the existing database-backed catalog, cart,
 checkout, order, inventory, delivery, payment, and reporting APIs. The account,
@@ -737,6 +762,15 @@ inviting anyone. Creation and resending use native Frappe welcome/password-setup
 instructions, never administrator-entered passwords or exposed reset links.
 Configuration errors fail explicitly; queued email is not confirmed delivery.
 Resending can invalidate earlier setup links.
+
+If an invitation reports an outgoing-email error (Frappe may return HTTP 501),
+open **Email Account** in Desk and configure the provider's SMTP settings and
+credentials. Enable outgoing email, mark the account as the default outgoing
+account, and verify the provider's authentication and connection settings.
+Save and test the configuration, then retry the invitation. If Frappe reports
+that an email was queued but it does not arrive, inspect the Email Queue and
+ensure scheduler and workers are running. Never share SMTP passwords or reset
+links when requesting support.
 
 Search by name/email, change an operational role, or enable/disable a managed
 account. The backend checks the loaded modification timestamp and normal User

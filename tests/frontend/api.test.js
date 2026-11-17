@@ -48,3 +48,17 @@ test("network, permission and non-JSON failures give actionable diagnostics", as
   }));
   await assert.rejects(get("orders.list_orders"), /invalid response.*orders\.list_orders, HTTP 502/);
 });
+
+test("legacy invitation HTTP 501 identifies email configuration without exposing server details", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => ({
+    ok: false, status: 501, json: async () => ({ message: "private SMTP details", exc: "secret" }),
+  }));
+  for (const operation of ["accounts.send_invitation", "accounts.create_account"]) {
+    await assert.rejects(get(operation), (error) => {
+      assert.match(error.message, /default outgoing Email Account/);
+      assert.doesNotMatch(error.message, /private SMTP|secret/);
+      return true;
+    });
+  }
+  await assert.rejects(get("orders.list_orders"), /server encountered an error/);
+});

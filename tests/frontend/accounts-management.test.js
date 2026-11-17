@@ -126,3 +126,19 @@ test("mail failures and denied account administration never display success", as
   assert.equal(submit.disabled, true);
   assert.match(nodes.get("#accounts-error").textContent, /permission/);
 });
+
+test("resend shows how to fix an outgoing email failure", async (t) => {
+  const { nodes } = install(t);
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("send_invitation")) return {
+      ok: false, status: 501, json: async () => ({ exc: "private credentials" }),
+    };
+    return response(listing);
+  });
+  await import(`../../intelligent_ordering/public/js/accounts-management.js?email=${Date.now()}`);
+  await tick();
+  const card = nodes.get("#accounts-list").children[0];
+  await card.children[3].listeners.click();
+  assert.match(card.children[4].textContent, /default outgoing Email Account/);
+  assert.doesNotMatch(card.children[4].textContent, /queued|private credentials/);
+});

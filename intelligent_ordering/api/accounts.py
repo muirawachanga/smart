@@ -53,6 +53,17 @@ def _locked_user(name):
     return user, roles[0]
 
 
+def _send_invitation(user):
+    try:
+        user.send_welcome_mail_to_user()
+    except frappe.OutgoingEmailError:
+        frappe.clear_messages()
+        frappe.throw(
+            "Password-setup email could not be queued. Configure an enabled default outgoing Email Account in Frappe and retry.",
+            frappe.ValidationError,
+        )
+
+
 @frappe.whitelist()
 def list_accounts(search="", page=1, page_size=20):
     _require()
@@ -104,9 +115,8 @@ def create_account(email, full_name, phone, role):
                      frappe.ValidationError)
     if role == "Customer":
         _save_customer_profile(user.name, full_name, phone)
-    # Call directly so outgoing-mail errors abort the transaction instead of
-    # the User welcome-notification wrapper swallowing a configuration failure.
-    user.send_welcome_mail_to_user()
+    # Avoid Frappe's notification wrapper, which suppresses outgoing-mail errors.
+    _send_invitation(user)
     record_admin_event("Account invitation requested", "User", user.name, f"Assigned role: {role}")
     return {"name": user.name, "message": "Account created and password-setup email queued. Delivery is not confirmed."}
 
@@ -144,6 +154,6 @@ def send_invitation(user_name):
     user, role = _locked_user(user_name)
     if not user.enabled:
         frappe.throw("Enable this account before sending password-setup instructions.", frappe.ValidationError)
-    user.send_welcome_mail_to_user()
+    _send_invitation(user)
     record_admin_event("Account invitation requested", "User", user.name, f"Assigned role: {role}")
     return {"message": "Password-setup email queued. Delivery is not confirmed; previous setup links may no longer work."}

@@ -90,6 +90,51 @@ class TestDeliveryWorkflow(unittest.TestCase):
         self.frappe.session.user = "driver@example.test"
         self.frappe.get_roles.return_value = ["Delivery Staff"]
 
+    def test_area_updates_require_loaded_version_and_native_write_permission(self):
+        area = Mock(modified="version-1")
+        area.name = "Central"
+        self.frappe.get_doc.side_effect = None
+        self.frappe.get_doc.return_value = area
+        self.frappe.db.exists.return_value = True
+        with self.assertRaisesRegex(DeliveryError, "changed"):
+            self.service.save_delivery_area("Central", 50, modified="old")
+        area.save.assert_not_called()
+        with patch.object(self.service, "record_admin_event") as audit:
+            self.service.save_delivery_area("Central", 50, modified="version-1")
+            audit.assert_called_once()
+        area.check_permission.assert_called_with("write")
+        area.save.assert_called_once_with()
+        self.assertEqual(area.delivery_fee, 50)
+
+    def test_area_delete_blocks_history_and_requires_delete_permission_and_version(self):
+        area = Mock(modified="version-1")
+        area.name = "Central"
+        self.frappe.get_doc.side_effect = None
+        self.frappe.get_doc.return_value = area
+        self.frappe.delete_doc = Mock()
+        with self.assertRaisesRegex(DeliveryError, "changed"):
+            self.service.delete_delivery_area("Central", "old")
+        self.frappe.db.exists.return_value = True
+        with self.assertRaisesRegex(DeliveryError, "Disable"):
+            self.service.delete_delivery_area("Central", "version-1")
+        self.frappe.delete_doc.assert_not_called()
+        self.frappe.db.exists.return_value = False
+        with patch.object(self.service, "record_admin_event") as audit:
+            self.service.delete_delivery_area("Central", "version-1")
+            audit.assert_called_once()
+        self.frappe.delete_doc.assert_called_once_with("Delivery Area", "Central")
+        area.check_permission.assert_called_with("delete")
+        area.check_permission.side_effect = DeliveryError("No delete permission")
+        with self.assertRaisesRegex(DeliveryError, "No delete permission"):
+            self.service.delete_delivery_area("Central", "version-1")
+        self.assertEqual(self.frappe.delete_doc.call_count, 1)
+
+    def test_rider_cannot_delete_delivery_areas(self):
+        self.as_driver()
+        with self.assertRaises(DeliveryError):
+            self.service.delete_delivery_area("Central", "version-1")
+        self.frappe.get_doc.assert_not_called()
+
     def test_delivery_creation_snapshots_order_and_does_not_change_stock_payment_or_order(self):
         self.frappe.db.get_value.return_value = None
         self.service.create_delivery("SO-1")

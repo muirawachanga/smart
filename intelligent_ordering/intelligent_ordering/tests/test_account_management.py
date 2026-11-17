@@ -3,7 +3,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from intelligent_ordering.api.accounts import create_account, list_accounts, update_access
+from intelligent_ordering.api.accounts import create_account, list_accounts, send_invitation, update_access
 
 
 class TestAccountManagement(FrappeTestCase):
@@ -50,3 +50,20 @@ class TestAccountManagement(FrappeTestCase):
             list_accounts()
         with self.assertRaises(frappe.PermissionError):
             create_account("denied@example.test", "Denied", "+254712345678", "Order Manager")
+
+    def test_outgoing_email_failure_reports_configuration_without_logging_an_invitation(self):
+        user = self.create("Inventory Manager")
+        count = frappe.db.count("Admin Audit Log", {
+            "event_type": "Account invitation requested", "reference_name": user.name,
+        })
+        with patch(
+            "frappe.core.doctype.user.user.User.send_welcome_mail_to_user",
+            side_effect=frappe.OutgoingEmailError("private provider details"),
+        ):
+            with self.assertRaises(frappe.ValidationError) as error:
+                send_invitation(user.name)
+        self.assertIn("default outgoing Email Account", str(error.exception))
+        self.assertNotIn("private provider details", str(error.exception))
+        self.assertEqual(frappe.db.count("Admin Audit Log", {
+            "event_type": "Account invitation requested", "reference_name": user.name,
+        }), count)

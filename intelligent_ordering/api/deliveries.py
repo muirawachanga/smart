@@ -22,6 +22,7 @@ from intelligent_ordering.utils.delivery import (
 from intelligent_ordering.utils.delivery_rates import get_area_quote
 from intelligent_ordering.utils.fulfillment_notifications import prepare_notification
 from intelligent_ordering.utils.validation import validate_pagination
+from intelligent_ordering.utils.audit import record_admin_event
 
 
 MANAGER_ROLES = {"System Manager", "Business Admin", "Store Manager", "Order Manager", "Delivery Manager"}
@@ -294,7 +295,7 @@ def delivery_dashboard(page=1, page_size=20):
         """, as_dict=True,
     )
     areas = frappe.get_list(
-        "Delivery Area", fields=["name", "currency", "delivery_fee", "enabled"],
+        "Delivery Area", fields=["name", "currency", "delivery_fee", "enabled", "modified"],
         order_by="area_name", limit_page_length=0,
     )
     return {
@@ -307,6 +308,7 @@ def delivery_dashboard(page=1, page_size=20):
         "available_riders": sum(1 for person in personnel if not int(person.workload or 0)),
         "personnel_performance": performance,
         "can_manage_areas": frappe.has_permission("Delivery Area", "write"),
+        "can_delete_areas": frappe.has_permission("Delivery Area", "delete"),
         "ready_orders": ready[:page_size],
         "has_more": len(ready) > page_size, "personnel": personnel, "areas": areas,
     }
@@ -780,7 +782,7 @@ def upload_delivery_proof(delivery_name, file_data):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_delivery_area(area_name, delivery_fee, currency="KES", enabled=1):
+def save_delivery_area(area_name, delivery_fee, currency="KES", enabled=1, modified=""):
     _require_manager()
     if (
         frappe.session.user != "Administrator"
@@ -793,9 +795,31 @@ def save_delivery_area(area_name, delivery_fee, currency="KES", enabled=1):
     if frappe.db.exists("Delivery Area", area_name):
         area = frappe.get_doc("Delivery Area", area_name, for_update=True)
         area.check_permission("write")
+        if not modified or str(area.modified) != modified:
+            frappe.throw("This area changed. Select Edit area again before saving.", frappe.ValidationError)
+        event = "Delivery area updated"
     else:
+        if modified:
+            frappe.throw("This area no longer exists. Refresh before continuing.", frappe.ValidationError)
         area = frappe.new_doc("Delivery Area")
         area.area_name = area_name
+        event = "Delivery area created"
     area.delivery_fee, area.currency, area.enabled = delivery_fee, currency, int(enabled)
     area.save()
+    record_admin_event(event, "Delivery Area", area.name, "Area rate or availability saved")
     return {"name": area.name, "delivery_fee": area.delivery_fee, "currency": area.currency, "enabled": area.enabled}
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_delivery_area(area_name, modified):
+    _require_manager()
+    area = frappe.get_doc("Delivery Area", _text(area_name, "Area name", required=True), for_update=True)
+    area.check_permission("delete")
+    if not modified or str(area.modified) != modified:
+        frappe.throw("This area changed. Refresh before deleting it.", frappe.ValidationError)
+    if any(frappe.db.exists(doctype, {"delivery_area": area.name}) for doctype in ("Sales Order", "Delivery")):
+        frappe.throw("This area has order or delivery history. Disable it instead of deleting it.", frappe.ValidationError)
+    # Native link checks also protect references from custom apps and fields.
+    frappe.delete_doc("Delivery Area", area.name)
+    record_admin_event("Delivery area deleted", "Delivery Area", area.name, "Unused delivery area deleted")
+    return {"message": "Unused delivery area deleted. Existing orders have not changed."}

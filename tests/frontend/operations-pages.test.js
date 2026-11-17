@@ -513,10 +513,57 @@ test("delivery manager sees performance and routing areas without rate editing",
   await tick();
   assert.equal(nodes.get("#delivery-area-management").hidden, false);
   assert.equal(nodes.get("#delivery-area-form").hidden, true);
+  assert.equal(nodes.get("#delivery-areas").children[0].children.length, 1);
   assert.match(nodes.get("#delivery-areas").textContent, /Central/);
   assert.match(nodes.get("#delivery-performance").textContent, /3 completed/);
   assert.match(nodes.get("#delivery-performance").textContent, /75\.0% completion/);
   assert.ok(nodes.get("#delivery-metrics").children.some((item) => /Total deliveries4/.test(item.textContent)));
+});
+
+test("authorized area editing uses loaded version and deletion preserves rejected history", async (t) => {
+  const nodes = install(t, deliveryIds, "[data-delivery-page]", {});
+  window.confirm = () => true;
+  const form = nodes.get("#delivery-area-form");
+  form.queries = { 'button[type="submit"]': new Element("button") };
+  const calls = [];
+  let deleted = false;
+  let rejectDelete = true;
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    if (url.includes("deliveries.delivery_dashboard")) return response({
+      manager: true, summary: {}, delayed_deliveries: 0, available_riders: 0,
+      can_manage_areas: true, can_delete_areas: true, personnel: [],
+      personnel_performance: [], ready_orders: [], has_more: false,
+      areas: deleted ? [] : [{ name: "Central", currency: "KES", delivery_fee: 20,
+        enabled: 1, modified: "version-1" }],
+    });
+    if (url.includes("deliveries.list_deliveries")) return response({ deliveries: [], has_more: false });
+    calls.push({ url, body: options.body });
+    if (url.includes("delete_delivery_area")) {
+      if (rejectDelete) return { ok: false, status: 417, json: async () => ({ message: "Disable it instead." }) };
+      deleted = true;
+      return response({ message: "Unused delivery area deleted." });
+    }
+    return response({});
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?areas=${Date.now()}`);
+  await tick();
+  nodes.get("#delivery-areas").children[0].children[1].listeners.click();
+  assert.equal(form.elements.area_name.readOnly, true);
+  form.elements.delivery_fee.value = "35";
+  form.listeners.submit({ preventDefault() {} });
+  await tick();
+  assert.equal(calls[0].body.get("modified"), "version-1");
+  assert.equal(calls[0].body.get("delivery_fee"), "35");
+  assert.equal(form.elements.area_name.readOnly, false);
+  nodes.get("#delivery-areas").children[0].children[2].listeners.click();
+  await tick();
+  assert.match(nodes.get("#delivery-feedback").textContent, /Disable it instead/);
+  assert.equal(nodes.get("#delivery-areas").children.length, 1);
+  rejectDelete = false;
+  nodes.get("#delivery-areas").children[0].children[2].listeners.click();
+  await tick();
+  assert.equal(nodes.get("#delivery-areas").children.length, 0);
+  assert.match(nodes.get("#delivery-feedback").textContent, /deleted/);
 });
 
 test("rider rejection requires a reason and returns the assignment to the queue", async (t) => {
