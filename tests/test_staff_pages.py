@@ -55,6 +55,43 @@ class TestStaffPages(unittest.TestCase):
         self.pages.require_staff_page(context, "admin")
         self.assertTrue(context.can_manage_users)
 
+    def test_sidebar_is_populated_with_every_admin_shortcut_before_javascript(self):
+        for user, roles in (
+            ("Administrator", []), ("manager@example.test", ["System Manager"]),
+        ):
+            self.frappe.session.user = user
+            self.frappe.get_roles.return_value = roles
+            context = types.SimpleNamespace()
+            self.pages.require_staff_page(context, "admin")
+            self.assertEqual(context.smarto_staff_workspace, "/dashboard/admin")
+            self.assertEqual(context.smarto_staff_payments, "/dashboard/sales#payment-dashboard")
+            for link in (
+                "staff-setup-link", "staff-reports-link", "payments-link", "staff-orders-link",
+                "inventory-dashboard-link", "deliveries-link", "staff-delivery-areas-link",
+                "staff-products-link", "staff-customers-link", "staff-accounts-link",
+                "staff-users-link", "staff-roles-link", "staff-permissions-link",
+                "staff-settings-link", "staff-audit-link",
+            ):
+                with self.subTest(user=user, link=link):
+                    self.assertIn(link, context.smarto_visible_staff_links)
+
+    def test_server_rendered_sidebar_preserves_business_admin_and_rider_boundaries(self):
+        for role, page, destination in (
+            ("Business Admin", "admin", "/dashboard/admin"),
+            ("Delivery Staff", "delivery", "/dashboard/delivery"),
+        ):
+            self.frappe.get_roles.return_value = [role]
+            context = types.SimpleNamespace()
+            self.pages.require_staff_page(context, page)
+            self.assertEqual(context.smarto_staff_workspace, destination)
+            for link in ("staff-accounts-link", "staff-users-link", "staff-roles-link",
+                         "staff-permissions-link", "staff-settings-link"):
+                self.assertNotIn(link, context.smarto_visible_staff_links)
+            if role == "Delivery Staff":
+                self.assertEqual(context.smarto_visible_staff_links, ["deliveries-link"])
+            else:
+                self.assertIn("staff-products-link", context.smarto_visible_staff_links)
+
     def test_delivery_staff_cannot_access_inventory(self):
         self.frappe.get_roles.return_value = ["Delivery Staff"]
         self.pages.require_staff_page(types.SimpleNamespace(), "delivery")

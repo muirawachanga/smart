@@ -1,6 +1,6 @@
 <header class="smarto-header">
   <div class="smarto-header-inner">
-    <button class="smarto-sidebar-toggle smarto-icon-button" id="smarto-sidebar-toggle" type="button" aria-controls="smarto-sidebar" aria-expanded="false" aria-label="Open staff navigation" hidden>
+    <button class="smarto-sidebar-toggle smarto-icon-button" id="smarto-sidebar-toggle" type="button" aria-controls="smarto-sidebar" aria-expanded="false" aria-label="Open staff navigation"{% if not smarto_visible_staff_links %} hidden{% endif %}>
       {% from "templates/includes/lucide_icon.html" import icon %}{{ icon("menu") }}
     </button>
     <a class="smarto-brand smarto-business-brand" href="/" aria-label="SmartO home">

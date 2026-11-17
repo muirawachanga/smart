@@ -8,7 +8,7 @@
 {% endblock %}
 
 {% block page_content %}
-<div class="smarto-workspace-shell" id="smarto-workspace-shell">
+<div class="smarto-workspace-shell{% if smarto_visible_staff_links %} has-sidebar{% endif %}" id="smarto-workspace-shell">
 {% include "templates/includes/staff_sidebar.html" %}
 <div class="smarto-workspace-content" id="smarto-workspace-content">
 {% include "templates/includes/smarto_header.html" %}

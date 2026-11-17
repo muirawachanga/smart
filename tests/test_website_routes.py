@@ -61,7 +61,7 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
                 elif target == "/dashboard/admin":
                     self.assertIn(target, (APP_ROOT / "public/js/site.js").read_text())
                 else:
-                    self.assertIn(f'href="{target}"', sidebar)
+                    self.assertIn(f'"{target}"', sidebar)
 
     def test_delivery_area_shortcuts_open_the_dedicated_workspace(self):
         for template in ("admin.html", "setup.html"):

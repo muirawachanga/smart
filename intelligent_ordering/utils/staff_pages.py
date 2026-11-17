@@ -27,6 +27,48 @@ def require_staff_page(context, page):
         frappe.throw("You are not authorized to access this workspace.", frappe.PermissionError)
     context.no_cache = 1
     context.can_manage_users = user == "Administrator" or "System Manager" in roles
+    sidebar_roles = {
+        "staff-setup-link": PAGE_ROLES["admin"],
+        "staff-reports-link": PAGE_ROLES["admin"],
+        "staff-orders-link": PAGE_ROLES["orders"],
+        "payments-link": PAGE_ROLES["sales"] | {"Order Manager"},
+        "deliveries-link": PAGE_ROLES["delivery"],
+        "staff-delivery-areas-link": PAGE_ROLES["delivery_areas"],
+        "staff-products-link": PAGE_ROLES["products"],
+        "staff-customers-link": PAGE_ROLES["support"],
+        "staff-accounts-link": PAGE_ROLES["accounts"],
+        "admin-dashboard-link": {
+            "System Manager", "Business Admin", "Store Manager", "Order Manager",
+            "Finance Manager", "Inventory Manager", "Delivery Manager",
+        },
+        "inventory-dashboard-link": PAGE_ROLES["inventory"],
+        "support-dashboard-link": PAGE_ROLES["support"],
+        "staff-users-link": PAGE_ROLES["accounts"],
+        "staff-roles-link": PAGE_ROLES["accounts"],
+        "staff-permissions-link": PAGE_ROLES["accounts"],
+        "staff-settings-link": PAGE_ROLES["accounts"],
+        "staff-audit-link": PAGE_ROLES["owner"],
+    }
+    context.smarto_visible_staff_links = [
+        link for link, allowed in sidebar_roles.items()
+        if user == "Administrator" or roles.intersection(allowed)
+    ]
+    context.smarto_staff_workspace = next(
+        route for allowed, route in (
+            (PAGE_ROLES["admin"], "/dashboard/admin"),
+            ({"Store Manager"}, "/dashboard/owner"),
+            ({"Finance Manager"}, "/dashboard/sales"),
+            ({"Order Manager"}, "/dashboard/orders"),
+            ({"Inventory Manager"}, "/dashboard/inventory"),
+            ({"Delivery Manager", "Delivery Staff"}, "/dashboard/delivery"),
+            ({"Customer Support"}, "/dashboard/support"),
+        ) if user == "Administrator" or roles.intersection(allowed)
+    )
+    context.smarto_staff_payments = (
+        "/dashboard/sales#payment-dashboard"
+        if user == "Administrator" or roles.intersection(PAGE_ROLES["sales"])
+        else "/store#payment-dashboard"
+    )
     context.workspace_reports = {
         "delivery_areas": [],
         "accounts": [],

@@ -1,3 +1,5 @@
+from html.parser import HTMLParser
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils.password import check_password
@@ -5,6 +7,17 @@ from frappe.utils.password import check_password
 from intelligent_ordering.api import administration, deliveries, inventory, orders, payments
 from intelligent_ordering.utils.development_accounts import TEST_ACCOUNTS, _account_roles
 from intelligent_ordering.utils.staff_pages import require_staff_page
+
+
+class NavigationLinks(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = {}
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "a" and "id" in attributes:
+            self.links[attributes["id"]] = attributes
 
 
 class TestRoleAccounts(FrappeTestCase):
@@ -39,6 +52,19 @@ class TestRoleAccounts(FrappeTestCase):
                 if role != "System Manager":
                     self.assertNotIn("System Manager", frappe.get_roles())
                     self.assertFalse(frappe.has_permission("User", "create"))
+
+    def test_admin_sidebar_renders_every_shortcut_visible_without_browser_scripts(self):
+        for user in ("Administrator", self.users["System Manager"]):
+            frappe.set_user(user)
+            context = frappe._dict()
+            require_staff_page(context, "admin")
+            parser = NavigationLinks()
+            parser.feed(frappe.render_template("templates/includes/staff_sidebar.html", context))
+            for link in context.smarto_visible_staff_links:
+                with self.subTest(user=user, link=link):
+                    self.assertNotIn("hidden", parser.links[link])
+            self.assertEqual(parser.links["staff-delivery-areas-link"]["href"], "/dashboard/delivery-areas")
+            self.assertEqual(parser.links["payments-link"]["href"], "/dashboard/sales#payment-dashboard")
 
     def test_support_is_read_only_and_cannot_access_other_workspaces_or_payments(self):
         frappe.set_user(self.users["Customer Support"])
