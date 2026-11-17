@@ -520,6 +520,53 @@ test("delivery manager sees performance and routing areas without rate editing",
   assert.ok(nodes.get("#delivery-metrics").children.some((item) => /Total deliveries4/.test(item.textContent)));
 });
 
+test("dedicated delivery area workspace loads directly and saves the selected rate", async (t) => {
+  const nodes = install(t, ["areas-form", "areas-status", "areas-error", "areas-list", "areas-new", "areas-heading"]);
+  const form = nodes.get("#areas-form");
+  form.elements = Object.fromEntries(
+    ["area_name", "currency", "delivery_fee", "enabled"].map((key) => [key, new Element()]),
+  );
+  form.queries = { 'button[type="submit"]': new Element("button") };
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    calls.push({ url, body: options.body });
+    if (url.includes("save_delivery_area")) return response({});
+    assert.match(url, /list_delivery_areas/);
+    return response({ can_create: true, can_write: true, can_delete: true,
+      areas: [{ name: "Central", currency: "KES", delivery_fee: 20, enabled: 1, modified: "version-1" }] });
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-areas.js?direct=${Date.now()}`);
+  await tick();
+  assert.match(nodes.get("#areas-list").textContent, /Central/);
+  nodes.get("#areas-list").children[0].children[2].listeners.click();
+  assert.equal(form.elements.area_name.readOnly, true);
+  assert.equal(form.hidden, false);
+  form.elements.delivery_fee.value = "45";
+  form.listeners.submit({ preventDefault() {} });
+  await tick();
+  const save = calls.find((call) => call.url.includes("save_delivery_area"));
+  assert.equal(save.body.get("modified"), "version-1");
+  assert.equal(save.body.get("delivery_fee"), "45");
+  assert.match(nodes.get("#areas-status").textContent, /saved/);
+  nodes.get("#areas-new").listeners.click();
+  assert.equal(form.elements.area_name.readOnly, false);
+  assert.equal(form.elements.currency.value, "KES");
+});
+
+test("dedicated area workspace does not expose editing or stale data after denied loading", async (t) => {
+  const nodes = install(t, ["areas-form", "areas-status", "areas-error", "areas-list", "areas-new", "areas-heading"]);
+  nodes.get("#areas-form").queries = { 'button[type="submit"]': new Element("button") };
+  t.mock.method(globalThis, "fetch", async () => ({
+    ok: false, status: 403, json: async () => ({}),
+  }));
+  await import(`../../intelligent_ordering/public/js/delivery-areas.js?denied=${Date.now()}`);
+  await tick();
+  assert.equal(nodes.get("#areas-form").hidden, true);
+  assert.equal(nodes.get("#areas-new").hidden, true);
+  assert.equal(nodes.get("#areas-list").children.length, 0);
+  assert.match(nodes.get("#areas-error").textContent, /permission/);
+});
+
 test("authorized area editing uses loaded version and deletion preserves rejected history", async (t) => {
   const nodes = install(t, deliveryIds, "[data-delivery-page]", {});
   window.confirm = () => true;

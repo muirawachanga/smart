@@ -101,7 +101,7 @@ def readiness():
     check("stock", "Saleable stock", bool(stock),
           "Receive stock through the inventory workflow in an active warehouse.", "/dashboard/inventory")
     check("areas", "Delivery areas for catalog currencies", bool(catalog) and not missing_areas,
-          "Enable a delivery area with a fee for every currency used by published products.", "/app/delivery-area")
+          "Enable a delivery area with a fee for every currency used by published products.", "/dashboard/delivery-areas")
     staff = frappe.db.sql("""
         SELECT COUNT(DISTINCT u.name) FROM `tabUser` u
         INNER JOIN `tabHas Role` r ON r.parent = u.name AND r.parenttype = 'User'

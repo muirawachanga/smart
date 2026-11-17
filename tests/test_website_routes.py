@@ -40,11 +40,18 @@ SHELL_ROUTES = {
     "/dashboard/products": "dashboard/products.html",
     "/dashboard/accounts": "dashboard/accounts.html",
     "/dashboard/delivery": "dashboard/delivery.html",
+    "/dashboard/delivery-areas": "dashboard/delivery-areas.html",
     "/dashboard/support": "dashboard/support.html",
 }
 
 
 class TestSmartOWebsiteRoutes(unittest.TestCase):
+    def test_delivery_area_shortcuts_open_the_dedicated_workspace(self):
+        for template in ("admin.html", "setup.html"):
+            source = (WWW / "dashboard" / template).read_text()
+            self.assertIn('href="/dashboard/delivery-areas"', source)
+            self.assertNotIn('href="/dashboard/delivery#delivery-area-management"', source)
+
     def test_account_and_nested_controllers_import_as_a_guarded_package(self):
         customer_pages = types.ModuleType("intelligent_ordering.utils.customer_pages")
         customer_pages.require_customer_page = Mock()

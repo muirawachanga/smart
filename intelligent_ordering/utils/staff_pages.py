@@ -2,6 +2,7 @@ import frappe
 
 
 PAGE_ROLES = {
+    "delivery_areas": {"System Manager", "Business Admin", "Store Manager", "Order Manager", "Delivery Manager"},
     "accounts": {"System Manager"},
     "products": {"System Manager", "Business Admin", "Store Manager", "Order Manager", "Inventory Manager"},
     "orders": {"System Manager", "Business Admin", "Store Manager", "Order Manager"},
@@ -27,6 +28,7 @@ def require_staff_page(context, page):
     context.no_cache = 1
     context.can_manage_users = user == "Administrator" or "System Manager" in roles
     context.workspace_reports = {
+        "delivery_areas": [],
         "accounts": [],
         "products": [],
         "admin": [("sales", "Verified sales"), ("orders", "Orders"), ("customers", "Customers"),

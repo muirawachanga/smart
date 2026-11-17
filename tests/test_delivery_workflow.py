@@ -134,6 +134,18 @@ class TestDeliveryWorkflow(unittest.TestCase):
         with self.assertRaises(DeliveryError):
             self.service.delete_delivery_area("Central", "version-1")
         self.frappe.get_doc.assert_not_called()
+        with self.assertRaises(DeliveryError):
+            self.service.list_delivery_areas()
+        self.frappe.get_list.assert_not_called()
+
+    def test_area_workspace_reads_native_records_and_permissions(self):
+        self.frappe.get_list.return_value = [{"name": "Central", "delivery_fee": 20}]
+        self.frappe.has_permission = Mock(side_effect=lambda doctype, permission: permission != "delete")
+        result = self.service.list_delivery_areas()
+        self.assertEqual(result["areas"][0]["name"], "Central")
+        self.assertTrue(result["can_write"])
+        self.assertFalse(result["can_delete"])
+        self.assertIn("modified", self.frappe.get_list.call_args.kwargs["fields"])
 
     def test_delivery_creation_snapshots_order_and_does_not_change_stock_payment_or_order(self):
         self.frappe.db.get_value.return_value = None

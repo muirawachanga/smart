@@ -222,7 +222,7 @@ an address in My account first.
 The delivery-area selector is populated from enabled **Delivery Area** records
 whose currency exactly matches the cart's currency. If it is empty, sign in
 with System Manager, Business Admin, Store Manager, or Order Manager, open
-**Delivery areas and fees** from the admin dashboard (or `/dashboard/delivery`),
+**Delivery areas and fees** from the admin dashboard (or `/dashboard/delivery-areas`),
 and create or enable an area with the correct
 currency (for example, KES when the cart subtotal is in KES) and a delivery fee.
 An area with another currency, or a disabled area, will not appear. After saving

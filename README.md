@@ -125,7 +125,7 @@ outside the current scope.
 ### Delivery areas and fees
 
 Open **Administrator dashboard -> Delivery areas and fees** to manage the
-existing Delivery Area records at `/dashboard/delivery`. Authorized rate
+existing Delivery Area records at `/dashboard/delivery-areas`. Authorized rate
 managers can add areas, edit fees/currency and enable or disable them.
 Administrator/System Manager and Business Admin can permanently delete unused
 areas; areas referenced by orders or deliveries must be disabled instead.

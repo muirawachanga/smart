@@ -1,0 +1,24 @@
+{% extends "templates/smarto_base.html" %}
+{% block title %}Delivery areas and fees | SmartO{% endblock %}
+{% block smarto_content %}
+<main class="smarto-page">
+  {% include "templates/includes/page_script_warning.html" %}
+  <h1>Delivery areas and fees</h1>
+  <p>Manage checkout delivery areas here. Rate changes apply to new orders only.
+    Disable areas with history; only unused areas can be deleted. Area names cannot be changed.</p>
+  <p><a href="/dashboard/admin">Administrator dashboard</a> · <a href="/dashboard/delivery">Delivery operations</a></p>
+  <p id="areas-status" role="status" aria-live="polite">Loading delivery areas...</p>
+  <p id="areas-error" role="alert"></p>
+  <button id="areas-new" class="smarto-button" type="button" hidden>Add new area</button>
+  <form id="areas-form" class="smarto-checkout-form" hidden>
+    <h2 id="areas-heading">Add delivery area</h2>
+    <label>Area name <input name="area_name" maxlength="140" required></label>
+    <label>Currency <input name="currency" value="KES" pattern="[A-Z]{3}" maxlength="3" required></label>
+    <label>Delivery fee <input name="delivery_fee" type="number" min="0" max="250000" step="0.01" required></label>
+    <label>Status <select name="enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></label>
+    <button class="smarto-button" type="submit">Save delivery area</button>
+  </form>
+  <div id="areas-list" class="smarto-cart-items"></div>
+</main>
+<script type="module" src="/assets/intelligent_ordering/js/delivery-areas.js"></script>
+{% endblock %}

@@ -810,6 +810,20 @@ def save_delivery_area(area_name, delivery_fee, currency="KES", enabled=1, modif
     return {"name": area.name, "delivery_fee": area.delivery_fee, "currency": area.currency, "enabled": area.enabled}
 
 
+@frappe.whitelist()
+def list_delivery_areas():
+    _require_manager()
+    return {
+        "areas": frappe.get_list(
+            "Delivery Area", fields=["name", "currency", "delivery_fee", "enabled", "modified"],
+            order_by="area_name", limit_page_length=0,
+        ),
+        "can_create": bool(frappe.has_permission("Delivery Area", "create")),
+        "can_write": bool(frappe.has_permission("Delivery Area", "write")),
+        "can_delete": bool(frappe.has_permission("Delivery Area", "delete")),
+    }
+
+
 @frappe.whitelist(methods=["POST"])
 def delete_delivery_area(area_name, modified):
     _require_manager()
