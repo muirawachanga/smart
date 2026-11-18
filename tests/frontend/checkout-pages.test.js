@@ -186,7 +186,7 @@ test("checkout quotes server totals and recovers an interrupted submission", asy
   recover = true;
   await import(`../../intelligent_ordering/public/js/checkout-page.js?reload=${Date.now()}`);
   await tick();
-  assert.equal(locations.at(-1), "/order-confirmation/SO-1");
+  assert.equal(locations.at(-1), "/track-order?order=SO-1");
   assert.equal(session.get("smarto.checkout.pending-order.v1"), "SO-1");
   assert.equal(calls.filter((call) => call.url.includes("checkout.create_order")).length, 1);
 });
@@ -229,7 +229,7 @@ test("retry uses the same checkout token and accepts an existing order", async (
   await nodes.get("#checkout-form").listeners.submit({ preventDefault() {} });
   assert.equal(tokens.length, 2);
   assert.equal(tokens[0], tokens[1]);
-  assert.equal(locations.at(-1), "/order-confirmation/SO-1");
+  assert.equal(locations.at(-1), "/track-order?order=SO-1");
 });
 
 test("checkout submits the selected Cash on Delivery method", async (t) => {
@@ -281,7 +281,7 @@ test("a definitive validation rejection allows a corrected new submission", asyn
   await nodes.get("#checkout-form").listeners.submit({ preventDefault() {} });
   assert.equal(tokens.length, 2);
   assert.notEqual(tokens[0], tokens[1]);
-  assert.equal(locations.at(-1), "/order-confirmation/SO-2");
+  assert.equal(locations.at(-1), "/track-order?order=SO-2");
 });
 
 test("failed delivery quotes never enable order submission", async (t) => {

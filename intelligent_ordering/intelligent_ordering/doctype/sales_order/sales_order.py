@@ -10,6 +10,7 @@ from intelligent_ordering.utils.checkout import (
     validate_request_token,
 )
 from intelligent_ordering.utils.delivery_rates import get_area_quote
+from intelligent_ordering.utils.order_fulfillment import preparation_minutes
 
 
 class SalesOrder(Document):
@@ -56,6 +57,15 @@ class SalesOrder(Document):
             )
         self._validate_unchanged_order_data(original)
         self._validate_status_transition(original.status)
+        if self.status == "Confirmed" and original.status != "Confirmed":
+            self.confirmed_at = now_datetime()
+            self.preparation_minutes = preparation_minutes()
+        elif not getattr(frappe.flags, "processing_order_fulfillment", False) and (
+            self.confirmed_at != original.confirmed_at
+            or self.preparation_minutes != original.preparation_minutes
+        ):
+            frappe.throw("Order preparation timing is managed by the fulfillment workflow.",
+                         frappe.PermissionError)
         if self.status == "Completed" and self.payment_status != "Paid":
             frappe.throw(
                 "Only a verified paid order can be completed.",

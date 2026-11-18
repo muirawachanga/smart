@@ -58,7 +58,10 @@ function install(t, mode) {
       ? { dataset: { ordersPage: mode } } : nodes.get(selector),
     createElement: () => new Element(),
   });
-  setGlobal("window", { frappe: {}, setInterval: () => 1, clearInterval() {}, confirm: () => true });
+  setGlobal("window", {
+    frappe: {}, location: { pathname: "/track-order", search: "" },
+    setInterval: () => 1, clearInterval() {}, confirm: () => true,
+  });
   setGlobal("Option", class extends Element {
     constructor(label, value) { super(); this.textContent = label; this.value = value; }
   });
@@ -74,6 +77,11 @@ function install(t, mode) {
 const response = (message) => ({ ok: true, json: async () => ({ message }) });
 const failed = (message) => ({ ok: false, json: async () => ({ message }) });
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+const renderedText = (node) => [node.textContent, ...node.children.map(renderedText)].join(" ");
+async function waitFor(predicate) {
+  for (let attempt = 0; attempt < 10 && !predicate(); attempt += 1) await tick();
+  assert.ok(predicate(), "expected asynchronous order UI to finish rendering");
+}
 const order = {
   name: "SO-1", status: "Pending", payment_status: "Unpaid",
   customer_name: "Customer", customer_phone: "123", delivery_address: "Address",
@@ -102,6 +110,35 @@ test("customer history uses owner-only detail and shows payment status", async (
   assert.ok(calls.some((url) => url.includes("orders.get_my_order?")));
   const card = nodes.get("#order-detail").children[0];
   assert.ok(card.children.some((node) => node.textContent === "Payment status: Unpaid"));
+});
+
+test("checkout tracking URL opens the order and shows its assigned rider", async (t) => {
+  const nodes = install(t, "customer");
+  window.location.search = "?order=SO-1";
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("orders.get_my_orders")) return response({ orders: [order], has_more: false });
+    if (url.includes("orders.get_my_order")) return response({ ...order });
+    if (url.includes("payments.get_order_payments")) return response([]);
+    if (url.includes("customers.track_order")) return response({
+      order_status: "Ready for Delivery", payment_status: "Paid",
+      delivery: {
+        name: "DEL-1", status: "Assigned", delivery_area: "Central",
+        assigned_rider: "Rider One", scheduled_delivery_date: "2026-11-18",
+      },
+      timeline: [{ activity_datetime: "now", from_status: "Awaiting Assignment", to_status: "Assigned" }],
+    });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/order-pages.js?track-order=${Date.now()}`);
+  for (let attempt = 0; attempt < 5 && !nodes.get("#order-detail").children.length; attempt += 1) {
+    await tick();
+  }
+  const detail = nodes.get("#order-detail");
+  assert.ok(detail.children.length);
+  const content = renderedText(detail);
+  assert.match(content, /Rider: Rider One/);
+  assert.match(content, /Delivery: Assigned/);
+  assert.match(content, /Awaiting Assignment → Assigned/);
 });
 
 test("guest sees login and no customer records", async (t) => {
@@ -151,6 +188,8 @@ test("payment button stays disabled until payment history is loaded", async (t) 
   await import(`../../intelligent_ordering/public/js/order-pages.js?payments=${Date.now()}`);
   await tick();
   await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
+  await waitFor(() => nodes.get("#order-detail").children[0]?.children
+    .some((child) => child.className === "status-update-form"));
   const card = nodes.get("#order-detail").children[0];
   const form = card.children.find((child) => child.className === "status-update-form");
   assert.equal(form.children[1].disabled, true);
@@ -240,7 +279,8 @@ test("customer live tracking refreshes persisted status and requests cancellatio
   await import(`../../intelligent_ordering/public/js/order-pages.js?tracking=${Date.now()}`);
   await tick();
   await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
-  await tick();
+  await waitFor(() => nodes.get("#order-detail").children[0]?.children.at(-1)?.children
+    .some((child) => /Order: Confirmed.*Delivery: Assigned/.test(child.textContent)));
   const tracking = nodes.get("#order-detail").children[0].children.at(-1);
   assert.match(tracking.children[1].textContent, /Order: Confirmed.*Delivery: Assigned/);
   const form = tracking.children[4];

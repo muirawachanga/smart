@@ -195,6 +195,25 @@ class TestCustomerPortal(unittest.TestCase):
                     operation()
         self.frappe.get_doc.assert_not_called()
 
+    def test_customer_tracking_shows_only_assigned_rider_display_name(self):
+        order = types.SimpleNamespace(
+            name="SO-1", status="Ready for Delivery", payment_status="Paid",
+            modified="now", get=lambda field: None,
+        )
+        self.frappe.db.get_value.return_value = "Rider One"
+        self.frappe.get_all.side_effect = lambda doctype, **kwargs: (
+            [{
+                "name": "DEL-1", "status": "Assigned", "assigned_delivery_person": "rider@example.test",
+                "scheduled_delivery_date": "2026-11-19", "delivery_area": "Central", "modified": "now",
+            }]
+            if doctype == "Delivery" else []
+        )
+        with patch.object(self.api, "_owned_order", return_value=order):
+            result = self.api.track_order("SO-1")
+        self.assertEqual(result["delivery"]["assigned_rider"], "Rider One")
+        self.assertNotIn("assigned_delivery_person", result["delivery"])
+        self.assertEqual(result["delivery"]["delivery_area"], "Central")
+
     def test_cancellation_request_saves_only_request_and_restores_internal_flag(self):
         order = types.SimpleNamespace(
             name="SO-1", status="Pending", payment_status="Unpaid", total=125,

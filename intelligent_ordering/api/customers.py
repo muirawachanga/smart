@@ -230,12 +230,20 @@ def track_order(order_name):
     order = _owned_order(order_name)
     deliveries = frappe.get_all(
         "Delivery", filters={"order": order.name},
-        fields=["name", "status", "scheduled_delivery_date", "modified"],
+        fields=["name", "status", "scheduled_delivery_date", "modified",
+                "delivery_area", "assigned_delivery_person"],
         order_by="creation desc", limit_page_length=1,
     )
     delivery = deliveries[0] if deliveries else None
+    assigned_person = delivery.get("assigned_delivery_person") if delivery else None
+    if assigned_person:
+        delivery["assigned_rider"] = frappe.db.get_value(
+            "User", assigned_person, "full_name",
+        )
+    if delivery:
+        delivery.pop("assigned_delivery_person", None)
     timeline = frappe.get_all(
-        "Delivery Activity", filters={"parent": delivery.name, "parenttype": "Delivery", "parentfield": "activities"},
+        "Delivery Activity", filters={"parent": delivery.get("name"), "parenttype": "Delivery", "parentfield": "activities"},
         fields=["activity_datetime", "from_status", "to_status"],
         order_by="idx asc", limit_page_length=100,
     ) if delivery else []

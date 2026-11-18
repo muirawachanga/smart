@@ -25,6 +25,10 @@ export function orderPaymentUrl(id) {
   return `/payment?${new URLSearchParams({ order: id })}`;
 }
 
+export function orderTrackingUrl(id) {
+  return `/track-order?${new URLSearchParams({ order: id })}`;
+}
+
 export function renderOrderItems(container, items, currency) {
   container.replaceChildren(...items.map((item) => {
     const row = text("article", "", "smarto-order-item");

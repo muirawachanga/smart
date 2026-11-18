@@ -1,6 +1,7 @@
 import { get, post } from "./api.js";
 import { formatPrice, renderOrderItems, text } from "./components/order-display.js";
 import { mountOrderPayment } from "./payments.js";
+import { FINGERPRINT_KEY, ORDER_KEY, TOKEN_KEY } from "./checkout-recovery.js";
 
 const mode = document.querySelector("[data-orders-page]").dataset.ordersPage;
 const staff = mode === "staff" || mode === "support";
@@ -14,8 +15,8 @@ const pageLabel = document.querySelector("#orders-page");
 const filters = staff ? document.querySelector("#orders-filters") : null;
 const transitions = {
   Pending: ["Confirmed", "Cancelled"],
-  Confirmed: ["Processing", "Cancelled"],
-  Processing: ["Ready for Delivery", "Cancelled"],
+  Confirmed: ["Cancelled"],
+  Processing: ["Cancelled"],
   "Ready for Delivery": ["Cancelled"],
 };
 let page = 1;
@@ -54,8 +55,14 @@ async function loadOrders() {
     const result = await get(staff ? "orders.list_orders" : "orders.get_my_orders", parameters);
     if (request !== listRequest) return;
     if (result.requires_login) {
-      clearDetail();
-      document.querySelector("#orders-login").hidden = false;
+      const login = document.querySelector("#orders-login");
+      const requestedOrder = new URLSearchParams(window.location.search).get("order");
+      if (requestedOrder) {
+        login.href = `/login?${new URLSearchParams({
+          "redirect-to": `${window.location.pathname}${window.location.search}`,
+        })}`;
+      }
+      login.hidden = false;
       status.textContent = "Sign in to view your orders.";
       return;
     }
@@ -67,6 +74,10 @@ async function loadOrders() {
     next.disabled = !hasMore;
     pageLabel.textContent = `Page ${page}`;
     pagination.hidden = page === 1 && !hasMore;
+    const requestedOrder = new URLSearchParams(window.location.search).get("order");
+    if (!selectedOrder && requestedOrder && result.orders.some((order) => order.name === requestedOrder)) {
+      await loadDetail(requestedOrder);
+    }
   } catch (error) {
     if (request === listRequest) {
       clearDetail();
@@ -111,6 +122,17 @@ async function loadDetail(name) {
       detail.textContent = "Sign in to view order details.";
       return;
     }
+    if (!staff) {
+      try {
+        if (sessionStorage.getItem(ORDER_KEY) === order.name) {
+          sessionStorage.removeItem(TOKEN_KEY);
+          sessionStorage.removeItem(ORDER_KEY);
+          sessionStorage.removeItem(FINGERPRINT_KEY);
+        }
+      } catch (error) {
+        console.error("Could not clear the completed checkout recovery state:", error);
+      }
+    }
     renderDetail(order);
   } catch (error) {
     if (request === detailRequest) detail.textContent = `Order could not be loaded: ${error.message}`;
@@ -127,6 +149,7 @@ function renderDetail(order) {
     paymentStatus,
     text("p", `Customer: ${order.customer_name} · ${order.customer_phone}`),
     text("p", `Delivery address: ${order.delivery_address}`),
+    text("p", `Delivery area: ${order.delivery_area || "Not specified"}`),
   );
   const items = text("div", "", "smarto-cart-items");
   renderOrderItems(items, order.items, order.currency);
@@ -196,7 +219,7 @@ function addCustomerTracking(card, order, updateStatus) {
 
   function display(result) {
     updateStatus(result);
-    state.textContent = `Order: ${result.order_status} · Payment: ${result.payment_status} · Delivery: ${result.delivery?.status || "Not assigned"} · Updated: ${result.delivery?.modified || result.updated_at || ""}`;
+    state.textContent = `Order: ${result.order_status} · Payment: ${result.payment_status} · Delivery: ${result.delivery?.status || "Not assigned"} · Area: ${result.delivery?.delivery_area || "Not specified"} · Rider: ${result.delivery?.assigned_rider || "Not assigned"} · Scheduled: ${result.delivery?.scheduled_delivery_date || "Not scheduled"} · Updated: ${result.delivery?.modified || result.updated_at || ""}`;
     history.replaceChildren(...result.timeline.map((entry) =>
       text("p", `${entry.activity_datetime}: ${entry.from_status || "Created"} → ${entry.to_status}`)));
     cancellation.hidden = ["Requested", "Approved"].includes(result.cancellation_request_status)

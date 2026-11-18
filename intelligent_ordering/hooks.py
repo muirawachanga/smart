@@ -73,6 +73,7 @@ scheduler_events = {
     "all": [
         "intelligent_ordering.utils.fulfillment_notifications.send_pending_sms",
         "intelligent_ordering.api.deliveries.escalate_expired_broadcasts",
+        "intelligent_ordering.utils.order_fulfillment.advance_confirmed_orders",
     ],
 }
 

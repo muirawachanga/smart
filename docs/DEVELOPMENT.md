@@ -733,20 +733,29 @@ Session storage recovery is limited to the same browser tab.
 Private HTTP uses cryptographically random UUID tokens and exact retry
 comparison when HTTPS-only digest APIs are unavailable. Use HTTPS in production.
 The confirmation and account pages use owner-scoped endpoints even for customer
-accounts that also have staff roles. Successful checkout opens the order
-confirmation page, which links to M-Pesa payment or Cash on Delivery details.
+accounts that also have staff roles. Successful checkout opens
+`/track-order?order=<order-name>`, automatically selects that order, and displays
+its payment and delivery progress. Customers can see the assigned rider's
+display name once one accepts; rider account identifiers and contact details are
+not exposed. The existing payment controls are available on the tracking page.
 
 Customers can list and view only their own orders. Business Admin and Order
-Manager roles can search, filter, inspect, and update order statuses. Submitted
-order details and line prices are immutable; status changes are validated on
-the server with these transitions: Pending → Confirmed → Processing → Ready
-for Delivery → Completed, with cancellation permitted before completion.
-Completed and Cancelled are terminal. Legacy Sales Order statuses are not
-automatically remapped; an explicit migration is required before rollout if
-legacy records exist.
+Manager roles can search and inspect orders. Order confirmation remains the
+existing payment/staff workflow; after confirmation, the scheduler advances
+orders to **Processing** without a staff status click, then to **Ready for
+Delivery** after the preparation interval. The default interval is 20 minutes,
+configurable per site with `"order_fulfillment": {"preparation_minutes": 20}`.
+The interval is captured on confirmation. M-Pesa orders do not become Ready for
+Delivery until payment is verified; Cash on Delivery orders can advance with
+their pending COD transaction. Ready for Delivery dispatches reserved stock and
+starts the existing rider broadcast. Delivery completion and COD finance
+reconciliation retain their existing safeguards. Submitted order details and
+line prices are immutable; Completed and Cancelled are terminal. Legacy
+confirmed/processing orders without preparation timestamps are given a fresh
+interval by the scheduler rather than being dispatched immediately.
 
-The storefront continues to provide checkout review, order confirmation,
-customer order history, and staff order controls. The dedicated `/account` and
+The storefront continues to provide checkout review, customer order tracking,
+order history, and staff order controls. The dedicated `/account` and
 `/dashboard/orders` pages use the same APIs. Completion is performed through
 the delivery workflow, not through the staff order status form. Customers can
 choose M-Pesa or Cash on Delivery (KES only); M-Pesa must be configured

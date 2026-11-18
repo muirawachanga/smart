@@ -325,8 +325,8 @@ export function initAdministrationDashboard() {
       : "No delivery record."));
     const transitions = {
       Pending: ["Confirmed", "Cancelled"],
-      Confirmed: ["Processing", "Cancelled"],
-      Processing: ["Ready for Delivery", "Cancelled"],
+      Confirmed: ["Cancelled"],
+      Processing: ["Cancelled"],
       "Ready for Delivery": ["Cancelled"],
     }[order.status] || [];
     if (transitions.length) {

@@ -1,5 +1,7 @@
 import json
 import uuid
+from datetime import timedelta
+from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
@@ -180,8 +182,20 @@ class TestCheckout(FrappeTestCase):
         order_name = self._submit_order(payment_method="Cash on Delivery")["order"]["name"]
         rider = self._make_user(f"workflow-rider-{frappe.generate_hash(length=8)}@example.test", "Delivery Staff")
         frappe.set_user("Administrator")
-        update_order_status(order_name, "Processing")
-        update_order_status(order_name, "Ready for Delivery")
+        from intelligent_ordering.utils.order_fulfillment import advance_confirmed_orders
+
+        order = frappe.get_doc("Sales Order", order_name)
+        with patch(
+            "intelligent_ordering.utils.order_fulfillment.now_datetime",
+            return_value=order.confirmed_at,
+        ):
+            self.assertEqual(advance_confirmed_orders(), 1)
+        self.assertEqual(frappe.db.get_value("Sales Order", order_name, "status"), "Processing")
+        with patch(
+            "intelligent_ordering.utils.order_fulfillment.now_datetime",
+            return_value=order.confirmed_at + timedelta(minutes=order.preparation_minutes + 1),
+        ):
+            self.assertEqual(advance_confirmed_orders(), 1)
         delivery_name = frappe.db.get_value("Delivery", {"order": order_name}, "name")
         self.assertTrue(delivery_name)
         frappe.set_user(rider.name)
