@@ -1,6 +1,6 @@
 import { ApiError, get, post } from "./api.js";
 import { loadCart } from "./cart-service.js";
-import { formatPrice, orderPaymentUrl, renderOrderItems } from "./components/order-display.js";
+import { formatPrice, orderConfirmationUrl, renderOrderItems } from "./components/order-display.js";
 import { checkoutFingerprint, createCheckoutToken, FINGERPRINT_KEY, ORDER_KEY, TOKEN_KEY } from "./checkout-recovery.js";
 
 const status = document.querySelector("#checkout-status");
@@ -40,7 +40,7 @@ function goToOrder(orderName) {
   } catch (error) {
     console.error("Could not store the recovered order reference:", error);
   }
-  window.location.assign(orderPaymentUrl(orderName));
+  window.location.assign(orderConfirmationUrl(orderName));
 }
 
 function showCart(checkout) {

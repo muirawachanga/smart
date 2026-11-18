@@ -133,6 +133,10 @@ function setupAccountNavigation(user) {
     setVisible(link, visible);
     hasStaffLinks ||= visible;
   }
+  const riderLink = document.querySelector("#staff-rider-link");
+  const riderVisible = authenticated && roles.has("Delivery Staff");
+  setVisible(riderLink, riderVisible);
+  hasStaffLinks ||= riderVisible;
 
   const workspace = document.querySelector("#smarto-workspace-link");
   if (administrator || ["System Manager", "Business Admin", "Store Manager", "Finance Manager"].some((role) => roles.has(role))) {
@@ -144,7 +148,8 @@ function setupAccountNavigation(user) {
     [["Finance Manager"], "/dashboard/sales"],
     [["Order Manager"], "/dashboard/orders"],
     [["Inventory Manager"], "/dashboard/inventory"],
-    [["Delivery Manager", "Delivery Staff"], "/dashboard/delivery"],
+    [["Delivery Manager"], "/dashboard/delivery"],
+    [["Delivery Staff"], "/dashboard/rider"],
     [["Customer Support"], "/dashboard/support"],
   ];
   const destination = workspaceByRole.find(([allowedRoles]) =>
@@ -156,7 +161,7 @@ function setupAccountNavigation(user) {
     const duplicate = staffControls.some(([selector]) => {
       const link = document.querySelector(selector);
       return !link.hidden && link.getAttribute("href") === destination[1];
-    });
+    }) || (riderVisible && riderLink?.getAttribute("href") === destination[1]);
     setVisible(workspace, !duplicate);
     setVisible(staffEntry, true);
     hasStaffLinks = true;

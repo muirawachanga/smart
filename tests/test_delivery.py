@@ -44,6 +44,10 @@ class TestDeliveryValidation(unittest.TestCase):
             validate_delivery_transition("Ready for Dispatch", "Dispatched", personnel=True),
             "Dispatched",
         )
+        self.assertEqual(
+            validate_delivery_transition("Accepted", "Ready for Dispatch", personnel=True),
+            "Ready for Dispatch",
+        )
 
     def test_invalid_transitions_and_terminal_states(self):
         for before, after in (

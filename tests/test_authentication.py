@@ -53,7 +53,7 @@ class TestAuthentication(unittest.TestCase):
             ("System Manager", "/dashboard/admin"), ("Business Admin", "/dashboard/admin"),
             ("Store Manager", "/dashboard/owner"), ("Finance Manager", "/dashboard/sales"),
             ("Order Manager", "/dashboard/orders"), ("Inventory Manager", "/dashboard/inventory"),
-            ("Delivery Manager", "/dashboard/delivery"), ("Delivery Staff", "/dashboard/delivery"),
+            ("Delivery Manager", "/dashboard/delivery"), ("Delivery Staff", "/dashboard/rider"),
             ("Customer Support", "/dashboard/support"), ("Customer", "/"),
         ):
             self.frappe.get_roles.return_value = [role]
@@ -78,6 +78,10 @@ class TestAuthentication(unittest.TestCase):
         self.frappe.get_roles.return_value = ["Inventory Manager"]
         self.assertEqual(self.auth.login_destination("/dashboard/orders"), "/dashboard/inventory")
         self.assertEqual(self.auth.login_destination("/dashboard/inventory"), "/dashboard/inventory")
+        self.frappe.get_roles.return_value = ["Delivery Staff"]
+        self.assertEqual(self.auth.login_destination("/dashboard/rider"), "/dashboard/rider")
+        self.frappe.get_roles.return_value = ["Customer"]
+        self.assertEqual(self.auth.login_destination("/dashboard/rider"), "/")
 
     def test_password_confirmation_length_and_strength_are_enforced(self):
         with patch.dict(sys.modules, self.modules):

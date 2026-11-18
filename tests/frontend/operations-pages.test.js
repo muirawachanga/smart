@@ -317,6 +317,96 @@ const optimizationIds = [
   "delivery-my-route", "delivery-my-route-results", "delivery-optimization-manager",
   "delivery-plan-form", "delivery-plan-results",
 ];
+const offerIds = [
+  "delivery-offers-section", "delivery-offers-status", "delivery-offers-list",
+  "delivery-online", "delivery-offline", "delivery-escalations-section", "delivery-escalations",
+];
+
+test("dedicated rider page uses only rider-scoped delivery APIs", async (t) => {
+  const ids = [
+    "delivery-feedback", "delivery-filters", "delivery-list", "delivery-detail",
+    "delivery-previous", "delivery-next", "delivery-metrics", "delivery-delayed",
+    ...offerIds, ...optimizationIds.slice(0, 5),
+  ];
+  const nodes = install(t, ids, "[data-rider-page]", {});
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    calls.push(String(url));
+    if (url.includes("deliveries.my_delivery_dashboard")) return response({
+      manager: false, rider: true, summary: { total: 1 }, delayed_deliveries: 0,
+    });
+    if (url.includes("deliveries.delivery_offers")) return response({ online: false, busy: false, offers: [] });
+    if (url.includes("deliveries.my_deliveries")) return response({
+      deliveries: [{
+        name: "DEL-1", order: "SO-1", status: "Accepted", delivery_area: "Central",
+        customer_name: "Customer", customer_phone: "123", delivery_address: "Street",
+      }], has_more: false,
+    });
+    if (url.includes("deliveries.get_my_delivery")) return response({
+      name: "DEL-1", order: "SO-1", status: "Accepted", allowed_statuses: ["Preparing"], activities: [],
+    });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?rider-page=${Date.now()}`);
+  await tick();
+  assert.equal(nodes.get("#delivery-offers-section").hidden, false);
+  assert.equal(nodes.get("#delivery-location-share").hidden, false);
+  assert.match(nodes.get("#delivery-list").textContent, /SO-1/);
+  nodes.get("#delivery-list").children[0].children.find((child) => child.textContent === "View delivery").listeners.click();
+  await tick();
+  assert.match(nodes.get("#delivery-detail").textContent, /Accepted/);
+  assert.ok(calls.some((url) => url.includes("deliveries.get_my_delivery")));
+  assert.ok(!calls.some((url) => url.includes("deliveries.delivery_dashboard")));
+  assert.ok(!calls.some((url) => url.includes("deliveries.list_deliveries")));
+});
+
+test("rider goes online and accepts a broadcast offer on the rider page", async (t) => {
+  const nodes = install(t, [
+    "delivery-feedback", "delivery-filters", "delivery-list", "delivery-detail",
+    "delivery-previous", "delivery-next", "delivery-metrics", "delivery-delayed", ...offerIds,
+  ], "[data-rider-page]", {});
+  const calls = [];
+  let online = false;
+  let accepted = false;
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (url.includes("deliveries.my_delivery_dashboard")) return response({
+      manager: false, rider: true, summary: {}, delayed_deliveries: 0,
+    });
+    if (url.includes("deliveries.my_deliveries")) return response({ deliveries: [], has_more: false });
+    if (url.includes("deliveries.delivery_offers")) return response({
+      online, busy: accepted, offers: online && !accepted
+        ? [{ name: "DEL-1", order: "SO-1", delivery_area: "Central", round_number: 1, expires_at: "12:05" }]
+        : [],
+    });
+    if (url.includes("deliveries.set_offer_presence")) {
+      online = options.body.get("online") === "1";
+      return response({ online });
+    }
+    if (url.includes("deliveries.accept_delivery_offer")) {
+      accepted = true;
+      return response({ name: "DEL-1" });
+    }
+    if (url.includes("deliveries.get_my_delivery")) return response({
+      name: "DEL-1", order: "SO-1", status: "Accepted", allowed_statuses: [], activities: [],
+    });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?offers=${Date.now()}`);
+  await tick();
+  assert.match(nodes.get("#delivery-offers-status").textContent, /Offline/);
+  nodes.get("#delivery-online").listeners.click();
+  await tick();
+  const offer = nodes.get("#delivery-offers-list").children[0];
+  assert.match(offer.textContent, /Central/);
+  offer.children.find((child) => child.textContent === "Accept offer").listeners.click();
+  await tick();
+  const acceptance = calls.find((call) => call.url.includes("accept_delivery_offer"));
+  assert.equal(acceptance.options.body.get("delivery_name"), "DEL-1");
+  assert.equal(acceptance.options.body.get("round_number"), "1");
+  assert.match(nodes.get("#delivery-offers-status").textContent, /unavailable/);
+  assert.match(nodes.get("#delivery-detail").textContent, /Accepted/);
+});
 
 function installOptimization(t) {
   const nodes = install(t, [...deliveryIds, ...optimizationIds], "[data-delivery-page]", {});

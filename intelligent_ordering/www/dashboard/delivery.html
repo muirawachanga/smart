@@ -8,8 +8,9 @@
   <p class="smarto-eyebrow">Delivery workspace</p>
   <h1 id="delivery-workspace-heading">Delivery workspace</h1>
   <p><a href="/dashboard/delivery-areas">Open delivery areas and fees workspace</a></p>
-  <p>Delivery staff can see only assigned work. Order inventory and payment values remain read-only in this workspace.</p>
+  <p>Delivery staff see their assigned work and available offers. Order inventory and payment values remain read-only in this workspace.</p>
   <p id="delivery-feedback" role="status" aria-live="polite">Loading deliveries...</p>
+  {% include "templates/includes/delivery_offers.html" %}
   {% include "templates/includes/delivery_optimization.html" %}
   <section aria-labelledby="delivery-overview-heading">
     <h2 id="delivery-overview-heading">Delivery overview</h2>

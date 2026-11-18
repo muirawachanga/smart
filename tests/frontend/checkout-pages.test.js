@@ -186,7 +186,7 @@ test("checkout quotes server totals and recovers an interrupted submission", asy
   recover = true;
   await import(`../../intelligent_ordering/public/js/checkout-page.js?reload=${Date.now()}`);
   await tick();
-  assert.equal(locations.at(-1), "/payment?order=SO-1");
+  assert.equal(locations.at(-1), "/order-confirmation/SO-1");
   assert.equal(session.get("smarto.checkout.pending-order.v1"), "SO-1");
   assert.equal(calls.filter((call) => call.url.includes("checkout.create_order")).length, 1);
 });
@@ -229,7 +229,7 @@ test("retry uses the same checkout token and accepts an existing order", async (
   await nodes.get("#checkout-form").listeners.submit({ preventDefault() {} });
   assert.equal(tokens.length, 2);
   assert.equal(tokens[0], tokens[1]);
-  assert.equal(locations.at(-1), "/payment?order=SO-1");
+  assert.equal(locations.at(-1), "/order-confirmation/SO-1");
 });
 
 test("checkout submits the selected Cash on Delivery method", async (t) => {
@@ -281,7 +281,7 @@ test("a definitive validation rejection allows a corrected new submission", asyn
   await nodes.get("#checkout-form").listeners.submit({ preventDefault() {} });
   assert.equal(tokens.length, 2);
   assert.notEqual(tokens[0], tokens[1]);
-  assert.equal(locations.at(-1), "/payment?order=SO-2");
+  assert.equal(locations.at(-1), "/order-confirmation/SO-2");
 });
 
 test("failed delivery quotes never enable order submission", async (t) => {
@@ -317,6 +317,7 @@ test("confirmation shows only the server-returned order and clears its recovery 
   await tick();
   assert.equal(nodes.get("#order-detail").children[0].textContent, "Order SO-1");
   assert.equal(nodes.get("#order-detail").children[2].textContent, "Payment status: Unpaid");
+  assert.equal(nodes.get("#order-detail").children.at(-1).href, "/payment?order=SO-1");
   assert.equal(session.size, 0);
 });
 
@@ -328,6 +329,22 @@ test("confirmation does not show details when the owner-scoped request fails", a
   await tick();
   assert.equal(nodes.get("#order-detail").children.length, 0);
   assert.match(nodes.get("#order-status").textContent, /unavailable/);
+});
+
+test("COD confirmation explains preparation and links to payment details", async (t) => {
+  const { nodes } = install(t);
+  window.location.pathname = "/order-confirmation/SO-1";
+  t.mock.method(globalThis, "fetch", async () => response({
+    name: "SO-1", status: "Confirmed", payment_status: "Unpaid",
+    payment_method: "Cash on Delivery", customer_name: "Customer", customer_phone: "123",
+    delivery_address: "Road", items: [], subtotal: 100, total: 110, delivery_fee: 10, currency: "KES",
+  }));
+  await import(`../../intelligent_ordering/public/js/order-confirmation.js?cod-confirmation=${Date.now()}`);
+  await tick();
+  assert.match(nodes.get("#order-status").textContent, /confirmed.*prepare.*pay the rider/i);
+  const link = nodes.get("#order-detail").children.at(-1);
+  assert.equal(link.textContent, "View Cash on Delivery details");
+  assert.equal(link.href, "/payment?order=SO-1");
 });
 
 test("checkout fills a default saved address without submitting its owner", async (t) => {

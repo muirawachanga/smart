@@ -49,7 +49,7 @@ test("each staff role sees only authorized navigation and its own workspace", as
     ["Inventory Manager", "/dashboard/inventory", ["#inventory-dashboard-link", "#admin-dashboard-link"]],
     ["Delivery Manager", "/dashboard/delivery", ["#deliveries-link", "#admin-dashboard-link"]],
     ["Finance Manager", "/dashboard/sales", ["#payments-link", "#admin-dashboard-link"]],
-    ["Delivery Staff", "/dashboard/delivery", ["#deliveries-link"]],
+    ["Delivery Staff", "/dashboard/rider", ["#deliveries-link"]],
     ["Customer", "/account", []],
   ]) {
     const nodes = new Map();
@@ -64,6 +64,7 @@ test("each staff role sees only authorized navigation and its own workspace", as
             "#staff-orders-link": "/dashboard/orders",
             "#payments-link": "/store#payment-dashboard",
             "#deliveries-link": "/dashboard/delivery",
+            "#staff-rider-link": "/dashboard/rider",
             "#admin-dashboard-link": "/store#admin-dashboard",
             "#inventory-dashboard-link": "/dashboard/inventory",
             "#support-dashboard-link": "/dashboard/support",
@@ -95,7 +96,7 @@ test("each staff role sees only authorized navigation and its own workspace", as
     assert.equal(nodes.get("#smarto-workspace-link").href, destination);
     assert.equal(nodes.get("#smarto-staff-entry-link").href, destination);
     assert.equal(nodes.get("#smarto-workspace-link").hidden,
-      ["/account", "/dashboard/orders", "/dashboard/inventory", "/dashboard/delivery", "/dashboard/support"]
+      ["/account", "/dashboard/orders", "/dashboard/inventory", "/dashboard/delivery", "/dashboard/rider", "/dashboard/support"]
         .includes(destination));
     for (const selector of [
       "#staff-orders-link", "#payments-link", "#deliveries-link",
@@ -117,6 +118,7 @@ test("each staff role sees only authorized navigation and its own workspace", as
     assert.equal(nodes.get("#staff-products-link").hidden,
       !["Administrator", "System Manager", "Business Admin", "Store Manager", "Order Manager", "Inventory Manager"]
         .includes(role), `${role}: products`);
+    assert.equal(nodes.get("#staff-rider-link").hidden, role !== "Delivery Staff", `${role}: rider workspace`);
     assert.equal(nodes.get("#staff-audit-link").hidden,
       !["Administrator", "System Manager", "Business Admin"].includes(role), `${role}: Desk audit logs`);
     t.mock.restoreAll();

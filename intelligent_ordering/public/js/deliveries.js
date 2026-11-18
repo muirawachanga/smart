@@ -40,7 +40,7 @@ function renderMetrics(summary) {
     ["unassigned", "Unassigned"],
     ["assigned", "Assigned"],
     ["completed", "Completed"],
-    ["available_riders", "Available riders"],
+    ["available_riders", "Idle riders"],
   ];
   const container = document.querySelector("#delivery-metrics");
   container.replaceChildren(...labels
@@ -63,6 +63,7 @@ function readProof(file) {
 }
 
 export function initDeliveryDashboard() {
+  const riderPage = Boolean(document.querySelector("[data-rider-page]"));
   const feedback = document.querySelector("#delivery-feedback");
   const filters = document.querySelector("#delivery-filters");
   const results = document.querySelector("#delivery-list");
@@ -79,18 +80,29 @@ export function initDeliveryDashboard() {
   const planForm = document.querySelector("#delivery-plan-form");
   const planResults = document.querySelector("#delivery-plan-results");
   const routeResults = document.querySelector("#delivery-my-route-results");
+  const offersSection = document.querySelector("#delivery-offers-section");
+  const offersStatus = document.querySelector("#delivery-offers-status");
+  const offersList = document.querySelector("#delivery-offers-list");
+  const onlineButton = document.querySelector("#delivery-online");
+  const offlineButton = document.querySelector("#delivery-offline");
+  const escalationsSection = document.querySelector("#delivery-escalations-section");
+  const escalations = document.querySelector("#delivery-escalations");
+  let offersOnline = false;
+  let offerRefreshInProgress = false;
+  let lastHeartbeat = 0;
   let page = 1;
   let readyPage = 1;
   let dashboard = { manager: false, personnel: [], areas: [] };
   let selectedArea = null;
-  const newArea = button("Add new area", () => {
-    selectedArea = null;
-    areaForm.reset();
-    areaForm.elements.area_name.readOnly = false;
-    areaForm.elements.currency.value = "KES";
-    areaForm.elements.enabled.value = "1";
-  });
-  areaForm.append(newArea);
+  if (areaForm) {
+    areaForm.append(button("Add new area", () => {
+      selectedArea = null;
+      areaForm.reset();
+      areaForm.elements.area_name.readOnly = false;
+      areaForm.elements.currency.value = "KES";
+      areaForm.elements.enabled.value = "1";
+    }));
+  }
 
   async function act(control, operation) {
     if (control.disabled) return;
@@ -101,12 +113,15 @@ export function initDeliveryDashboard() {
     } catch (error) {
       feedback.textContent = error.message;
     } finally {
-      control.disabled = false;
+      control.disabled = control === onlineButton ? offersOnline
+        : control === offlineButton ? !offersOnline : false;
     }
   }
 
   async function loadDashboard() {
-    dashboard = await get("deliveries.delivery_dashboard", { page: String(readyPage) });
+    dashboard = riderPage
+      ? await get("deliveries.my_delivery_dashboard")
+      : await get("deliveries.delivery_dashboard", { page: String(readyPage) });
     const summary = dashboard.manager
       ? { ...dashboard.summary, available_riders: dashboard.available_riders }
       : dashboard.summary;
@@ -118,10 +133,22 @@ export function initDeliveryDashboard() {
     const completion = document.querySelector("#delivery-completion-rate");
     if (completion) completion.textContent = dashboard.manager
       ? `${dashboard.completion_rate}% of all deliveries completed.` : "";
-    manager.hidden = !dashboard.manager;
+    if (manager) manager.hidden = !dashboard.manager;
+    if (offersSection) offersSection.hidden = !dashboard.rider;
+    if (escalationsSection) escalationsSection.hidden = !dashboard.manager;
+    if (dashboard.rider && offersSection) await loadOffers();
     if (riderLocation) riderLocation.hidden = dashboard.manager;
     if (managerPlan) managerPlan.hidden = !dashboard.manager;
     if (!dashboard.manager) return;
+    if (escalations) {
+      escalations.replaceChildren(...(dashboard.escalated_broadcasts || []).map((delivery) => {
+        const row = document.createElement("article");
+        const view = button("Manage delivery", () => act(view, () => showDetail(delivery.name)));
+        row.append(text("p", `${delivery.name} · ${delivery.order} · Expired ${delivery.broadcast_escalated_at}`), view);
+        return row;
+      }));
+      if (!dashboard.escalated_broadcasts?.length) escalations.append(text("p", "No expired broadcasts."));
+    }
     document.querySelector("#delivery-workloads").replaceChildren(
       ...dashboard.personnel.map((person) =>
         text("p", `${person.full_name} (${person.name}): ${person.workload} active deliveries`)),
@@ -203,8 +230,76 @@ export function initDeliveryDashboard() {
     }));
   }
 
+  async function loadOffers() {
+    if (!offersSection || !dashboard.rider || offerRefreshInProgress) return;
+    offerRefreshInProgress = true;
+    try {
+      const data = await get("deliveries.delivery_offers");
+      offersOnline = data.online;
+      offersStatus.textContent = !data.online ? "Offline"
+        : data.busy ? "Online, but unavailable while you have active deliveries."
+          : "Online and available for offers.";
+      onlineButton.disabled = data.online;
+      offlineButton.disabled = !data.online;
+      offersList.replaceChildren(...data.offers.map((offer) => {
+        const card = document.createElement("article");
+        card.className = "smarto-order-item";
+        const accept = button("Accept offer", () => act(accept, async () => {
+          await post("deliveries.accept_delivery_offer", {
+            delivery_name: offer.name, round_number: String(offer.round_number),
+          });
+          await refresh();
+          await showDetail(offer.name);
+        }));
+        const reject = button("Reject offer", () => act(reject, async () => {
+          await post("deliveries.reject_delivery_offer", {
+            delivery_name: offer.name, round_number: String(offer.round_number),
+          });
+          await loadOffers();
+        }));
+        card.append(text("h3", `${offer.name} · ${offer.order}`),
+          text("p", `Area: ${offer.delivery_area || "Not specified"} · Round ${offer.round_number} expires: ${offer.expires_at}`),
+          accept, reject);
+        return card;
+      }));
+      if (!data.offers.length) offersList.append(text("p", "No delivery offers."));
+    } finally {
+      offerRefreshInProgress = false;
+    }
+  }
+
+  if (offersSection) {
+    onlineButton.addEventListener("click", () => act(onlineButton, async () => {
+      await post("deliveries.set_offer_presence", { online: "1" });
+      lastHeartbeat = Date.now();
+      await loadOffers();
+    }));
+    offlineButton.addEventListener("click", () => act(offlineButton, async () => {
+      await post("deliveries.set_offer_presence", { online: "0" });
+      await loadOffers();
+    }));
+    const updateOffers = async () => {
+      if (!dashboard.rider || document.visibilityState === "hidden") return;
+      try {
+        if (offersOnline && Date.now() - lastHeartbeat >= 30000) {
+          await post("deliveries.set_offer_presence", { online: "heartbeat" });
+          lastHeartbeat = Date.now();
+        }
+        await loadOffers();
+      } catch (error) {
+        offersOnline = false;
+        onlineButton.disabled = false;
+        offlineButton.disabled = true;
+        offersList.replaceChildren();
+        offersStatus.textContent = error.message;
+      }
+    };
+    if (window.setInterval) window.setInterval(updateOffers, 5000);
+    if (window.frappe?.realtime) window.frappe.realtime.on("delivery_offers_changed", updateOffers);
+  }
+
   async function loadList() {
-    const listing = await get("deliveries.list_deliveries", {
+    const listing = await get(riderPage ? "deliveries.my_deliveries" : "deliveries.list_deliveries", {
       ...Object.fromEntries(new FormData(filters)), page: String(page),
     });
     results.replaceChildren(...listing.deliveries.map((delivery) => {
@@ -230,7 +325,9 @@ export function initDeliveryDashboard() {
   }
 
   async function showDetail(name) {
-    const delivery = await get("deliveries.get_delivery", { delivery_name: name });
+    const delivery = await get(riderPage ? "deliveries.get_my_delivery" : "deliveries.get_delivery", {
+      delivery_name: name,
+    });
     detail.hidden = false;
     detail.replaceChildren(
       text("h3", `${delivery.name} - ${delivery.status}`),
@@ -379,6 +476,7 @@ export function initDeliveryDashboard() {
       status.add(new Option("Add a note without changing status", delivery.status));
       for (const allowed of delivery.allowed_statuses) {
         const label = allowed === "Preparing" ? "Start delivery preparation"
+          : allowed === "Ready for Dispatch" ? "Mark ready for dispatch"
           : allowed === "Picked Up" ? "Start delivery / pick up order"
           : allowed === "In Transit" ? "Mark in transit"
             : allowed === "Delivered" ? "Mark delivered"
@@ -457,7 +555,8 @@ export function initDeliveryDashboard() {
       return true;
     } catch (error) {
       results.replaceChildren();
-      manager.hidden = true;
+      if (manager) manager.hidden = true;
+      if (offersSection) offersSection.hidden = true;
       if (riderLocation) riderLocation.hidden = true;
       if (managerPlan) managerPlan.hidden = true;
       feedback.textContent = error.message;
@@ -539,7 +638,7 @@ export function initDeliveryDashboard() {
     });
   }
 
-  areaForm.addEventListener("submit", (event) => {
+  if (areaForm) areaForm.addEventListener("submit", (event) => {
     event.preventDefault();
     if (!areaForm.reportValidity()) return;
     act(areaForm.querySelector('button[type="submit"]'), async () => {
@@ -562,14 +661,14 @@ export function initDeliveryDashboard() {
   filters.addEventListener("submit", (event) => { event.preventDefault(); page = 1; refresh(); });
   previous.addEventListener("click", () => { if (page > 1) { page -= 1; refresh(); } });
   next.addEventListener("click", () => { page += 1; refresh(); });
-  readyPrevious.addEventListener("click", () => { if (readyPage > 1) { readyPage -= 1; refresh(); } });
-  readyNext.addEventListener("click", () => { readyPage += 1; refresh(); });
-  document.querySelector("#deliveries-link").addEventListener("click", refresh);
-  if (document.querySelector("[data-delivery-page]")) {
+  if (readyPrevious) readyPrevious.addEventListener("click", () => { if (readyPage > 1) { readyPage -= 1; refresh(); } });
+  if (readyNext) readyNext.addEventListener("click", () => { readyPage += 1; refresh(); });
+  document.querySelector("#deliveries-link")?.addEventListener("click", refresh);
+  if (riderPage || document.querySelector("[data-delivery-page]")) {
     const warning = document.querySelector("#smarto-page-script-warning");
     if (warning) warning.hidden = true;
   }
-  if (window.location.hash === "#delivery-dashboard" || document.querySelector("[data-delivery-page]")) {
+  if (riderPage || window.location.hash === "#delivery-dashboard" || document.querySelector("[data-delivery-page]")) {
     refresh();
   }
 }

@@ -40,6 +40,7 @@ SHELL_ROUTES = {
     "/dashboard/products": "dashboard/products.html",
     "/dashboard/accounts": "dashboard/accounts.html",
     "/dashboard/delivery": "dashboard/delivery.html",
+    "/dashboard/rider": "dashboard/rider.html",
     "/dashboard/delivery-areas": "dashboard/delivery-areas.html",
     "/dashboard/support": "dashboard/support.html",
 }
@@ -99,7 +100,7 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
     def test_role_pages_and_auth_include_script_startup_warning(self):
         routes = [
             "dashboard/admin.html", "dashboard/owner.html", "dashboard/sales.html",
-            "dashboard/orders.html", "dashboard/inventory.html", "dashboard/delivery.html",
+            "dashboard/orders.html", "dashboard/inventory.html", "dashboard/delivery.html", "dashboard/rider.html",
             "dashboard/support.html", "account.html", "account/profile.html",
             "account/addresses.html", "account/payments.html", "account/notifications.html",
             "store.html",
@@ -170,6 +171,7 @@ class TestSmartOWebsiteRoutes(unittest.TestCase):
             "dashboard/products.html": "products-management.js",
             "dashboard/accounts.html": "accounts-management.js",
             "dashboard/delivery.html": "delivery-page.js",
+            "dashboard/rider.html": "delivery-page.js",
             "dashboard/support.html": "order-pages.js",
         }
         for template, script in expected.items():

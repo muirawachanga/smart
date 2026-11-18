@@ -45,7 +45,7 @@ def nearest_delivery_route(origin, deliveries):
 DELIVERY_TRANSITIONS = {
     "Awaiting Assignment": {"Assigned", "Cancelled"},
     "Assigned": {"Accepted", "Cancelled"},
-    "Accepted": {"Preparing", "Cancelled"},
+    "Accepted": {"Preparing", "Ready for Dispatch", "Cancelled"},
     "Preparing": {"Ready for Dispatch", "Cancelled"},
     "Ready for Dispatch": {"Picked Up", "Dispatched", "Cancelled"},
     "Picked Up": {"In Transit", "Failed"},
@@ -57,7 +57,7 @@ DELIVERY_TRANSITIONS = {
 }
 PERSONNEL_TRANSITIONS = {
     "Assigned": {"Accepted"},
-    "Accepted": {"Preparing"},
+    "Accepted": {"Preparing", "Ready for Dispatch"},
     "Preparing": {"Ready for Dispatch"},
     "Ready for Dispatch": {"Picked Up", "Dispatched"},
     "Picked Up": {"In Transit", "Failed"},

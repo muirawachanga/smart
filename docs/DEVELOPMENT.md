@@ -187,6 +187,7 @@ individual forms and readable text retain their own width constraints.
 | `/dashboard/inventory` | Role-protected inventory workspace |
 | `/dashboard/products` | Authorized product creation/editing and category creation |
 | `/dashboard/delivery` | Role-protected delivery workspace |
+| `/dashboard/rider` | Delivery Staff workspace for offers and assigned deliveries |
 | `/dashboard/support` | Read-only customer search, profiles, order history and enquiries |
 | `/store` | Existing database-backed storefront and staff workflows |
 
@@ -732,8 +733,8 @@ Session storage recovery is limited to the same browser tab.
 Private HTTP uses cryptographically random UUID tokens and exact retry
 comparison when HTTPS-only digest APIs are unavailable. Use HTTPS in production.
 The confirmation and account pages use owner-scoped endpoints even for customer
-accounts that also have staff roles. The account page reuses the existing
-M-Pesa controls; successful dedicated checkout opens `/payment?order=<order-name>`.
+accounts that also have staff roles. Successful checkout opens the order
+confirmation page, which links to M-Pesa payment or Cash on Delivery details.
 
 Customers can list and view only their own orders. Business Admin and Order
 Manager roles can search, filter, inspect, and update order statuses. Submitted
@@ -747,8 +748,9 @@ legacy records exist.
 The storefront continues to provide checkout review, order confirmation,
 customer order history, and staff order controls. The dedicated `/account` and
 `/dashboard/orders` pages use the same APIs. Completion is performed through
-the delivery workflow, not through the staff order status form. M-Pesa is the only
-customer payment method and must be configured server-side for payment to work.
+the delivery workflow, not through the staff order status form. Customers can
+choose M-Pesa or Cash on Delivery (KES only); M-Pesa must be configured
+server-side for payment to work.
 New orders include the configured delivery-area
 fee in their immutable server-calculated total. Product/category-at-order
 snapshots support historical reporting; old orders without a snapshot report
@@ -821,6 +823,7 @@ customer consent through the actual customer process.
 | `/dashboard/sales` | System Manager, Business Admin, Store Manager, Finance Manager |
 | `/dashboard/inventory` | System Manager, Business Admin, Inventory Manager |
 | `/dashboard/delivery` | System Manager, Business Admin, Store Manager, Order Manager, Delivery Manager, Delivery Staff |
+| `/dashboard/rider` | Delivery Staff |
 | `/dashboard/support` | System Manager, Business Admin, Store Manager, Customer Support |
 
 `Administrator` retains Frappe's administrative access. These page checks do
@@ -866,7 +869,7 @@ command arguments, source files, environment files, or shell history.
 | `delivery.test@smarto.local` | Delivery Manager | `/dashboard/delivery` |
 | `finance.test@smarto.local` | Finance Manager | `/dashboard/sales` |
 | `support.test@smarto.local` | Customer Support | `/dashboard/support` |
-| `rider.test@smarto.local` | Delivery Staff | `/dashboard/delivery` |
+| `rider.test@smarto.local` | Delivery Staff | `/dashboard/rider` |
 
 **Password:** for each newly created account, use the temporary password you
 entered at the hidden prompt. Keep that value in your local password manager.
@@ -984,14 +987,17 @@ balance/movement history before submitting the same receipt again.
 
 ## Delivery management
 
-The `/dashboard/delivery` page uses the existing `deliveries` APIs for
+The rider-specific `/dashboard/rider` page shows delivery offers, the signed-in
+rider's assignments and route controls, including for users who also have
+manager roles. The `/dashboard/delivery` page uses the existing `deliveries` APIs for
 permission-scoped delivery listing/detail, manager assignment and scheduling,
-delivery-area management, and assigned-staff status updates. Only managers can
+delivery-area management, and assigned-staff status updates. Managers can
 create deliveries from ready orders or change assignments. Delivery Managers
 can view routing areas; only System Manager, Business Admin, Store Manager and
 Order Manager can change area rates.
-Delivery staff see only their assigned deliveries and can confirm completion
-only for an assigned delivery after verified payment. Delivery updates do not
+Delivery staff see their assigned deliveries and minimal details of available
+offers. Only the assigned rider can confirm completion, subject to the existing
+payment or cash-on-delivery safeguards. Delivery updates do not
 deduct inventory a second time. Manager and staff API checks remain
 authoritative even when a page is accessible.
 
@@ -1002,6 +1008,47 @@ the delivery to Assigned so the replacement rider must accept it; picked-up
 deliveries cannot be reassigned. Completion requires the assigned rider's
 explicit confirmation, private proof photo, and verified payment, with existing
 activity records retaining actors and timestamps.
+
+After a rider accepts, the rider can mark the delivery **Ready for Dispatch**
+directly; the older **Preparing** step remains available for existing
+workflows. Pickup and transit still require verified M-Pesa payment or an
+outstanding COD transaction. The assigned rider confirms delivery with private
+proof; COD also requires the rider to record cash collection before finance
+reconciles it and completes the order.
+
+### Automatic delivery offers
+
+When an order changes to **Ready for Delivery**, SmartO creates its existing
+Delivery record and starts a broadcast. Riders use their existing Delivery Staff
+accounts and choose **Go online** in the delivery workspace. They must keep the
+dashboard open; presence expires after 90 seconds without a heartbeat. Riders
+with active deliveries do not receive offers. Offers show only the order,
+delivery reference and area until accepted; location sharing is not required.
+
+The default is three consecutive five-minute rounds. Rejections apply only to
+that rider and persist across rounds. Acceptance locks the rider, order and
+delivery, checks eligibility and the current round again, and records the
+assignment and acceptance together. A stale offer cannot be accepted after
+another rider or manager assigns it. Offers update over Frappe realtime when
+available, with dashboard polling as a fallback. Managers can still assign or
+reassign deliveries using the existing workflow.
+
+Configure the policy per site in `site_config.json`, for example
+`"delivery_broadcast": {"attempts": 3, "round_minutes": 5}`. Attempts must be
+an integer from 1 to 20 and round minutes an integer from 1 to 1440. The policy
+is captured when each broadcast starts. After the final round, the Frappe
+scheduler creates an in-app Notification Log for each enabled Delivery Manager
+and lists the delivery in the manager workspace for manual intervention.
+Escalation depends on running scheduler workers and may occur after the exact
+expiry. If there are no enabled Delivery Managers, the condition is logged and
+the delivery still appears in the manager workspace.
+
+Orders already ready before this update are not broadcast retroactively; a
+manager can create their delivery to start a broadcast. Legacy orders without
+a delivery area retain their original total and may show an unspecified area.
+Run `bench --site <site-name> migrate` and rebuild assets after deploying, then
+verify competing accepts, notification delivery, and the scheduler on an
+isolated Frappe site before production use.
 
 ### Delivery planning and rider locations
 
@@ -1075,16 +1122,16 @@ persisted workflows. Pending orders remain the existing new-order queue.
 
 ## M-Pesa configuration and operations
 
-Successful checkout (including a recovered/repeated submission) opens
-`/payment?order=<order-name>`, using the owner-only order API. The page offers
-only M-Pesa STK Push, displays the server-calculated order total and existing
-payment attempts, and never asks for the customer's PIN. It does not initiate a
-charge on page load. The customer explicitly clicks **Pay with M-Pesa**, approves
+Successful checkout (including a recovered/repeated submission) opens the
+owner-only order confirmation, with a link to `/payment?order=<order-name>`.
+For M-Pesa orders, the payment page displays the server-calculated order total
+and existing payment attempts, and never asks for the customer's PIN. It does
+not initiate a charge on page load. The customer explicitly clicks **Pay with M-Pesa**, approves
 the prompt on their phone, then uses **Refresh payment status** to view the
 verified result. Paid or closed orders cannot initiate another payment.
 An unconfigured integration reports an error; it does not offer fake payment
-success or another payment method. The original confirmation URLs remain valid
-and include a link to the payment page.
+success or switch the order's payment method. Cash on Delivery orders show
+collection instructions instead of an M-Pesa prompt.
 
 ### Configure this Frappe app
 

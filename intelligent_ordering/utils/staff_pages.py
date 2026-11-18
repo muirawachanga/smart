@@ -14,6 +14,7 @@ PAGE_ROLES = {
         "System Manager", "Business Admin", "Store Manager", "Order Manager",
         "Delivery Manager", "Delivery Staff",
     },
+    "rider": {"Delivery Staff"},
     "support": {"System Manager", "Business Admin", "Store Manager", "Customer Support"},
 }
 
@@ -53,6 +54,8 @@ def require_staff_page(context, page):
         link for link, allowed in sidebar_roles.items()
         if user == "Administrator" or roles.intersection(allowed)
     ]
+    if "Delivery Staff" in roles:
+        context.smarto_visible_staff_links.append("staff-rider-link")
     context.smarto_staff_workspace = next(
         route for allowed, route in (
             (PAGE_ROLES["admin"], "/dashboard/admin"),
@@ -60,7 +63,8 @@ def require_staff_page(context, page):
             ({"Finance Manager"}, "/dashboard/sales"),
             ({"Order Manager"}, "/dashboard/orders"),
             ({"Inventory Manager"}, "/dashboard/inventory"),
-            ({"Delivery Manager", "Delivery Staff"}, "/dashboard/delivery"),
+            ({"Delivery Manager"}, "/dashboard/delivery"),
+            ({"Delivery Staff"}, "/dashboard/rider"),
             ({"Customer Support"}, "/dashboard/support"),
         ) if user == "Administrator" or roles.intersection(allowed)
     )
@@ -83,6 +87,7 @@ def require_staff_page(context, page):
         "delivery": [("deliveries", "Deliveries")] if (
             user == "Administrator" or roles & (PAGE_ROLES["delivery"] - {"Delivery Staff"})
         ) else [],
+        "rider": [],
         "support": [],
     }[page]
     if page == "sales" and (

@@ -170,6 +170,44 @@ class TestCheckout(FrappeTestCase):
         with self.assertRaises(frappe.PermissionError):
             submitted.save(ignore_permissions=True)
 
+    def test_cod_order_reaches_delivery_and_finance_reconciliation(self):
+        from intelligent_ordering.api.deliveries import (
+            accept_delivery_offer, delivery_offers, set_offer_presence,
+            update_delivery, upload_delivery_proof,
+        )
+        from intelligent_ordering.api.payments import confirm_cod_payment
+
+        order_name = self._submit_order(payment_method="Cash on Delivery")["order"]["name"]
+        rider = self._make_user(f"workflow-rider-{frappe.generate_hash(length=8)}@example.test", "Delivery Staff")
+        frappe.set_user("Administrator")
+        update_order_status(order_name, "Processing")
+        update_order_status(order_name, "Ready for Delivery")
+        delivery_name = frappe.db.get_value("Delivery", {"order": order_name}, "name")
+        self.assertTrue(delivery_name)
+        frappe.set_user(rider.name)
+        set_offer_presence("1")
+        offer = next(row for row in delivery_offers()["offers"] if row["name"] == delivery_name)
+        accept_delivery_offer(delivery_name, offer["round_number"])
+        for status in ("Ready for Dispatch", "Picked Up", "In Transit"):
+            update_delivery(delivery_name, status)
+        image = ("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8"
+                 "/w8AAwMCAO+aD1sAAAAASUVORK5CYII=")
+        proof = upload_delivery_proof(delivery_name, image)
+        try:
+            update_delivery(delivery_name, "Delivered", confirmation=1, cash_collected=1)
+            self.assertEqual(frappe.db.get_value("Sales Order", order_name, "payment_status"), "Unpaid")
+            frappe.set_user("Administrator")
+            payment = frappe.db.get_value("Payment Transaction", {"order": order_name}, "name")
+            confirm_cod_payment(payment)
+            order = frappe.get_doc("Sales Order", order_name)
+            self.assertEqual((order.status, order.payment_status), ("Completed", "Paid"))
+            self.assertEqual(frappe.db.get_value("Payment Transaction", payment, "status"), "Successful")
+        finally:
+            frappe.set_user("Administrator")
+            file_name = frappe.db.get_value("File", {"file_url": proof["file_url"]}, "name")
+            if file_name:
+                frappe.delete_doc("File", file_name, ignore_permissions=True, force=True)
+
     def test_cod_checkout_rejects_insufficient_stock_without_creating_order(self):
         quote = get_checkout(delivery_area=self.delivery_area.name)
         frappe.set_user("Administrator")

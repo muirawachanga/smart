@@ -41,7 +41,8 @@ def login_destination(requested=""):
         ({"Finance Manager"}, "/dashboard/sales"),
         ({"Order Manager"}, "/dashboard/orders"),
         ({"Inventory Manager"}, "/dashboard/inventory"),
-        ({"Delivery Manager", "Delivery Staff"}, "/dashboard/delivery"),
+        ({"Delivery Manager"}, "/dashboard/delivery"),
+        ({"Delivery Staff"}, "/dashboard/rider"),
         ({"Customer Support"}, "/dashboard/support"),
         ({"Customer"}, "/"),
     ):

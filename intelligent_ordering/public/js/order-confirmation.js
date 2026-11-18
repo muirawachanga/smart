@@ -61,7 +61,13 @@ async function loadOrder() {
         "smarto-button");
       payLink.href = orderPaymentUrl(order.name);
       target.append(payLink);
-      status.textContent = "Order details";
+      status.textContent = order.status === "Confirmed" && order.payment_method === "Cash on Delivery"
+        ? "Order confirmed. The store will prepare it; pay the rider at handover."
+        : order.status === "Pending" && order.payment_method === "M-Pesa"
+          ? order.payment_status === "Paid"
+            ? "Payment verified. The store will confirm the order separately."
+            : "Order placed. Continue to payment; the store will confirm the order separately."
+          : "Order details and current status are shown below.";
     }
   } catch (error) {
     status.textContent = `Order could not be loaded: ${error.message}`;

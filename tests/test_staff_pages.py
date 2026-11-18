@@ -78,7 +78,7 @@ class TestStaffPages(unittest.TestCase):
     def test_server_rendered_sidebar_preserves_business_admin_and_rider_boundaries(self):
         for role, page, destination in (
             ("Business Admin", "admin", "/dashboard/admin"),
-            ("Delivery Staff", "delivery", "/dashboard/delivery"),
+            ("Delivery Staff", "delivery", "/dashboard/rider"),
         ):
             self.frappe.get_roles.return_value = [role]
             context = types.SimpleNamespace()
@@ -88,7 +88,7 @@ class TestStaffPages(unittest.TestCase):
                          "staff-permissions-link", "staff-settings-link"):
                 self.assertNotIn(link, context.smarto_visible_staff_links)
             if role == "Delivery Staff":
-                self.assertEqual(context.smarto_visible_staff_links, ["deliveries-link"])
+                self.assertEqual(context.smarto_visible_staff_links, ["deliveries-link", "staff-rider-link"])
             else:
                 self.assertIn("staff-products-link", context.smarto_visible_staff_links)
 
@@ -97,6 +97,17 @@ class TestStaffPages(unittest.TestCase):
         self.pages.require_staff_page(types.SimpleNamespace(), "delivery")
         with self.assertRaises(PermissionDenied):
             self.pages.require_staff_page(types.SimpleNamespace(), "inventory")
+
+    def test_rider_workspace_requires_delivery_staff_role(self):
+        self.frappe.get_roles.return_value = ["Delivery Staff"]
+        context = types.SimpleNamespace()
+        self.pages.require_staff_page(context, "rider")
+        self.assertEqual(context.smarto_staff_workspace, "/dashboard/rider")
+        self.assertEqual(context.workspace_reports, [])
+        for role in ("Customer", "Delivery Manager", "Order Manager"):
+            self.frappe.get_roles.return_value = [role]
+            with self.subTest(role=role), self.assertRaises(PermissionDenied):
+                self.pages.require_staff_page(types.SimpleNamespace(), "rider")
 
     def test_product_management_does_not_grant_stock_permissions(self):
         for role in ("Store Manager", "Order Manager"):

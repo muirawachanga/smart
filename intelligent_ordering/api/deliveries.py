@@ -80,7 +80,7 @@ def _order_locked(name):
     return frappe.get_doc("Sales Order", _text(name, "Order", required=True), for_update=True)
 
 
-def _delivery_locked(name):
+def _delivery_locked(name, *, offer=False):
     name = _text(name, "Delivery", required=True)
     order_name = frappe.db.get_value("Delivery", name, "order")
     if not order_name:
@@ -88,7 +88,8 @@ def _delivery_locked(name):
     # All mutations lock the order before its delivery, including payment reconciliation.
     order = _order_locked(order_name)
     delivery = frappe.get_doc("Delivery", name, for_update=True)
-    _check_assigned(delivery)
+    if not offer:
+        _check_assigned(delivery)
     return delivery, order
 
 
@@ -97,7 +98,7 @@ def _check_assigned(delivery):
         frappe.throw("You can only access your assigned deliveries.", frappe.PermissionError)
 
 
-def _serialize(delivery, detail=False):
+def _serialize(delivery, detail=False, *, personnel=False):
     data = {field: delivery.get(field) for field in DELIVERY_FIELDS}
     if detail:
         order = frappe.db.get_value(
@@ -116,7 +117,8 @@ def _serialize(delivery, detail=False):
             (
                 row.activity_datetime for row in reversed(delivery.activities)
                 if row.assigned_person == delivery.assigned_delivery_person
-                and row.to_status == "Assigned"
+                and (row.to_status == "Assigned"
+                     or (row.from_status == "Awaiting Assignment" and row.to_status == "Accepted"))
             ),
             None,
         )
@@ -131,7 +133,7 @@ def _serialize(delivery, detail=False):
             order_by="creation desc",
             limit_page_length=20,
         )
-        transitions = DELIVERY_TRANSITIONS if is_manager() else PERSONNEL_TRANSITIONS
+        transitions = PERSONNEL_TRANSITIONS if personnel or not is_manager() else DELIVERY_TRANSITIONS
         data["allowed_statuses"] = sorted(transitions.get(delivery.status, set()))
         if delivery.assigned_delivery_person != frappe.session.user:
             data["allowed_statuses"] = [
@@ -143,14 +145,17 @@ def _serialize(delivery, detail=False):
                 "previous_person", "assigned_person", "scheduled_delivery_date", "notes",
             )}
             for row in delivery.activities
+            if ((not personnel and is_manager()) or row.get("activity_type") != "Offer Rejected"
+                or row.get("responsible_user") == frappe.session.user)
         ]
     return data
 
 
-def _save(delivery, order, previous_status="", previous_person="", notes=""):
+def _save(delivery, order, previous_status="", previous_person="", notes="", activity_type=""):
     delivery.append("activities", {
         "activity_datetime": now_datetime(),
         "responsible_user": frappe.session.user,
+        "activity_type": activity_type,
         "from_status": previous_status,
         "to_status": delivery.status,
         "previous_person": previous_person,
@@ -179,11 +184,39 @@ def _save(delivery, order, previous_status="", previous_person="", notes=""):
             else f"{delivery.name}:{len(delivery.activities)}:{event}"
         )
         prepare_notification(event, order, delivery, event_key)
+    if delivery.broadcast_started_at and (
+        delivery.status == "Awaiting Assignment" or previous_status == "Awaiting Assignment"
+    ):
+        _notify_offer_change()
+
+
+def _notify_offer_change():
+    riders = frappe.db.sql(
+        """SELECT l.rider FROM `tabDelivery Rider Location` l
+           INNER JOIN `tabUser` u ON u.name = l.rider
+           WHERE l.offers_online = 1 AND l.offers_seen_at >= %s AND u.enabled = 1
+             AND EXISTS (SELECT 1 FROM `tabHas Role` r
+                         WHERE r.parent = u.name AND r.parenttype = 'User'
+                           AND r.role = 'Delivery Staff')""",
+        now_datetime() - timedelta(seconds=90), as_dict=True,
+    )
+    for row in riders:
+        frappe.publish_realtime("delivery_offers_changed", {}, user=row.rider, after_commit=True)
 
 
 @frappe.whitelist()
 def list_deliveries(status="", area="", search="", page=1, page_size=20, delayed="0"):
     _require_access()
+    return _list_deliveries(status, area, search, page, page_size, delayed)
+
+
+@frappe.whitelist()
+def my_deliveries(status="", area="", search="", page=1, page_size=20, delayed="0"):
+    _require_rider()
+    return _list_deliveries(status, area, search, page, page_size, delayed, assigned_only=True)
+
+
+def _list_deliveries(status, area, search, page, page_size, delayed, *, assigned_only=False):
     page, page_size = _pagination(page, page_size)
     search = _text(search, "Search", 100)
     area = _text(area, "Delivery area")
@@ -196,7 +229,7 @@ def list_deliveries(status="", area="", search="", page=1, page_size=20, delayed
         filters["status"] = status
     if area:
         filters["delivery_area"] = area
-    if not is_manager():
+    if assigned_only or not is_manager():
         filters["assigned_delivery_person"] = frappe.session.user
     if str(delayed) == "1":
         filters["scheduled_delivery_date"] = ["<", now_datetime().date()]
@@ -223,28 +256,47 @@ def get_delivery(delivery_name):
 
 
 @frappe.whitelist()
+def get_my_delivery(delivery_name):
+    rider = _require_rider()
+    delivery = frappe.get_doc("Delivery", _text(delivery_name, "Delivery", required=True))
+    if delivery.assigned_delivery_person != rider:
+        frappe.throw("You can only access your assigned deliveries.", frappe.PermissionError)
+    delivery.check_permission("read")
+    return _serialize(delivery, detail=True, personnel=True)
+
+
+@frappe.whitelist()
+def my_delivery_dashboard():
+    return _rider_dashboard(_require_rider())
+
+
+def _rider_dashboard(assigned):
+    summary = frappe.db.sql(
+        """
+        SELECT COUNT(*) AS total,
+          SUM(status = 'Assigned') AS pending,
+          SUM(status = 'Accepted') AS accepted,
+          SUM(status = 'Picked Up') AS picked_up,
+          SUM(status IN ('Preparing','Ready for Dispatch','Dispatched','In Transit')) AS in_progress,
+          SUM(status = 'Delivered') AS delivered,
+          SUM(status = 'Failed') AS failed
+        FROM `tabDelivery` WHERE assigned_delivery_person = %s
+        """, assigned, as_dict=True,
+    )[0]
+    return {
+        "manager": False,
+        "rider": True,
+        "summary": _delivery_summary(summary),
+        "delayed_deliveries": _delayed_count(assigned),
+        "personnel": [],
+    }
+
+
+@frappe.whitelist()
 def delivery_dashboard(page=1, page_size=20):
     _require_access()
     if not is_manager():
-        assigned = frappe.session.user
-        summary = frappe.db.sql(
-            """
-            SELECT COUNT(*) AS total,
-              SUM(status = 'Assigned') AS pending,
-              SUM(status = 'Accepted') AS accepted,
-              SUM(status = 'Picked Up') AS picked_up,
-              SUM(status IN ('Preparing','Ready for Dispatch','Dispatched','In Transit')) AS in_progress,
-              SUM(status = 'Delivered') AS delivered,
-              SUM(status = 'Failed') AS failed
-            FROM `tabDelivery` WHERE assigned_delivery_person = %s
-            """, assigned, as_dict=True,
-        )[0]
-        return {
-            "manager": False,
-            "summary": _delivery_summary(summary),
-            "delayed_deliveries": _delayed_count(assigned),
-            "personnel": [],
-        }
+        return _rider_dashboard(frappe.session.user)
     page, page_size = _pagination(page, page_size)
     personnel = frappe.db.sql(
         """
@@ -301,7 +353,8 @@ def delivery_dashboard(page=1, page_size=20):
         order_by="area_name", limit_page_length=0,
     )
     return {
-        "manager": True, "summary": _delivery_summary(summary),
+        "manager": True, "rider": "Delivery Staff" in frappe.get_roles(frappe.session.user),
+        "summary": _delivery_summary(summary),
         "completion_rate": (
             round(100 * int(summary.completed or 0) / int(summary.total), 1)
             if summary.total else 0
@@ -311,6 +364,11 @@ def delivery_dashboard(page=1, page_size=20):
         "personnel_performance": performance,
         "can_manage_areas": frappe.has_permission("Delivery Area", "write"),
         "can_delete_areas": frappe.has_permission("Delivery Area", "delete"),
+        "escalated_broadcasts": frappe.get_all(
+            "Delivery", filters={"status": "Awaiting Assignment", "broadcast_escalated_at": ["is", "set"]},
+            fields=["name", "order", "broadcast_escalated_at"], order_by="broadcast_escalated_at desc",
+            limit_page_length=100,
+        ),
         "ready_orders": ready[:page_size],
         "has_more": len(ready) > page_size, "personnel": personnel, "areas": areas,
     }
@@ -347,8 +405,13 @@ def create_delivery(order_name, delivery_area=""):
         return get_delivery(existing)
     if order.status != "Ready for Delivery":
         frappe.throw("Only orders Ready for Delivery can enter fulfillment.", frappe.ValidationError)
+    delivery = _create_delivery(order, delivery_area)
+    return _serialize(delivery, detail=True)
+
+
+def _create_delivery(order, delivery_area="", *, automatic=False):
     area = order.get("delivery_area")
-    if not area:
+    if not area and not automatic:
         # Legacy orders retain their paid amount; the selected area is routing only.
         area = get_area_quote(delivery_area, order.currency)["delivery_area"]
     delivery = frappe.get_doc({
@@ -360,8 +423,74 @@ def create_delivery(order_name, delivery_area=""):
         "delivery_fee": order.get("delivery_fee") or 0,
         "status": "Awaiting Assignment",
     })
+    _start_broadcast(delivery)
     _save(delivery, order, notes="Delivery created from immutable order snapshots.")
-    return _serialize(delivery, detail=True)
+    return delivery
+
+
+def _broadcast_settings():
+    config = frappe.conf.get("delivery_broadcast", {})
+    if not isinstance(config, dict):
+        frappe.throw("Delivery broadcast configuration must be an object.", frappe.ValidationError)
+    rounds = config.get("attempts", 3)
+    minutes = config.get("round_minutes", 5)
+    if (type(rounds) is not int or not 1 <= rounds <= 20
+            or type(minutes) is not int or not 1 <= minutes <= 1440):
+        frappe.throw("Delivery broadcast attempts and round minutes are invalid.", frappe.ValidationError)
+    return rounds, minutes
+
+
+def _start_broadcast(delivery):
+    rounds, minutes = _broadcast_settings()
+    delivery.broadcast_started_at = now_datetime()
+    delivery.broadcast_attempts = rounds
+    delivery.broadcast_round_minutes = minutes
+    delivery.broadcast_expires_at = delivery.broadcast_started_at + timedelta(minutes=rounds * minutes)
+    delivery.broadcast_escalated_at = None
+
+
+def broadcast_ready_order(order, method=None):
+    original = order.get_doc_before_save()
+    if not original or original.status == order.status or order.status != "Ready for Delivery":
+        return
+    if not frappe.db.get_value("Delivery", {"order": order.name}, "name", for_update=True):
+        _create_delivery(order, automatic=True)
+
+
+def escalate_expired_broadcasts():
+    names = frappe.get_all(
+        "Delivery",
+        filters={
+            "status": "Awaiting Assignment", "broadcast_expires_at": ["<=", now_datetime()],
+            "broadcast_escalated_at": ["is", "not set"],
+        },
+        pluck="name", order_by="broadcast_expires_at asc", limit_page_length=100,
+    )
+    for name in names:
+        delivery, order = _delivery_locked(name, offer=True)
+        if (delivery.status != "Awaiting Assignment" or delivery.assigned_delivery_person
+                or not delivery.broadcast_expires_at or delivery.broadcast_escalated_at
+                or delivery.broadcast_expires_at > now_datetime()):
+            continue
+        managers = frappe.db.sql(
+            """SELECT DISTINCT u.name FROM `tabUser` u
+               INNER JOIN `tabHas Role` r ON r.parent = u.name AND r.parenttype = 'User'
+               WHERE u.enabled = 1 AND r.role = 'Delivery Manager'""",
+            as_dict=True,
+        )
+        for manager in managers:
+            frappe.get_doc({
+                "doctype": "Notification Log", "for_user": manager.name,
+                "from_user": frappe.session.user, "type": "Alert",
+                "document_type": "Delivery", "document_name": delivery.name,
+                "subject": f"{delivery.name} needs manual rider assignment.",
+            }).insert(ignore_permissions=True)
+        if not managers:
+            frappe.log_error(title="Delivery broadcast escalation",
+                             message=f"No enabled Delivery Manager for {delivery.name}.")
+        delivery.broadcast_escalated_at = now_datetime()
+        _save(delivery, order, delivery.status, delivery.assigned_delivery_person,
+              "Broadcast expired; manual assignment required.")
 
 
 def _validate_person(person):
@@ -427,10 +556,157 @@ def _coordinates(latitude, longitude):
 def _require_rider():
     user = frappe.session.user
     if user in {"Guest", "Administrator"} or "Delivery Staff" not in frappe.get_roles(user):
-        frappe.throw("Only delivery personnel can share their location.", frappe.PermissionError)
+        frappe.throw("Only delivery personnel can access rider functions.", frappe.PermissionError)
     if not frappe.db.get_value("User", user, "enabled"):
         frappe.throw("This delivery account is disabled.", frappe.PermissionError)
     return user
+
+
+def _lock_rider(rider):
+    users = frappe.db.sql(
+        "SELECT enabled FROM `tabUser` WHERE name = %s FOR UPDATE", rider,
+    )
+    roles = frappe.db.sql(
+        """SELECT name FROM `tabHas Role` WHERE parent = %s AND parenttype = 'User'
+           AND role = 'Delivery Staff' FOR UPDATE""", rider,
+    )
+    if not users or not users[0][0] or not roles:
+        frappe.throw("Select an enabled user with the Delivery Staff role.", frappe.PermissionError)
+
+
+def _rider_busy(rider):
+    return bool(frappe.db.sql(
+        """SELECT name FROM `tabDelivery` WHERE assigned_delivery_person = %s
+           AND status NOT IN ('Delivered', 'Failed', 'Cancelled') LIMIT 1 FOR UPDATE""", rider,
+    ))
+
+
+def _presence(rider, *, for_update=False):
+    return frappe.db.get_value(
+        "Delivery Rider Location", rider, ["offers_online", "offers_seen_at"],
+        as_dict=True, for_update=for_update,
+    )
+
+
+def _is_online(presence):
+    if not presence or not presence.offers_online or not presence.offers_seen_at:
+        return False
+    seen = presence.offers_seen_at
+    if isinstance(seen, str):
+        seen = datetime.fromisoformat(seen)
+    return now_datetime() - timedelta(seconds=90) <= seen <= now_datetime()
+
+
+@frappe.whitelist(methods=["POST"])
+def set_offer_presence(online):
+    rider = _require_rider()
+    if str(online) not in {"0", "1", "heartbeat"}:
+        frappe.throw("Choose a valid availability state.", frappe.ValidationError)
+    _lock_rider(rider)
+    if frappe.db.exists("Delivery Rider Location", rider):
+        location = frappe.get_doc("Delivery Rider Location", rider, for_update=True)
+    else:
+        location = frappe.get_doc({"doctype": "Delivery Rider Location", "rider": rider})
+    if online == "heartbeat" and not _is_online(location):
+        frappe.throw("Go online again to receive delivery offers.", frappe.ValidationError)
+    location.offers_online = 0 if str(online) == "0" else 1
+    location.offers_seen_at = now_datetime() if location.offers_online else None
+    previous = getattr(frappe.flags, "sharing_delivery_location", False)
+    frappe.flags.sharing_delivery_location = True
+    try:
+        location.save(ignore_permissions=True)
+    finally:
+        frappe.flags.sharing_delivery_location = previous
+    return {"online": bool(location.offers_online)}
+
+
+@frappe.whitelist()
+def delivery_offers():
+    rider = _require_rider()
+    online = _is_online(_presence(rider))
+    busy = bool(frappe.db.exists(
+        "Delivery", {"assigned_delivery_person": rider, "status": ["not in", ["Delivered", "Failed", "Cancelled"]]},
+    ))
+    offers = []
+    if online and not busy:
+        now = now_datetime()
+        offers = frappe.db.sql(
+            """SELECT d.name, d.`order`, d.delivery_area, d.broadcast_started_at,
+                      d.broadcast_round_minutes, d.broadcast_attempts
+               FROM `tabDelivery` d
+               INNER JOIN `tabSales Order` o ON o.name = d.`order`
+               WHERE d.status = 'Awaiting Assignment'
+                 AND COALESCE(d.assigned_delivery_person, '') = ''
+                 AND d.broadcast_started_at IS NOT NULL AND d.broadcast_expires_at > %s
+                 AND o.status = 'Ready for Delivery'
+                 AND NOT EXISTS (
+                    SELECT 1 FROM `tabDelivery Activity` a
+                    WHERE a.parent = d.name AND a.parenttype = 'Delivery'
+                      AND a.activity_type = 'Offer Rejected' AND a.responsible_user = %s
+                 )
+               ORDER BY d.broadcast_started_at, d.name LIMIT 100""",
+            (now, rider), as_dict=True,
+        )
+        for offer in offers:
+            round_number, expires_at = _offer_round(offer, now)
+            offer["round_number"] = round_number
+            offer["expires_at"] = expires_at
+            for field in ("broadcast_started_at", "broadcast_round_minutes", "broadcast_attempts"):
+                offer.pop(field, None)
+    return {"online": online, "busy": busy, "offers": offers}
+
+
+def _offer_round(delivery, now):
+    started = delivery.broadcast_started_at
+    if isinstance(started, str):
+        started = datetime.fromisoformat(started)
+    minutes = int(delivery.broadcast_round_minutes or 0)
+    attempts = int(delivery.broadcast_attempts or 0)
+    if not started or minutes <= 0 or attempts <= 0 or now < started:
+        frappe.throw("This delivery broadcast is invalid.", frappe.ValidationError)
+    number = int((now - started).total_seconds() // (minutes * 60)) + 1
+    if number > attempts:
+        frappe.throw("This delivery offer is no longer available.", frappe.ValidationError)
+    return number, started + timedelta(minutes=number * minutes)
+
+
+def _locked_offer(name, rider, round_number):
+    _lock_rider(rider)
+    if not _is_online(_presence(rider, for_update=True)) or _rider_busy(rider):
+        frappe.throw("You must be online and have no active deliveries.", frappe.ValidationError)
+    delivery, order = _delivery_locked(name, offer=True)
+    if (order.status != "Ready for Delivery" or delivery.status != "Awaiting Assignment"
+            or delivery.assigned_delivery_person or not delivery.broadcast_started_at
+            or not delivery.broadcast_expires_at or delivery.broadcast_expires_at <= now_datetime()):
+        frappe.throw("This delivery offer is no longer available.", frappe.ValidationError)
+    current_round, _ = _offer_round(delivery, now_datetime())
+    if str(round_number) != str(current_round):
+        frappe.throw("This delivery offer has expired. Refresh the offers.", frappe.ValidationError)
+    if any(row.activity_type == "Offer Rejected" and row.responsible_user == rider
+           for row in delivery.activities):
+        frappe.throw("You have already rejected this delivery offer.", frappe.ValidationError)
+    return delivery, order
+
+
+@frappe.whitelist(methods=["POST"])
+def accept_delivery_offer(delivery_name, round_number):
+    rider = _require_rider()
+    delivery, order = _locked_offer(delivery_name, rider, round_number)
+    delivery.assigned_delivery_person = rider
+    delivery.scheduled_delivery_date = now_datetime().date()
+    delivery.status = "Assigned"
+    _save(delivery, order, "Awaiting Assignment", "", "Delivery offer accepted.")
+    delivery.status = "Accepted"
+    _save(delivery, order, "Assigned", rider, "Delivery offer accepted.")
+    return _serialize(delivery, detail=True)
+
+
+@frappe.whitelist(methods=["POST"])
+def reject_delivery_offer(delivery_name, round_number):
+    rider = _require_rider()
+    delivery, order = _locked_offer(delivery_name, rider, round_number)
+    _save(delivery, order, delivery.status, "", "Delivery offer rejected.", "Offer Rejected")
+    return {"rejected": True}
 
 
 def _rider_location(rider, *, for_update=False):

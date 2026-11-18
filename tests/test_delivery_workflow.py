@@ -3,7 +3,7 @@ import importlib.util
 import sys
 import types
 import unittest
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -176,6 +176,131 @@ class TestDeliveryWorkflow(unittest.TestCase):
         with self.assertRaisesRegex(DeliveryError, "Ready for Delivery"):
             self.service.create_delivery("SO-1")
         self.save.assert_not_called()
+
+    def test_ready_order_creates_broadcast_once_without_changing_order(self):
+        self.order.get_doc_before_save.return_value = types.SimpleNamespace(status="Preparing")
+        self.frappe.db.get_value.return_value = None
+        with patch.object(self.service, "_create_delivery") as create:
+            self.service.broadcast_ready_order(self.order)
+            create.assert_called_once_with(self.order, automatic=True)
+            self.frappe.db.get_value.return_value = "DEL-1"
+            self.service.broadcast_ready_order(self.order)
+            create.assert_called_once()
+        self.order.save.assert_not_called()
+
+    def test_broadcast_rounds_expire_and_use_configured_policy(self):
+        self.frappe.conf = {"delivery_broadcast": {"attempts": 3, "round_minutes": 5}}
+        self.service._start_broadcast(self.delivery)
+        self.assertEqual(self.delivery.broadcast_expires_at, datetime(2026, 1, 10, 12, 15))
+        number, expires = self.service._offer_round(self.delivery, datetime(2026, 1, 10, 12, 5))
+        self.assertEqual((number, expires), (2, datetime(2026, 1, 10, 12, 10)))
+        with self.assertRaisesRegex(DeliveryError, "no longer available"):
+            self.service._offer_round(self.delivery, datetime(2026, 1, 10, 12, 15))
+        self.frappe.conf = {"delivery_broadcast": {"attempts": 0}}
+        with self.assertRaisesRegex(DeliveryError, "configuration|invalid"):
+            self.service._start_broadcast(self.delivery)
+
+    def test_offers_require_online_idle_rider_and_first_acceptance_wins(self):
+        self.as_driver()
+        self.delivery.status = "Awaiting Assignment"
+        self.delivery.assigned_delivery_person = None
+        self.service._start_broadcast(self.delivery)
+        presence = types.SimpleNamespace(offers_online=1, offers_seen_at=datetime(2026, 1, 10, 12))
+        with (patch.object(self.service, "_lock_rider"),
+              patch.object(self.service, "_presence", return_value=presence),
+              patch.object(self.service, "_rider_busy", return_value=False),
+              patch.object(self.service, "_delivery_locked", return_value=(self.delivery, self.order)),
+              patch.object(self.service, "_serialize", return_value={"name": "DEL-1"})):
+            with self.assertRaisesRegex(DeliveryError, "expired"):
+                self.service.accept_delivery_offer("DEL-1", "2")
+            self.service.accept_delivery_offer("DEL-1", "1")
+            self.assertEqual(self.delivery.assigned_delivery_person, "driver@example.test")
+            self.assertEqual(self.delivery.status, "Accepted")
+            self.assertEqual(self.save.call_count, 2)
+            self.assertEqual(self.save.call_args_list[0].args[2], "Awaiting Assignment")
+            self.assertEqual(self.save.call_args_list[1].args[2], "Assigned")
+            self.frappe.session.user = "other-rider@example.test"
+            with self.assertRaisesRegex(DeliveryError, "no longer available"):
+                self.service.accept_delivery_offer("DEL-1", "1")
+            self.assertEqual(self.save.call_count, 2)
+
+    def test_accepted_offer_can_progress_to_handover_with_payment_safeguards(self):
+        for method in ("M-Pesa", "Cash on Delivery"):
+            with self.subTest(method=method):
+                self.as_driver()
+                self.delivery.status = "Awaiting Assignment"
+                self.delivery.assigned_delivery_person = None
+                self.delivery.activities = []
+                self.order.status = "Ready for Delivery"
+                self.order.payment_method = method
+                self.order.payment_status = "Paid" if method == "M-Pesa" else "Unpaid"
+                self.service._start_broadcast(self.delivery)
+                self.frappe.db.exists.return_value = method == "Cash on Delivery"
+                presence = types.SimpleNamespace(offers_online=1, offers_seen_at=datetime(2026, 1, 10, 12))
+                with (patch.object(self.service, "_lock_rider"),
+                      patch.object(self.service, "_presence", return_value=presence),
+                      patch.object(self.service, "_rider_busy", return_value=False),
+                      patch.object(self.service, "_delivery_locked", return_value=(self.delivery, self.order)),
+                      patch.object(self.service, "_serialize", return_value={}),
+                      patch.object(self.service, "_proof_files", return_value=[{"name": "FILE-1"}])):
+                    self.service.accept_delivery_offer("DEL-1", "1")
+                    for status in ("Ready for Dispatch", "Picked Up", "In Transit"):
+                        self.service.update_delivery("DEL-1", status)
+                        self.assertEqual(self.delivery.status, status)
+                    self.service.update_delivery(
+                        "DEL-1", "Delivered", confirmation=1,
+                        cash_collected=int(method == "Cash on Delivery"),
+                    )
+                self.assertEqual(self.delivery.status, "Delivered")
+                if method == "Cash on Delivery":
+                    self.assertEqual(self.order.payment_status, "Unpaid")
+                    self.assertEqual(self.delivery.cash_collected_amount, self.order.total)
+                    self.assertEqual(self.order.status, "Ready for Delivery")
+                else:
+                    self.assertEqual(self.order.status, "Completed")
+
+    def test_rejection_applies_only_to_rejecting_rider_and_busy_riders_cannot_accept(self):
+        self.as_driver()
+        self.delivery.status = "Awaiting Assignment"
+        self.delivery.assigned_delivery_person = None
+        self.service._start_broadcast(self.delivery)
+        presence = types.SimpleNamespace(offers_online=1, offers_seen_at=datetime(2026, 1, 10, 12))
+        with (patch.object(self.service, "_lock_rider"),
+              patch.object(self.service, "_presence", return_value=presence),
+              patch.object(self.service, "_rider_busy", return_value=False) as busy,
+              patch.object(self.service, "_delivery_locked", return_value=(self.delivery, self.order)),
+              patch.object(self.service, "_serialize", return_value={})):
+            self.service.reject_delivery_offer("DEL-1", "1")
+            self.assertEqual(self.save.call_args.args[-1], "Offer Rejected")
+            self.delivery.activities = [types.SimpleNamespace(
+                activity_type="Offer Rejected", responsible_user="driver@example.test",
+            )]
+            with self.assertRaisesRegex(DeliveryError, "already rejected"):
+                self.service.accept_delivery_offer("DEL-1", "1")
+            self.frappe.session.user = "other-rider@example.test"
+            busy.return_value = True
+            with self.assertRaisesRegex(DeliveryError, "no active deliveries"):
+                self.service.accept_delivery_offer("DEL-1", "1")
+            busy.return_value = False
+            self.service.accept_delivery_offer("DEL-1", "1")
+            self.assertEqual(self.delivery.assigned_delivery_person, "other-rider@example.test")
+
+    def test_expired_broadcast_notifies_manager_only_once(self):
+        self.delivery.status = "Awaiting Assignment"
+        self.delivery.assigned_delivery_person = None
+        self.delivery.broadcast_expires_at = datetime(2026, 1, 10, 12) - timedelta(seconds=1)
+        self.delivery.broadcast_escalated_at = None
+        self.frappe.get_all.return_value = ["DEL-1"]
+        self.frappe.db.sql.return_value = [types.SimpleNamespace(name="manager@example.test")]
+        notification = Mock()
+        self.frappe.get_doc.side_effect = None
+        self.frappe.get_doc.return_value = notification
+        with patch.object(self.service, "_delivery_locked", return_value=(self.delivery, self.order)):
+            self.service.escalate_expired_broadcasts()
+            self.service.escalate_expired_broadcasts()
+        notification.insert.assert_called_once_with(ignore_permissions=True)
+        self.assertEqual(self.frappe.get_doc.call_args.args[0]["for_user"], "manager@example.test")
+        self.save.assert_called_once()
 
     def test_cod_rider_records_cash_and_leaves_payment_confirmation_to_finance(self):
         self.as_driver()
@@ -418,6 +543,35 @@ class TestDeliveryWorkflow(unittest.TestCase):
             "assigned_delivery_person": "driver@example.test",
             "status": "Assigned", "delivery_area": "Central",
         })
+
+    def test_rider_workspace_scopes_even_users_with_manager_roles(self):
+        self.as_driver()
+        self.frappe.get_roles.return_value = ["Delivery Staff", "Delivery Manager"]
+        self.frappe.get_list.return_value = []
+        self.service.my_deliveries()
+        self.assertEqual(
+            self.frappe.get_list.call_args.kwargs["filters"]["assigned_delivery_person"],
+            "driver@example.test",
+        )
+        self.delivery.assigned_delivery_person = "other@example.test"
+        with self.assertRaisesRegex(DeliveryError, "your assigned"):
+            self.service.get_my_delivery("DEL-1")
+        self.delivery.assigned_delivery_person = "driver@example.test"
+        self.delivery.status = "Accepted"
+        with patch.object(self.service, "_serialize", wraps=self.service._serialize) as serialize:
+            result = self.service.get_my_delivery("DEL-1")
+        self.assertTrue(serialize.call_args.kwargs["personnel"])
+        self.assertEqual(result["allowed_statuses"], ["Preparing", "Ready for Dispatch"])
+
+    def test_rider_workspace_apis_reject_non_riders(self):
+        self.frappe.get_roles.return_value = ["Delivery Manager"]
+        for operation, args in (
+            (self.service.my_delivery_dashboard, ()),
+            (self.service.my_deliveries, ()),
+            (self.service.get_my_delivery, ("DEL-1",)),
+        ):
+            with self.subTest(operation=operation.__name__), self.assertRaises(DeliveryError):
+                operation(*args)
 
     def test_order_is_locked_before_delivery_and_assignment_is_checked_after_lock(self):
         self.service._delivery_locked("DEL-1")

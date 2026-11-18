@@ -31,7 +31,7 @@ role_home_page = {
     "Order Manager": "/dashboard/orders",
     "Inventory Manager": "/dashboard/inventory",
     "Delivery Manager": "/dashboard/delivery",
-    "Delivery Staff": "/dashboard/delivery",
+    "Delivery Staff": "/dashboard/rider",
     "Customer Support": "/dashboard/support",
 }
 update_website_context = "intelligent_ordering.utils.business.update_website_context"
@@ -44,6 +44,7 @@ doc_events = {
     "Sales Order": {
         "on_update": [
             "intelligent_ordering.utils.inventory.handle_order_status_change",
+            "intelligent_ordering.api.deliveries.broadcast_ready_order",
             "intelligent_ordering.utils.fulfillment_notifications.handle_order_status_change",
             "intelligent_ordering.utils.audit.audit_order_status",
             "intelligent_ordering.utils.customer_notifications.on_update",
@@ -69,7 +70,10 @@ doc_events = {
 }
 
 scheduler_events = {
-    "all": ["intelligent_ordering.utils.fulfillment_notifications.send_pending_sms"],
+    "all": [
+        "intelligent_ordering.utils.fulfillment_notifications.send_pending_sms",
+        "intelligent_ordering.api.deliveries.escalate_expired_broadcasts",
+    ],
 }
 
 permission_query_conditions = {

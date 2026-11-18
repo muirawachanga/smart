@@ -1,0 +1,46 @@
+{% extends "templates/smarto_base.html" %}
+
+{% block title %}Rider workspace | SmartO{% endblock %}
+
+{% block smarto_content %}
+<main class="smarto-page" data-rider-page>
+  {% include "templates/includes/page_script_warning.html" %}
+  <p class="smarto-eyebrow">Delivery staff</p>
+  <h1 id="delivery-workspace-heading">My deliveries</h1>
+  <p>Go online to receive offers, manage your assigned deliveries and record their progress.</p>
+  <p id="delivery-feedback" role="status" aria-live="polite">Loading deliveries...</p>
+  {% include "templates/includes/delivery_offers.html" %}
+  <section aria-labelledby="delivery-overview-heading">
+    <h2 id="delivery-overview-heading">My delivery overview</h2>
+    <div id="delivery-metrics" class="smarto-admin-metrics" aria-live="polite"></div>
+    <p id="delivery-delayed" class="smarto-dashboard-note"></p>
+  </section>
+  <section aria-labelledby="rider-deliveries-heading">
+    <h2 id="rider-deliveries-heading">My deliveries</h2>
+    <form id="delivery-filters" class="smarto-catalog-form">
+      <label>Search order or delivery <input name="search" type="search" maxlength="100"></label>
+      <label>Delivery status
+        <select name="status">
+          <option value="">All statuses</option>
+          <option>Assigned</option><option>Accepted</option><option>Preparing</option>
+          <option>Ready for Dispatch</option><option>Picked Up</option><option>Dispatched</option>
+          <option>In Transit</option><option>Delivered</option><option>Failed</option><option>Cancelled</option>
+        </select>
+      </label>
+      <label>Delivery area <input name="area" type="text" maxlength="140"></label>
+      <label>Schedule
+        <select name="delayed"><option value="0">All deliveries</option><option value="1">Delayed active deliveries</option></select>
+      </label>
+      <button type="submit" class="smarto-button">Search deliveries</button>
+    </form>
+    <div id="delivery-list" class="smarto-cart-items"></div>
+    <nav class="smarto-pagination" aria-label="Delivery pages">
+      <button id="delivery-previous" class="smarto-button smarto-button-secondary" type="button" disabled>Previous</button>
+      <button id="delivery-next" class="smarto-button smarto-button-secondary" type="button" disabled>Next</button>
+    </nav>
+    <div id="delivery-detail" class="smarto-cart-items" hidden></div>
+  </section>
+  {% include "templates/includes/delivery_location.html" %}
+</main>
+<script type="module" src="/assets/intelligent_ordering/js/delivery-page.js"></script>
+{% endblock %}

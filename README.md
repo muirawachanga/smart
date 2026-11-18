@@ -107,7 +107,7 @@ Implemented means code exists, not that live operation has been verified.
 | Inventory | Balances, reservations, movements and authorized stock adjustments | No automatic predictive replenishment |
 | Payments | M-Pesa integration, transaction reporting and provider-backed reconciliation | Verify sandbox/live outcomes; refund-request/approval workflows remain future work |
 | SMS | Order, payment and delivery events through the existing notification outbox | No handset delivery receipts; investigate ambiguous outcomes before resending |
-| Delivery | Role-scoped assignments, status actions and proximity-based group planning | Straight-line estimates, not road navigation, continuous GPS or traffic-aware routing |
+| Delivery | Automatic rider offers, role-scoped assignment and status actions, and proximity-based group planning | Straight-line estimates, not road navigation, continuous GPS or traffic-aware routing |
 | Assistance | Gemini product assistance and validated suggestions | Customer must explicitly add products and finish normal checkout; no AI-controlled payments |
 | Recommendations | Signed-in customer's completed-order history and available products | Not a trained collaborative-filtering or XGBoost model |
 | Forecasts | Local weekday-seasonal statistical sales/demand estimates | Requires sufficient history; estimates are not guarantees |
@@ -196,7 +196,7 @@ recorded. Apply migrations after updating permissions, and rebuild assets.
 | Administrator / System Manager only | `/dashboard/accounts` | Register customers/staff, assign one intended operational role, enable/disable access and resend setup email |
 | Authorized product staff | `/dashboard/products` | Product creation/editing; category creation requires separate permission |
 | Customer | `/products`, `/assistant`, `/account` | Shopping and owner-scoped order history |
-| Rider (`Delivery Staff`) | `/dashboard/delivery` | Their assigned deliveries and permitted status actions, not financial management |
+| Rider (`Delivery Staff`) | `/dashboard/rider` | Offers, their assigned deliveries and permitted status actions, not financial management |
 | Delivery Manager | `/dashboard/delivery` | Assignment, monitoring and delivery planning |
 | Finance Manager | `/dashboard/sales` | Reporting, reconciliation and forecasts, not unrestricted payment editing |
 | Inventory Manager | `/dashboard/inventory` | Stock operations, movement history and demand estimates |
