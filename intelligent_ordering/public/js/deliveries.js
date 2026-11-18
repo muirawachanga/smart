@@ -28,6 +28,10 @@ function input(type, value = "") {
   return element;
 }
 
+function canAssign(delivery) {
+  return !["Picked Up", "Dispatched", "In Transit", "Delivered", "Cancelled"].includes(delivery.status);
+}
+
 function renderMetrics(summary) {
   const labels = [
     ["total", summary?.manager ? "Total deliveries" : "Assigned deliveries"],
@@ -94,6 +98,10 @@ export function initDeliveryDashboard() {
   let readyPage = 1;
   let dashboard = { manager: false, personnel: [], areas: [] };
   let selectedArea = null;
+  const requestedOrder = !riderPage && document.querySelector("[data-delivery-page]")
+    ? new URLSearchParams(window.location.search).get("order") : null;
+  let openRequestedOrder = Boolean(requestedOrder);
+  if (requestedOrder) filters.elements.search.value = requestedOrder;
   if (areaForm) {
     areaForm.append(button("Add new area", () => {
       selectedArea = null;
@@ -190,7 +198,8 @@ export function initDeliveryDashboard() {
       card.append(create);
       return card;
     }));
-    if (!dashboard.ready_orders.length) readyOrders.append(text("p", "No unassigned ready orders."));
+    if (!dashboard.ready_orders.length) readyOrders.append(text("p",
+      "No ready orders need a delivery record. Automatically broadcast orders are in Deliveries below; choose Assign / monitor delivery to select a rider."));
     document.querySelector("#delivery-areas").replaceChildren(...dashboard.areas.map((area) => {
       const row = document.createElement("article");
       row.className = "smarto-order-item";
@@ -305,7 +314,8 @@ export function initDeliveryDashboard() {
     results.replaceChildren(...listing.deliveries.map((delivery) => {
       const card = document.createElement("article");
       card.className = "smarto-order-item";
-      const view = button("View delivery", () => act(view, () => showDetail(delivery.name)));
+      const view = button(dashboard.manager && canAssign(delivery) ? "Assign / monitor delivery" : "View delivery",
+        () => act(view, () => showDetail(delivery.name)));
       card.append(text("h4", `${delivery.order} · ${delivery.status}`),
         text("p", `${delivery.name} · ${delivery.customer_name} · ${delivery.customer_phone}`),
         text("p", `${delivery.delivery_address} · ${delivery.delivery_area}`),
@@ -322,6 +332,7 @@ export function initDeliveryDashboard() {
     if (!listing.deliveries.length) results.append(text("p", "No matching deliveries."));
     previous.disabled = page === 1;
     next.disabled = !listing.has_more;
+    return listing.deliveries;
   }
 
   async function showDetail(name) {
@@ -392,7 +403,7 @@ export function initDeliveryDashboard() {
       });
       detail.append(accept, rejectForm);
     }
-    if (dashboard.manager && !["Picked Up", "Dispatched", "In Transit", "Delivered", "Cancelled"].includes(delivery.status)) {
+    if (dashboard.manager && canAssign(delivery)) {
       const assignment = document.createElement("form");
       assignment.className = "smarto-checkout-form";
       assignment.append(text("h4", "Assign / reassign delivery"));
@@ -412,6 +423,11 @@ export function initDeliveryDashboard() {
       const save = text("button", "Save assignment");
       save.type = "submit";
       save.className = "smarto-button";
+      if (!dashboard.personnel.length) {
+        save.disabled = true;
+        assignment.append(text("p",
+          "No enabled riders are available. Ask an Administrator or System Manager to register a Delivery Staff (Rider) account at /dashboard/accounts."));
+      }
       assignment.append(save);
       assignment.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -543,6 +559,7 @@ export function initDeliveryDashboard() {
         `${activity.previous_person || "Unassigned"} -> ${activity.assigned_person || "Unassigned"}; ` +
         `scheduled ${activity.scheduled_delivery_date || "Not scheduled"}. ${activity.notes || ""}`));
     }
+    detail.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function refresh() {
@@ -550,8 +567,15 @@ export function initDeliveryDashboard() {
     detail.hidden = true;
     try {
       await loadDashboard();
-      await loadList();
+      const deliveries = await loadList();
       feedback.textContent = "";
+      if (openRequestedOrder) {
+        openRequestedOrder = false;
+        const delivery = deliveries.find((row) => row.order === requestedOrder);
+        if (delivery) await showDetail(delivery.name);
+        else feedback.textContent =
+          `No delivery record found for ${requestedOrder}. If the order is ready, use Create delivery above; otherwise wait for preparation to finish.`;
+      }
       return true;
     } catch (error) {
       results.replaceChildren();

@@ -519,7 +519,8 @@ test("manager saves coordinates against the existing delivery", async (t) => {
   });
   await import(`../../intelligent_ordering/public/js/delivery-page.js?coordinates=${Date.now()}`);
   await tick();
-  nodes.get("#delivery-list").children[0].children.find((child) => child.textContent === "View delivery").listeners.click();
+  nodes.get("#delivery-list").children[0].children
+    .find((child) => child.textContent === "Assign / monitor delivery").listeners.click();
   await tick();
   const form = nodes.get("#delivery-detail").children.find(
     (child) => child.tag === "form" && child.textContent.includes("Set delivery coordinates"),
@@ -608,6 +609,96 @@ test("delivery manager sees performance and routing areas without rate editing",
   assert.match(nodes.get("#delivery-performance").textContent, /3 completed/);
   assert.match(nodes.get("#delivery-performance").textContent, /75\.0% completion/);
   assert.ok(nodes.get("#delivery-metrics").children.some((item) => /Total deliveries4/.test(item.textContent)));
+});
+
+test("order assignment link opens the broadcast delivery and saves the selected rider", async (t) => {
+  const nodes = install(t, deliveryIds, "[data-delivery-page]", {});
+  window.location.search = "?order=SO-1";
+  const calls = [];
+  let assigned = false;
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    calls.push({ url: String(url), body: options.body });
+    if (url.includes("deliveries.delivery_dashboard")) return response({
+      manager: true, summary: {}, personnel: [
+        { name: "rider@example.test", full_name: "Rider One", workload: 0 },
+      ], personnel_performance: [], ready_orders: [], areas: [], has_more: false,
+    });
+    if (url.includes("deliveries.list_deliveries")) return response({
+      deliveries: [{ name: "DEL-1", order: "SO-1", status: assigned ? "Assigned" : "Awaiting Assignment" }],
+      has_more: false,
+    });
+    if (url.includes("deliveries.get_delivery")) return response({
+      name: "DEL-1", order: "SO-1", status: assigned ? "Assigned" : "Awaiting Assignment",
+      assigned_delivery_person: assigned ? "rider@example.test" : "",
+      allowed_statuses: [], activities: [],
+    });
+    if (url.includes("deliveries.assign_delivery")) {
+      assigned = true;
+      return response({ name: "DEL-1" });
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?assign-order=${Date.now()}`);
+  await tick();
+  assert.equal(nodes.get("#delivery-filters").elements.search.value, "SO-1");
+  assert.ok(calls.some((call) => call.url.includes("list_deliveries") && call.url.includes("search=SO-1")));
+  const detail = nodes.get("#delivery-detail");
+  assert.equal(detail.hidden, false);
+  const form = detail.children.find((child) => child.children[0]?.textContent === "Assign / reassign delivery");
+  const rider = form.children[1].children[0];
+  assert.ok(rider.options.some((option) => option.value === "rider@example.test"));
+  rider.value = "rider@example.test";
+  form.children[2].children[0].value = "2026-11-19";
+  form.listeners.submit({ preventDefault() {} });
+  await tick();
+  const save = calls.find((call) => call.url.includes("assign_delivery"));
+  assert.equal(save.body.get("delivery_name"), "DEL-1");
+  assert.equal(save.body.get("assigned_person"), "rider@example.test");
+  assert.equal(save.body.get("scheduled_delivery_date"), "2026-11-19");
+  assert.match(detail.textContent, /Assigned: rider@example.test/);
+});
+
+test("delivery assignment explains when no enabled rider accounts exist", async (t) => {
+  const nodes = install(t, deliveryIds, "[data-delivery-page]", {});
+  window.location.search = "?order=SO-1";
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("deliveries.delivery_dashboard")) return response({
+      manager: true, summary: {}, personnel: [], personnel_performance: [],
+      ready_orders: [], areas: [], has_more: false,
+    });
+    if (url.includes("deliveries.list_deliveries")) return response({
+      deliveries: [{ name: "DEL-1", order: "SO-1", status: "Awaiting Assignment" }], has_more: false,
+    });
+    if (url.includes("deliveries.get_delivery")) return response({
+      name: "DEL-1", order: "SO-1", status: "Awaiting Assignment", allowed_statuses: [], activities: [],
+    });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?no-riders=${Date.now()}`);
+  await tick();
+  const detail = nodes.get("#delivery-detail");
+  assert.match(detail.textContent, /No enabled riders.*Delivery Staff.*\/dashboard\/accounts/);
+  const form = detail.children.find((child) => child.children[0]?.textContent === "Assign / reassign delivery");
+  assert.equal(form.children.find((child) => child.textContent === "Save assignment").disabled, true);
+});
+
+test("order assignment link does not open a different order when the requested delivery is missing", async (t) => {
+  const nodes = install(t, deliveryIds, "[data-delivery-page]", {});
+  window.location.search = "?order=SO-1";
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("deliveries.delivery_dashboard")) return response({
+      manager: true, summary: {}, personnel: [], personnel_performance: [],
+      ready_orders: [], areas: [], has_more: false,
+    });
+    if (url.includes("deliveries.list_deliveries")) return response({
+      deliveries: [{ name: "DEL-10", order: "SO-10", status: "Awaiting Assignment" }], has_more: false,
+    });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?missing-order=${Date.now()}`);
+  await tick();
+  assert.equal(nodes.get("#delivery-detail").hidden, true);
+  assert.match(nodes.get("#delivery-feedback").textContent, /No delivery record found for SO-1/);
 });
 
 test("dedicated delivery area workspace loads directly and saves the selected rate", async (t) => {

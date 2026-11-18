@@ -187,7 +187,7 @@ function renderDetail(order) {
     }
     if (mode === "staff" && order.status === "Ready for Delivery") {
       const link = text("a", "Assign or monitor delivery", "smarto-button smarto-button-secondary");
-      link.href = "/dashboard/delivery";
+      link.href = `/dashboard/delivery?${new URLSearchParams({ order: order.name })}`;
       card.append(link);
     }
   }

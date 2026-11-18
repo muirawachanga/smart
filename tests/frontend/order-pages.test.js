@@ -241,6 +241,24 @@ test("staff API rejection does not display orders", async (t) => {
   assert.match(nodes.get("#orders-status").textContent, /Not authorized/);
 });
 
+test("ready order assignment link preserves the selected order", async (t) => {
+  const nodes = install(t, "staff");
+  const readyOrder = { ...order, name: "SO /1", status: "Ready for Delivery" };
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("orders.list_orders")) return response({ orders: [readyOrder], has_more: false });
+    if (url.includes("orders.get_order")) return response(readyOrder);
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/order-pages.js?assignment=${Date.now()}`);
+  await tick();
+  await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
+  const link = nodes.get("#order-detail").children[0].children
+    .find((child) => child.textContent === "Assign or monitor delivery");
+  const target = new URL(link.href, "https://example.test");
+  assert.equal(target.pathname, "/dashboard/delivery");
+  assert.equal(target.searchParams.get("order"), readyOrder.name);
+});
+
 test("support uses staff read APIs without status or payment controls", async (t) => {
   const nodes = install(t, "support");
   t.mock.method(globalThis, "fetch", async (url) => {

@@ -1010,6 +1010,15 @@ payment or cash-on-delivery safeguards. Delivery updates do not
 deduct inventory a second time. Manager and staff API checks remain
 authoritative even when a page is accessible.
 
+The order page's **Assign or monitor delivery** link opens
+`/dashboard/delivery?order=<order-name>`, filters the delivery list, and opens the
+matching delivery's assignment controls. Automatically broadcast orders already
+have a delivery record: use **Assign / monitor delivery** under Deliveries, not
+Create delivery. Managers select an enabled Delivery Staff account and scheduled
+date; if no rider accounts exist, the form explains that an Administrator/System
+Manager must register one at `/dashboard/accounts`. Rider accounts cannot assign
+other riders.
+
 The page separates rider and manager overviews, displays per-rider completion
 rates, and filters delayed active deliveries with `list_deliveries(delayed="1")`.
 The delayed filter preserves rider ownership. Reassigning before pickup resets
