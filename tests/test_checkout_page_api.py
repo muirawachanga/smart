@@ -24,6 +24,7 @@ def load_modules():
     frappe.throw = Mock(side_effect=raise_error)
     frappe.db = Mock()
     frappe.session = types.SimpleNamespace(user="owner@example.test")
+    frappe.flags = types.SimpleNamespace()
     frappe.get_roles = Mock(return_value=["Customer", "Order Manager"])
     frappe.get_doc = Mock()
     cart = types.ModuleType("intelligent_ordering.api.cart")
@@ -56,6 +57,51 @@ def load_modules():
 class TestCheckoutPageEndpoints(unittest.TestCase):
     def setUp(self):
         self.frappe, self.checkout, self.orders = load_modules()
+
+    def test_only_cod_checkout_uses_normal_confirmation_save_and_restores_flag(self):
+        for method in ("Cash on Delivery", "M-Pesa"):
+            with self.subTest(method=method):
+                self.setUp()
+                item = {"product": "SKU-1", "quantity": 2, "unit_price": 50, "currency": "KES"}
+                self.checkout.get_cart.return_value = {"items": [item], "currency": "KES"}
+                self.frappe.db.get_value.return_value = None
+                self.frappe.db.sql.return_value = [types.SimpleNamespace(
+                    price=50, currency="KES", category=None, enabled=1,
+                )]
+                self.checkout.get_area_quote.return_value = {
+                    "delivery_area": "Central", "delivery_quote": "quote-1",
+                }
+                order = Mock(status="Pending", name="SO-1")
+                order.name = "SO-1"
+                self.frappe.get_doc.return_value = order
+                payments = types.ModuleType("intelligent_ordering.api.payments")
+                payments.create_cod_transaction = Mock()
+                saved_flags = []
+                order.save.side_effect = lambda **kwargs: saved_flags.append(
+                    self.frappe.flags.confirming_cod_order
+                )
+                with (
+                    patch.dict(sys.modules, {"intelligent_ordering.api.payments": payments}),
+                    patch.object(self.checkout, "_save_customer_profile", return_value=types.SimpleNamespace(name="PROFILE-1")),
+                    patch.object(self.checkout, "_get_or_create_address", return_value=types.SimpleNamespace(name="ADDR-1")),
+                    patch.object(self.checkout, "_serialize_order", side_effect=lambda doc: {"status": doc.status}),
+                ):
+                    result = self.checkout.create_order(
+                        customer_name="Customer", phone="+254700000000",
+                        address_line_1="1 Main Road", city="Nairobi", request_token=str(uuid4()),
+                        cart_revision=checkout_cart_revision([item]), delivery_area="Central",
+                        delivery_quote="quote-1", payment_method=method,
+                    )
+                if method == "Cash on Delivery":
+                    payments.create_cod_transaction.assert_called_once_with(order)
+                    order.save.assert_called_once_with(ignore_permissions=True)
+                    self.assertEqual(saved_flags, ["SO-1"])
+                    self.assertEqual(result["order"]["status"], "Confirmed")
+                    self.assertIsNone(self.frappe.flags.confirming_cod_order)
+                else:
+                    order.save.assert_not_called()
+                    payments.create_cod_transaction.assert_not_called()
+                    self.assertEqual(result["order"]["status"], "Pending")
 
     def test_support_can_list_orders_but_cannot_change_status(self):
         self.frappe.get_roles.return_value = ["Customer Support"]

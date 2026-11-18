@@ -141,6 +141,51 @@ class TestCheckout(FrappeTestCase):
         self.assertTrue(duplicate["duplicate"])
         self.assertEqual(duplicate["order"]["name"], first["order"]["name"])
 
+    def test_cod_checkout_confirms_and_reserves_stock_only_once(self):
+        token = str(uuid.uuid4())
+        first = self._submit_order(token=token, payment_method="Cash on Delivery")
+        order = first["order"]
+        self.assertEqual(order["status"], "Confirmed")
+        self.assertEqual(order["payment_status"], "Unpaid")
+        balance = frappe.db.get_value(
+            "Stock Balance", {"product": self.product.name, "warehouse": self.warehouse.name},
+            ["quantity_on_hand", "reserved_quantity", "available_quantity"], as_dict=True,
+        )
+        self.assertEqual(balance.quantity_on_hand, 20)
+        self.assertEqual(balance.reserved_quantity, 2)
+        self.assertEqual(balance.available_quantity, 18)
+        duplicate = self._submit_order(token=token, payment_method="Cash on Delivery")
+        self.assertTrue(duplicate["duplicate"])
+        self.assertEqual(duplicate["order"]["name"], order["name"])
+        self.assertEqual(frappe.db.count("Stock Ledger Entry", {
+            "reference_order": order["name"], "transaction_type": "Reservation",
+        }), 1)
+        self.assertEqual(frappe.db.count("Payment Transaction", {
+            "order": order["name"], "payment_method": "Cash on Delivery", "status": "Pending",
+        }), 1)
+        self.assertEqual(first["cart"]["items"], [])
+        self.assertFalse(getattr(frappe.flags, "confirming_cod_order", None))
+        submitted = frappe.get_doc("Sales Order", order["name"])
+        submitted.status = "Processing"
+        with self.assertRaises(frappe.PermissionError):
+            submitted.save(ignore_permissions=True)
+
+    def test_cod_checkout_rejects_insufficient_stock_without_creating_order(self):
+        quote = get_checkout(delivery_area=self.delivery_area.name)
+        frappe.set_user("Administrator")
+        adjust_stock(self.product.name, self.warehouse.name, "Adjustment", -19)
+        frappe.set_user(self.customer.name)
+        token = str(uuid.uuid4())
+        with self.assertRaises(frappe.ValidationError):
+            create_order(
+                customer_name="Test Customer", phone="+254700000000",
+                address_line_1="1 Main Road", city="Nairobi", request_token=token,
+                cart_revision=quote["cart_revision"], delivery_area=self.delivery_area.name,
+                delivery_quote=quote["delivery_quote"], payment_method="Cash on Delivery",
+            )
+        self.assertFalse(frappe.db.exists("Sales Order", {"checkout_token": token}))
+        self.assertEqual(get_cart()["items"][0]["quantity"], 2)
+
     def test_customer_cannot_read_another_customers_order(self):
         result = self._submit_order()
         other_customer = self._make_user(
@@ -394,7 +439,7 @@ class TestCheckout(FrappeTestCase):
         self.assertTrue(any(row.details == "First reason" for row in events))
         self.assertTrue(any(row.details == "New reason" for row in events))
 
-    def _submit_order(self, token=None):
+    def _submit_order(self, token=None, payment_method="M-Pesa"):
         checkout = get_checkout(delivery_area=self.delivery_area.name)
         return create_order(
             customer_name="Test Customer",
@@ -405,6 +450,7 @@ class TestCheckout(FrappeTestCase):
             cart_revision=checkout["cart_revision"],
             delivery_area=self.delivery_area.name,
             delivery_quote=checkout["delivery_quote"],
+            payment_method=payment_method,
         )
 
     def _make_user(self, email, role):

@@ -37,10 +37,18 @@ class SalesOrder(Document):
             ))
         ):
             frappe.throw("Customers can only request cancellation, not approve it.", frappe.PermissionError)
+        checkout_confirmation = (
+            getattr(frappe.flags, "confirming_cod_order", None) == self.name
+            and original.status == "Pending"
+            and self.status == "Confirmed"
+            and self.payment_method == "Cash on Delivery"
+            and self.payment_status == "Unpaid"
+        )
         if (
             "Customer" in frappe.get_roles(frappe.session.user)
             and not getattr(frappe.flags, "processing_delivery", False)
             and not customer_request
+            and not checkout_confirmation
         ):
             frappe.throw(
                 "Customers cannot modify submitted orders.",

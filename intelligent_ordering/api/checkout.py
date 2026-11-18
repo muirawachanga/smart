@@ -236,6 +236,13 @@ def create_order(
         from intelligent_ordering.api.payments import create_cod_transaction
 
         create_cod_transaction(order)
+        previous_confirmation = getattr(frappe.flags, "confirming_cod_order", None)
+        frappe.flags.confirming_cod_order = order.name
+        try:
+            order.status = "Confirmed"
+            order.save(ignore_permissions=True)
+        finally:
+            frappe.flags.confirming_cod_order = previous_confirmation
 
     shopping_cart_name = frappe.db.get_value(
         "Shopping Cart", {"user": user}, "name"

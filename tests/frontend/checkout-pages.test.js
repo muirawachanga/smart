@@ -408,13 +408,13 @@ test("payment page loads an owned order and initiates only the existing M-Pesa A
   assert.equal(form.children[1].disabled, true);
 });
 
-test("Cash on Delivery order shows handover instructions without an M-Pesa prompt", async (t) => {
+test("confirmed Cash on Delivery order explains preparation without an M-Pesa prompt", async (t) => {
   const { nodes } = install(t);
   window.location.pathname = "/payment";
   window.location.search = "?order=SO-COD";
   t.mock.method(globalThis, "fetch", async (url) => {
     if (url.includes("orders.get_my_order")) return response({
-      name: "SO-COD", status: "Pending", payment_status: "Unpaid",
+      name: "SO-COD", status: "Confirmed", payment_status: "Unpaid",
       payment_method: "Cash on Delivery", customer_name: "Customer",
       customer_phone: "+254700000000", delivery_address: "Road",
       items: [{ ...item, line_total: 100 }], subtotal: 100, total: 110, delivery_fee: 10, currency: "KES",
@@ -426,6 +426,7 @@ test("Cash on Delivery order shows handover instructions without an M-Pesa promp
   const content = nodes.get("#order-detail").children.map((node) => node.textContent).join(" ");
   assert.match(content, /Cash on Delivery selected/);
   assert.match(content, /Pay the rider at handover/);
+  assert.match(nodes.get("#order-status").textContent, /confirmed and stock is reserved.*Staff will prepare/);
   assert.equal(nodes.get("#order-detail").children.some((node) => node.className === "status-update-form"), false);
 });
 

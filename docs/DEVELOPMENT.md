@@ -958,7 +958,12 @@ releases reservations. After dispatch, authorized inventory staff must record
 returns before the order can be cancelled. Stock operations run inside the
 order update transaction, lock product rows during allocation, and use unique
 movement keys to avoid duplicate reservations or dispatches. Orders remain
-Pending without affecting inventory until confirmation. Inventory screens
+Pending without affecting inventory until confirmation. New Cash on Delivery
+orders automatically take the normal Pending-to-Confirmed transition during
+checkout, reserving available stock atomically with order creation. Insufficient
+stock rejects checkout without clearing the cart. M-Pesa checkout remains Pending;
+existing pending orders are not auto-confirmed retroactively. Preparation and
+delivery assignment remain staff actions. Inventory screens
 provide dashboard totals, product/warehouse stock search, movements, and
 authorized receipt/adjustment controls.
 
@@ -1171,7 +1176,8 @@ details while that payment remains in the results. They can
 inspect raw callback/query records but cannot edit statuses through generic
 DocType writes. Receipt and checkout IDs are unique. M-Pesa cannot be manually
 marked paid and the app never collects a PIN. Cash on Delivery (KES only) creates
-an outstanding transaction at checkout. The assigned rider records collection
+an outstanding transaction and auto-confirms the order using normal stock
+reservation at checkout. Payment remains Unpaid. The assigned rider records collection
 at handover as delivery evidence but cannot change payment status. Finance
 Manager, Business Admin, or System Manager can confirm only a delivered COD
 order with matching rider, amount, and collection timestamp; this records the

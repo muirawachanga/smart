@@ -51,7 +51,9 @@ async function loadOrder() {
         : ["Cancelled", "Completed"].includes(order.status)
           ? "This order is closed; no new payment can be initiated."
           : order.payment_method === "Cash on Delivery"
-            ? "Order placed with Cash on Delivery. Pay the rider at handover; finance confirms collection."
+            ? order.status === "Confirmed"
+              ? "Your Cash on Delivery order is confirmed and stock is reserved. Staff will prepare it and arrange delivery. Pay the rider at handover."
+              : "Order placed with Cash on Delivery. Pay the rider at handover; finance confirms collection."
             : "Order placed. Pay using M-Pesa below. Payment is confirmed only after server verification.";
     } else {
       const payLink = text("a",
