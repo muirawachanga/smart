@@ -363,6 +363,43 @@ test("dedicated rider page uses only rider-scoped delivery APIs", async (t) => {
   assert.ok(!calls.some((url) => url.includes("deliveries.list_deliveries")));
 });
 
+test("rider sees the saved status even when the delivery overview returns 500", async (t) => {
+  const nodes = install(t, deliveryIds, "[data-rider-page]", {});
+  const updates = [];
+  let status = "Accepted";
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    if (url.includes("deliveries.my_delivery_dashboard")) return { ...response({}), ok: false, status: 500 };
+    if (url.includes("deliveries.my_deliveries")) return response({
+      deliveries: [{ name: "DEL-1", order: "SO-1", status }], has_more: false,
+    });
+    if (url.includes("deliveries.get_my_delivery")) return response({
+      name: "DEL-1", order: "SO-1", status, activities: [], allowed_statuses: ["Ready for Dispatch"],
+    });
+    if (url.includes("deliveries.update_delivery")) {
+      status = options.body.get("status");
+      updates.push(status);
+      return response({ name: "DEL-1" });
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?rider-update=${Date.now()}`);
+  await tick();
+  await nodes.get("#delivery-list").children[0].children
+    .find((child) => child.textContent === "View delivery").listeners.click();
+  const detail = nodes.get("#delivery-detail");
+  const form = detail.children.find((child) => child.tag === "form");
+  const save = () => form.listeners.submit({ preventDefault() {} });
+  await save();
+  assert.match(detail.textContent, /Choose a delivery action or enter a note/);
+  assert.deepEqual(updates, []);
+  form.children[0].children[0].value = "Ready for Dispatch";
+  await save();
+  assert.deepEqual(updates, ["Ready for Dispatch"]);
+  assert.match(detail.textContent, /DEL-1 - Ready for Dispatch/);
+  assert.match(detail.textContent, /Delivery update saved, but some information could not refresh/);
+  assert.match(nodes.get("#delivery-list").textContent, /Ready for Dispatch/);
+});
+
 test("rider goes online and accepts a broadcast offer on the rider page", async (t) => {
   const nodes = install(t, [
     "delivery-feedback", "delivery-filters", "delivery-list", "delivery-detail",

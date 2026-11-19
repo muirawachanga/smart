@@ -393,14 +393,14 @@ def _delayed_count(assigned_person=None):
         values.append(assigned_person)
     row = frappe.db.sql(
         f"""
-        SELECT COUNT(*) AS delayed
+        SELECT COUNT(*) AS delayed_count
         FROM `tabDelivery`
         WHERE scheduled_delivery_date < CURDATE()
           AND status NOT IN ('Delivered','Failed','Cancelled')
           {filters}
         """, values, as_dict=True,
     )[0]
-    return int(row.delayed or 0)
+    return int(row.delayed_count or 0)
 
 
 @frappe.whitelist(methods=["POST"])

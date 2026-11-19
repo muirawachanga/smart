@@ -1035,7 +1035,9 @@ activity records retaining actors and timestamps.
 
 After a rider accepts, the rider can mark the delivery **Ready for Dispatch**
 directly; the older **Preparing** step remains available for existing
-workflows. Pickup and transit still require verified M-Pesa payment or an
+workflows. **Save delivery update** shows whether the update was saved in the
+delivery details, separately from any overview refresh error. Pickup and
+transit still require verified M-Pesa payment or an
 outstanding COD transaction. The assigned rider confirms delivery with private
 proof; COD also requires the rider to record cash collection before finance
 reconciles it and completes the order.

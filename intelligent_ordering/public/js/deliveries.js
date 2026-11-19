@@ -115,14 +115,14 @@ export function initDeliveryDashboard() {
     }));
   }
 
-  async function act(control, operation) {
+  async function act(control, operation, message = feedback) {
     if (control.disabled) return;
     control.disabled = true;
-    feedback.textContent = "";
+    message.textContent = "";
     try {
       await operation();
     } catch (error) {
-      feedback.textContent = error.message;
+      message.textContent = error.message;
     } finally {
       control.disabled = control === onlineButton ? offersOnline
         : control === offlineButton ? !offersOnline : false;
@@ -338,7 +338,7 @@ export function initDeliveryDashboard() {
     return listing.deliveries;
   }
 
-  async function showDetail(name) {
+  async function showDetail(name, updateFeedback = text("p", "")) {
     const delivery = await get(riderPage ? "deliveries.get_my_delivery" : "deliveries.get_delivery", {
       delivery_name: name,
     });
@@ -362,6 +362,7 @@ export function initDeliveryDashboard() {
       text("p", `Completed: ${delivery.completion_date || "Not completed"}${delivery.completed_by ? ` by ${delivery.completed_by}` : ""}`),
       text("p", `Notes: ${delivery.delivery_notes || "None"}`),
     );
+    updateFeedback.setAttribute("role", "status");
     if (delivery.location_set) {
       detail.append(text("p", `Delivery coordinates: ${delivery.latitude}, ${delivery.longitude}`));
     }
@@ -512,6 +513,7 @@ export function initDeliveryDashboard() {
               : allowed === "Failed" ? "Report failed delivery" : allowed;
         status.add(new Option(label, allowed));
       }
+      status.value = delivery.status;
       field(update, "Delivery action", status);
       const notes = field(update, "Delivery notes / failure or cancellation reason", input("text"));
       notes.maxLength = 1000;
@@ -541,7 +543,12 @@ export function initDeliveryDashboard() {
       update.addEventListener("submit", (event) => {
         event.preventDefault();
         if (!update.reportValidity()) return;
-        act(save, async () => {
+        return act(save, async () => {
+          if (status.value === delivery.status && !notes.value.trim()) {
+            updateFeedback.textContent = "Choose a delivery action or enter a note before saving.";
+            return;
+          }
+          updateFeedback.textContent = "Saving delivery update...";
           if (status.value === "Delivered") {
             const file = proof.files?.[0];
             if (!file || file.size > 5 * 1024 * 1024) {
@@ -557,13 +564,19 @@ export function initDeliveryDashboard() {
             notes: notes.value, confirmation: confirmation.checked ? "1" : "0",
             cash_collected: cashConfirmation.checked ? "1" : "0",
           });
-          await loadDashboard();
-          await loadList();
-          await showDetail(name);
-        });
+          updateFeedback.textContent = "Delivery update saved.";
+          const refreshed = await Promise.allSettled([
+            showDetail(name, updateFeedback), loadList(), loadDashboard(),
+          ]);
+          const failure = refreshed.find((result) => result.status === "rejected");
+          if (failure) {
+            updateFeedback.textContent = `Delivery update saved, but some information could not refresh. ${failure.reason.message}`;
+          }
+        }, updateFeedback);
       });
       detail.append(update);
     }
+    detail.append(updateFeedback);
     detail.append(text("h4", "Activity history"));
     for (const activity of delivery.activities) {
       detail.append(text("p",
