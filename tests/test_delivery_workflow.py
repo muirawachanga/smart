@@ -94,6 +94,18 @@ class TestDeliveryWorkflow(unittest.TestCase):
         self.frappe.session.user = "driver@example.test"
         self.frappe.get_roles.return_value = ["Delivery Staff"]
 
+    def test_delivery_detail_exposes_rider_choices_only_to_managers(self):
+        riders = [{"name": "driver@example.test", "full_name": "Driver", "workload": 0}]
+        with patch.object(self.service, "_serialize", side_effect=lambda *args, **kwargs: {}), patch.object(
+            self.service, "_delivery_personnel", return_value=riders,
+        ) as personnel:
+            result = self.service.get_delivery("DEL-1")
+            self.assertEqual(result["assignment_personnel"], riders)
+            self.as_driver()
+            result = self.service.get_delivery("DEL-1")
+            self.assertNotIn("assignment_personnel", result)
+            personnel.assert_called_once()
+
     def test_area_updates_require_loaded_version_and_native_write_permission(self):
         area = Mock(modified="version-1")
         area.name = "Central"

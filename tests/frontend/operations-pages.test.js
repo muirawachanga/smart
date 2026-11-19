@@ -515,7 +515,7 @@ test("manager saves coordinates against the existing delivery", async (t) => {
     });
     if (url.includes("deliveries.get_delivery")) return response({
       name: "D1", order: "SO-1", status: "Awaiting Assignment", delivery_area: "Central",
-      allowed_statuses: [], activities: [],
+      allowed_statuses: [], activities: [], assignment_personnel: [],
     });
     if (url.includes("deliveries.set_delivery_coordinates")) return response({ name: "D1" });
     throw new Error(`Unexpected request: ${url}`);
@@ -691,6 +691,7 @@ test("order assignment link opens the broadcast delivery and saves the selected 
       name: "DEL-1", order: "SO-1", status: assigned ? "Assigned" : "Awaiting Assignment",
       assigned_delivery_person: assigned ? "rider@example.test" : "",
       allowed_statuses: [], activities: [],
+      assignment_personnel: [{ name: "rider@example.test", full_name: "Rider One", workload: 0 }],
     });
     if (url.includes("deliveries.assign_delivery")) {
       assigned = true;
@@ -731,6 +732,7 @@ test("delivery assignment explains when no enabled rider accounts exist", async 
     });
     if (url.includes("deliveries.get_delivery")) return response({
       name: "DEL-1", order: "SO-1", status: "Awaiting Assignment", allowed_statuses: [], activities: [],
+      assignment_personnel: [],
     });
     throw new Error(`Unexpected request: ${url}`);
   });
@@ -740,6 +742,41 @@ test("delivery assignment explains when no enabled rider accounts exist", async 
   assert.match(detail.textContent, /No enabled riders.*Delivery Staff.*\/dashboard\/accounts/);
   const form = detail.children.find((child) => child.children[0]?.textContent === "Assign / reassign delivery");
   assert.equal(form.children.find((child) => child.textContent === "Save assignment").disabled, true);
+});
+
+test("manager can assign when the delivery overview fails to load", async (t) => {
+  const nodes = install(t, deliveryIds, "[data-delivery-page]", {});
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    calls.push({ url: String(url), body: options.body });
+    if (url.includes("deliveries.delivery_dashboard")) throw new Error("Overview unavailable");
+    if (url.includes("deliveries.list_deliveries")) return response({
+      deliveries: [{ name: "DEL-1", order: "SO-1", status: "Awaiting Assignment" }], has_more: false,
+    });
+    if (url.includes("deliveries.get_delivery")) return response({
+      name: "DEL-1", order: "SO-1", status: "Awaiting Assignment", activities: [], allowed_statuses: [],
+      assignment_personnel: [{ name: "rider@example.test", full_name: "Rider", workload: 0 }],
+    });
+    if (url.includes("deliveries.assign_delivery")) return response({ name: "DEL-1" });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?overview-failed=${Date.now()}`);
+  await tick();
+  assert.match(nodes.get("#delivery-feedback").textContent, /overview could not be loaded/);
+  nodes.get("#delivery-list").children[0].children.find((child) => child.textContent === "View delivery")
+    .listeners.click();
+  await tick();
+  const form = nodes.get("#delivery-detail").children.find(
+    (child) => child.children[0]?.textContent === "Assign / reassign delivery",
+  );
+  assert.ok(form);
+  form.children[1].children[0].value = "rider@example.test";
+  form.children[2].children[0].value = "2026-11-20";
+  form.listeners.submit({ preventDefault() {} });
+  await tick();
+  assert.equal(calls.find((call) => call.url.includes("assign_delivery")).body.get("assigned_person"),
+    "rider@example.test");
+  assert.match(nodes.get("#delivery-feedback").textContent, /Delivery assigned, but the display could not refresh/);
 });
 
 test("order assignment link does not open a different order when the requested delivery is missing", async (t) => {

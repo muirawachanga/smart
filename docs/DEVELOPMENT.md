@@ -1017,7 +1017,9 @@ have a delivery record: use **Assign / monitor delivery** under Deliveries, not
 Create delivery. Managers select an enabled Delivery Staff account and scheduled
 date; if no rider accounts exist, the form explains that an Administrator/System
 Manager must register one at `/dashboard/accounts`. Rider accounts cannot assign
-other riders.
+other riders. Manager assignment controls and rider choices load from the
+authorized delivery detail, even if the delivery overview fails; overview
+errors still require investigation.
 
 Use **Search deliveries** to filter existing delivery records by order or
 delivery number. Search updates the list independently of the overview and

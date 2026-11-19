@@ -252,7 +252,10 @@ def get_delivery(delivery_name):
     delivery = frappe.get_doc("Delivery", _text(delivery_name, "Delivery", required=True))
     _check_assigned(delivery)
     delivery.check_permission("read")
-    return _serialize(delivery, detail=True)
+    result = _serialize(delivery, detail=True)
+    if is_manager():
+        result["assignment_personnel"] = _delivery_personnel()
+    return result
 
 
 @frappe.whitelist()
@@ -298,20 +301,7 @@ def delivery_dashboard(page=1, page_size=20):
     if not is_manager():
         return _rider_dashboard(frappe.session.user)
     page, page_size = _pagination(page, page_size)
-    personnel = frappe.db.sql(
-        """
-        SELECT u.name, u.full_name,
-            (SELECT COUNT(*) FROM `tabDelivery` d
-             WHERE d.assigned_delivery_person = u.name
-               AND d.status NOT IN ('Delivered', 'Failed', 'Cancelled')) AS workload
-        FROM `tabUser` u
-        WHERE u.enabled = 1 AND u.name NOT IN ('Guest', 'Administrator')
-          AND EXISTS (SELECT 1 FROM `tabHas Role` r
-                      WHERE r.parent = u.name AND r.parenttype = 'User'
-                        AND r.role = 'Delivery Staff')
-        ORDER BY u.full_name, u.name
-        """, as_dict=True,
-    )
+    personnel = _delivery_personnel()
     summary = frappe.db.sql(
         """
         SELECT COUNT(*) AS total,
@@ -372,6 +362,23 @@ def delivery_dashboard(page=1, page_size=20):
         "ready_orders": ready[:page_size],
         "has_more": len(ready) > page_size, "personnel": personnel, "areas": areas,
     }
+
+
+def _delivery_personnel():
+    return frappe.db.sql(
+        """
+        SELECT u.name, u.full_name,
+            (SELECT COUNT(*) FROM `tabDelivery` d
+             WHERE d.assigned_delivery_person = u.name
+               AND d.status NOT IN ('Delivered', 'Failed', 'Cancelled')) AS workload
+        FROM `tabUser` u
+        WHERE u.enabled = 1 AND u.name NOT IN ('Guest', 'Administrator')
+          AND EXISTS (SELECT 1 FROM `tabHas Role` r
+                      WHERE r.parent = u.name AND r.parenttype = 'User'
+                        AND r.role = 'Delivery Staff')
+        ORDER BY u.full_name, u.name
+        """, as_dict=True,
+    )
 
 
 def _delivery_summary(row):

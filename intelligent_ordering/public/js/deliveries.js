@@ -342,6 +342,8 @@ export function initDeliveryDashboard() {
     const delivery = await get(riderPage ? "deliveries.get_my_delivery" : "deliveries.get_delivery", {
       delivery_name: name,
     });
+    const assignmentPersonnel = delivery.assignment_personnel;
+    const detailManager = !riderPage && Array.isArray(assignmentPersonnel);
     detail.hidden = false;
     detail.replaceChildren(
       text("h3", `${delivery.name} - ${delivery.status}`),
@@ -379,7 +381,7 @@ export function initDeliveryDashboard() {
         detail.append(link);
       }
     }
-    if (!dashboard.manager && delivery.status === "Assigned") {
+    if (!detailManager && delivery.status === "Assigned") {
       const accept = button("Accept delivery", () => act(accept, async () => {
         await post("deliveries.update_delivery", { delivery_name: name, status: "Accepted" });
         await refresh();
@@ -406,14 +408,14 @@ export function initDeliveryDashboard() {
       });
       detail.append(accept, rejectForm);
     }
-    if (dashboard.manager && canAssign(delivery)) {
+    if (detailManager && canAssign(delivery)) {
       const assignment = document.createElement("form");
       assignment.className = "smarto-checkout-form";
       assignment.append(text("h4", "Assign / reassign delivery"));
       const person = document.createElement("select");
       person.required = true;
       person.add(new Option("Select delivery person", ""));
-      for (const user of dashboard.personnel) {
+      for (const user of assignmentPersonnel) {
         person.add(new Option(`${user.full_name} (${user.workload} active)`, user.name));
       }
       person.value = delivery.assigned_delivery_person || "";
@@ -426,7 +428,7 @@ export function initDeliveryDashboard() {
       const save = text("button", "Save assignment");
       save.type = "submit";
       save.className = "smarto-button";
-      if (!dashboard.personnel.length) {
+      if (!assignmentPersonnel.length) {
         save.disabled = true;
         assignment.append(text("p",
           "No enabled riders are available. Ask an Administrator or System Manager to register a Delivery Staff (Rider) account at /dashboard/accounts."));
@@ -440,14 +442,22 @@ export function initDeliveryDashboard() {
             delivery_name: name, assigned_person: person.value,
             scheduled_delivery_date: date.value, notes: notes.value,
           });
-          await loadDashboard();
-          await loadList();
-          await showDetail(name);
+          try {
+            await loadList();
+            await showDetail(name);
+            await loadDashboard();
+            feedback.textContent = "Delivery assigned. The rider must accept it.";
+          } catch (error) {
+            feedback.textContent = `Delivery assigned, but the display could not refresh. Reload before continuing. ${error.message}`;
+          }
         });
       });
       detail.append(assignment);
     }
-    if (dashboard.manager && !["Delivered", "Cancelled"].includes(delivery.status)) {
+    if (!detailManager && !riderPage && canAssign(delivery)) {
+      detail.append(text("p", "Only a delivery manager can assign this delivery. Sign in with a manager account."));
+    }
+    if (detailManager && !["Delivered", "Cancelled"].includes(delivery.status)) {
       const coordinates = document.createElement("form");
       coordinates.className = "smarto-checkout-form";
       coordinates.append(text("h4", "Set delivery coordinates"));
