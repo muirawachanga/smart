@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from test_delivery_workflow import load_services
+
 
 class AccessError(Exception):
     pass
@@ -229,7 +231,13 @@ class TestCustomerPortal(unittest.TestCase):
         receipt_completion = Mock()
         fulfillment = types.ModuleType("intelligent_ordering.utils.order_fulfillment")
         fulfillment.complete_order_after_customer_receipt = receipt_completion
-        with patch.dict(sys.modules, {"intelligent_ordering.utils.order_fulfillment": fulfillment}), \
+        deliveries, _, _, _ = load_services()
+        deliveries.frappe = self.frappe
+        delivery.save.side_effect = lambda **kwargs: self.assertTrue(self.frappe.flags.processing_delivery)
+        with patch.dict(sys.modules, {
+            "intelligent_ordering.api.deliveries": deliveries,
+            "intelligent_ordering.utils.order_fulfillment": fulfillment,
+        }), \
              patch.object(self.api, "_owned_order", return_value=order), \
              patch.object(self.api, "track_order", return_value={"delivery": {"status": "Delivered"}}):
             result = self.api.confirm_delivery_receipt("SO-1")
@@ -238,6 +246,7 @@ class TestCustomerPortal(unittest.TestCase):
         self.assertEqual(delivery.customer_receipt_confirmed_by, self.frappe.session.user)
         delivery.append.assert_called_once()
         delivery.save.assert_called_once_with(ignore_permissions=True)
+        self.assertFalse(self.frappe.flags.processing_delivery)
         receipt_completion.assert_called_once_with(order, delivery)
 
     def test_customer_cannot_confirm_receipt_before_delivery_is_marked_delivered(self):

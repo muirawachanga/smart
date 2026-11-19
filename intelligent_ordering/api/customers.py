@@ -282,7 +282,10 @@ def confirm_delivery_receipt(order_name):
             "scheduled_delivery_date": delivery.scheduled_delivery_date,
             "notes": "Customer confirmed receipt of the order.",
         })
-        delivery.save(ignore_permissions=True)
+        from intelligent_ordering.api.deliveries import _workflow
+
+        with _workflow():
+            delivery.save(ignore_permissions=True)
         from intelligent_ordering.utils.order_fulfillment import complete_order_after_customer_receipt
 
         complete_order_after_customer_receipt(order, delivery)

@@ -1,5 +1,5 @@
 import { get } from "./api.js";
-import { formatPrice, orderConfirmationUrl, orderPaymentUrl, renderOrderItems, text } from "./components/order-display.js";
+import { formatPrice, orderConfirmationUrl, orderPaymentUrl, orderTrackingUrl, renderOrderItems, text } from "./components/order-display.js";
 import { mountOrderPayment } from "./payments.js";
 import { FINGERPRINT_KEY, ORDER_KEY, TOKEN_KEY } from "./checkout-recovery.js";
 
@@ -44,6 +44,9 @@ async function loadOrder() {
       text("p", `Delivery${order.delivery_area ? ` (${order.delivery_area})` : ""}: ${formatPrice(order.delivery_fee, order.currency)}`),
       text("p", `Total: ${formatPrice(order.total, order.currency)}`),
     );
+    const tracking = text("a", "Track delivery and confirm receipt", "smarto-button smarto-button-secondary");
+    tracking.href = orderTrackingUrl(order.name);
+    target.append(tracking);
     if (paymentPage) {
       mountOrderPayment(target, order);
       status.textContent = order.payment_status === "Paid"

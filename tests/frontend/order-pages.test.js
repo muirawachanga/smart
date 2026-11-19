@@ -141,6 +141,27 @@ test("checkout tracking URL opens the order and shows its assigned rider", async
   assert.match(content, /Awaiting Assignment → Assigned/);
 });
 
+test("tracking link opens an owned order not present on the first history page", async (t) => {
+  const nodes = install(t, "customer");
+  window.location.search = "?order=SO-OLD";
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("orders.get_my_orders")) return response({ orders: [order], has_more: true });
+    if (url.includes("orders.get_my_order")) return response({ ...order, name: "SO-OLD" });
+    if (url.includes("payments.get_order_payments")) return response([]);
+    if (url.includes("customers.track_order")) return response({
+      order_status: "Ready for Delivery", payment_status: "Unpaid",
+      delivery: { status: "Delivered", customer_receipt_confirmed: 0 }, timeline: [],
+    });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/order-pages.js?older-order=${Date.now()}`);
+  await waitFor(() => renderedText(nodes.get("#order-detail")).includes("Order SO-OLD"));
+  const button = nodes.get("#order-detail").children[0].children.at(-1).children
+    .find((child) => child.textContent === "Confirm I received this order");
+  await waitFor(() => !button.disabled);
+  assert.equal(button.hidden, false);
+});
+
 test("guest sees login and no customer records", async (t) => {
   const nodes = install(t, "customer");
   t.mock.method(globalThis, "fetch", async () => response({ requires_login: true, orders: [] }));
@@ -348,11 +369,44 @@ test("customer confirms receipt after rider delivery and sees COD reconciliation
   await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
   const tracking = nodes.get("#order-detail").children[0].children.at(-1);
   const button = tracking.children.find((child) => child.textContent === "Confirm I received this order");
-  await waitFor(() => !button.hidden);
+  await waitFor(() => !button.disabled);
   assert.match(tracking.children[1].textContent, /Delivery: Delivered.*Awaiting your confirmation/);
   await button.listeners.click();
   assert.ok(calls.some((call) => call.url.includes("customers.confirm_delivery_receipt")
     && call.options.body.get("order_name") === order.name));
   assert.equal(button.hidden, true);
-  assert.match(tracking.children[3].textContent, /Finance confirmation.*cash is still pending/);
+  assert.match(tracking.children[3].textContent, /Payment verification is still pending/);
+});
+
+test("receipt button follows delivery status and disables if tracking refresh fails", async (t) => {
+  const nodes = install(t, "customer");
+  let deliveryStatus = "In Transit";
+  let trackingFails = false;
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("orders.get_my_orders")) return response({ orders: [order], has_more: false });
+    if (url.includes("orders.get_my_order")) return response({ ...order });
+    if (url.includes("payments.get_order_payments")) return response([]);
+    if (url.includes("customers.track_order")) return trackingFails ? failed("Tracking unavailable") : response({
+      order_status: "Ready for Delivery", payment_status: "Paid",
+      delivery: { status: deliveryStatus, customer_receipt_confirmed: 0 }, timeline: [],
+    });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/order-pages.js?pending-receipt=${Date.now()}`);
+  await tick();
+  await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
+  const tracking = nodes.get("#order-detail").children[0].children.at(-1);
+  await waitFor(() => tracking.children[1].textContent.includes("In Transit"));
+  const button = tracking.children.find((child) => child.textContent === "Confirm I received this order");
+  assert.equal(button.hidden, false);
+  assert.equal(button.disabled, true);
+  assert.match(tracking.children[3].textContent, /after the rider marks the delivery as delivered/);
+  const refresh = tracking.children.find((child) => child.textContent === "Refresh order status");
+  deliveryStatus = "Delivered";
+  await refresh.listeners.click();
+  assert.equal(button.disabled, false);
+  trackingFails = true;
+  await refresh.listeners.click();
+  assert.equal(button.disabled, true);
+  assert.match(tracking.children[1].textContent, /Order status could not be refreshed/);
 });

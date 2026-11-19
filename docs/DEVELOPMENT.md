@@ -1014,6 +1014,12 @@ receipt-confirmation fields. Delivery updates do not
 deduct inventory a second time. Manager and staff API checks remain
 authoritative even when a page is accessible.
 
+On `/track-order` or `/account`, select **View details** for the order. The
+receipt button is enabled only after the rider saves the delivery as
+**Delivered**; before then it explains why confirmation is unavailable. Order
+confirmation and payment pages link to tracking. A direct tracking link loads
+the owned order even if it is not on the first order-history page.
+
 The order page's **Assign or monitor delivery** link opens
 `/dashboard/delivery?order=<order-name>`, filters the delivery list, and opens the
 matching delivery's assignment controls. Automatically broadcast orders already

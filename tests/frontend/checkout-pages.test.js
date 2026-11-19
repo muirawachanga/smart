@@ -317,6 +317,8 @@ test("confirmation shows only the server-returned order and clears its recovery 
   await tick();
   assert.equal(nodes.get("#order-detail").children[0].textContent, "Order SO-1");
   assert.equal(nodes.get("#order-detail").children[2].textContent, "Payment status: Unpaid");
+  assert.equal(nodes.get("#order-detail").children.find((node) =>
+    node.textContent === "Track delivery and confirm receipt").href, "/track-order?order=SO-1");
   assert.equal(nodes.get("#order-detail").children.at(-1).href, "/payment?order=SO-1");
   assert.equal(session.size, 0);
 });
@@ -413,6 +415,8 @@ test("payment page loads an owned order and initiates only the existing M-Pesa A
   await import(`../../intelligent_ordering/public/js/order-confirmation.js?payment=${Date.now()}`);
   await tick();
   assert.equal(session.size, 0);
+  assert.equal(nodes.get("#order-detail").children.find((node) =>
+    node.textContent === "Track delivery and confirm receipt").href, "/track-order?order=SO-1");
   assert.equal(calls.some((call) => call.url.includes("initiate_payment")), false);
   const form = nodes.get("#order-detail").children.find((node) => node.className === "status-update-form");
   assert.equal(form.children[1].textContent, "Pay with M-Pesa");
