@@ -72,10 +72,16 @@ class SalesOrder(Document):
                 frappe.ValidationError,
             )
         if self.status == "Completed" and original.status != "Completed":
-            if not getattr(frappe.flags, "processing_delivery", False) or not frappe.db.exists(
-                "Delivery", {"order": self.name, "status": "Delivered"}
+            delivery = frappe.db.get_value(
+                "Delivery", {"order": self.name},
+                ["status", "customer_receipt_confirmed"], as_dict=True,
+            )
+            if (
+                not getattr(frappe.flags, "processing_delivery", False)
+                or not delivery or delivery.status != "Delivered" or not delivery.customer_receipt_confirmed
             ):
-                frappe.throw("Complete the assigned delivery to complete this order.", frappe.ValidationError)
+                frappe.throw("The customer must confirm receipt before completing this order.",
+                             frappe.ValidationError)
         if self.status == "Cancelled" and original.status != "Cancelled":
             if frappe.db.exists("Delivery", {"order": self.name, "status": ["!=", "Cancelled"]}):
                 frappe.throw("Cancel the delivery before cancelling its order.", frappe.ValidationError)

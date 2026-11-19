@@ -231,7 +231,8 @@ def track_order(order_name):
     deliveries = frappe.get_all(
         "Delivery", filters={"order": order.name},
         fields=["name", "status", "scheduled_delivery_date", "modified",
-                "delivery_area", "assigned_delivery_person"],
+                "delivery_area", "assigned_delivery_person", "customer_receipt_confirmed",
+                "customer_receipt_confirmed_at"],
         order_by="creation desc", limit_page_length=1,
     )
     delivery = deliveries[0] if deliveries else None
@@ -244,7 +245,7 @@ def track_order(order_name):
         delivery.pop("assigned_delivery_person", None)
     timeline = frappe.get_all(
         "Delivery Activity", filters={"parent": delivery.get("name"), "parenttype": "Delivery", "parentfield": "activities"},
-        fields=["activity_datetime", "from_status", "to_status"],
+        fields=["activity_datetime", "activity_type", "from_status", "to_status"],
         order_by="idx asc", limit_page_length=100,
     ) if delivery else []
     return {
@@ -252,6 +253,40 @@ def track_order(order_name):
         "updated_at": order.modified, "delivery": delivery, "timeline": timeline,
         **{field: order.get(field) for field in CANCELLATION_FIELDS if field != "cancellation_resolved_by"},
     }
+
+
+@frappe.whitelist(methods=["POST"])
+def confirm_delivery_receipt(order_name):
+    order = _owned_order(order_name, lock=True)
+    delivery_name = frappe.db.get_value("Delivery", {"order": order.name}, "name")
+    if not delivery_name:
+        frappe.throw("There is no delivery to confirm for this order.", frappe.ValidationError)
+    frappe.db.sql("SELECT name FROM `tabDelivery` WHERE name = %s FOR UPDATE", delivery_name)
+    delivery = frappe.get_doc("Delivery", delivery_name, for_update=True)
+    if delivery.order != order.name or delivery.status != "Delivered":
+        frappe.throw("You can confirm receipt only after the rider marks the delivery as delivered.",
+                     frappe.ValidationError)
+    if not delivery.customer_receipt_confirmed:
+        confirmed_at = now_datetime()
+        delivery.customer_receipt_confirmed = 1
+        delivery.customer_receipt_confirmed_at = confirmed_at
+        delivery.customer_receipt_confirmed_by = frappe.session.user
+        delivery.append("activities", {
+            "activity_datetime": confirmed_at,
+            "responsible_user": frappe.session.user,
+            "activity_type": "Customer Receipt Confirmed",
+            "from_status": "Delivered",
+            "to_status": "Delivered",
+            "previous_person": delivery.assigned_delivery_person,
+            "assigned_person": delivery.assigned_delivery_person,
+            "scheduled_delivery_date": delivery.scheduled_delivery_date,
+            "notes": "Customer confirmed receipt of the order.",
+        })
+        delivery.save(ignore_permissions=True)
+        from intelligent_ordering.utils.order_fulfillment import complete_order_after_customer_receipt
+
+        complete_order_after_customer_receipt(order, delivery)
+    return track_order(order.name)
 
 
 @frappe.whitelist(methods=["POST"])

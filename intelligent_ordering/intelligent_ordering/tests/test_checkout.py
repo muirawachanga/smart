@@ -177,6 +177,7 @@ class TestCheckout(FrappeTestCase):
             accept_delivery_offer, delivery_offers, set_offer_presence,
             update_delivery, upload_delivery_proof,
         )
+        from intelligent_ordering.api.customers import confirm_delivery_receipt
         from intelligent_ordering.api.payments import confirm_cod_payment
 
         order_name = self._submit_order(payment_method="Cash on Delivery")["order"]["name"]
@@ -210,6 +211,10 @@ class TestCheckout(FrappeTestCase):
         try:
             update_delivery(delivery_name, "Delivered", confirmation=1, cash_collected=1)
             self.assertEqual(frappe.db.get_value("Sales Order", order_name, "payment_status"), "Unpaid")
+            self.assertEqual(frappe.db.get_value("Sales Order", order_name, "status"), "Ready for Delivery")
+            frappe.set_user(self.customer.name)
+            confirm_delivery_receipt(order_name)
+            self.assertEqual(frappe.db.get_value("Sales Order", order_name, "status"), "Ready for Delivery")
             frappe.set_user("Administrator")
             payment = frappe.db.get_value("Payment Transaction", {"order": order_name}, "name")
             confirm_cod_payment(payment)

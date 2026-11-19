@@ -70,5 +70,22 @@ def _save(order):
         order.save(ignore_permissions=True)
 
 
+def complete_order_after_customer_receipt(order, delivery):
+    if (
+        order.status != "Ready for Delivery"
+        or order.payment_status != "Paid" or delivery.order != order.name
+        or delivery.status != "Delivered" or not delivery.customer_receipt_confirmed
+    ):
+        return False
+    previous = getattr(frappe.flags, "processing_delivery", False)
+    frappe.flags.processing_delivery = True
+    try:
+        order.status = "Completed"
+        order.save(ignore_permissions=True)
+    finally:
+        frappe.flags.processing_delivery = previous
+    return True
+
+
 def _datetime(value):
     return datetime.fromisoformat(value) if isinstance(value, str) else value

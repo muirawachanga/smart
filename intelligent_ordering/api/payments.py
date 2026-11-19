@@ -395,13 +395,10 @@ def confirm_cod_payment(payment_name):
     _save(payment)
     order.db_set("payment_status", "Paid", update_modified=True)
     order.reload()
-    was_processing_delivery = getattr(frappe.flags, "processing_delivery", False)
-    frappe.flags.processing_delivery = True
-    try:
-        order.status = "Completed"
-        order.save(ignore_permissions=True)
-    finally:
-        frappe.flags.processing_delivery = was_processing_delivery
+    if delivery.customer_receipt_confirmed:
+        from intelligent_ordering.utils.order_fulfillment import complete_order_after_customer_receipt
+
+        complete_order_after_customer_receipt(order, delivery)
     record_admin_event(
         "Cash on delivery payment confirmed",
         "Payment Transaction",

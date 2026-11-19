@@ -301,7 +301,7 @@ test("customer live tracking refreshes persisted status and requests cancellatio
     .some((child) => /Order: Confirmed.*Delivery: Assigned/.test(child.textContent)));
   const tracking = nodes.get("#order-detail").children[0].children.at(-1);
   assert.match(tracking.children[1].textContent, /Order: Confirmed.*Delivery: Assigned/);
-  const form = tracking.children[4];
+  const form = tracking.children.find((child) => child.className === "smarto-checkout-form");
   assert.equal(form.hidden, false);
   form.children[0].children[0].value = "Please cancel";
   await form.listeners.submit({ preventDefault() {} });
@@ -311,10 +311,48 @@ test("customer live tracking refreshes persisted status and requests cancellatio
   assert.equal(form.hidden, true);
   assert.match(tracking.children.at(-1).textContent, /Staff must approve/);
   paid = true;
-  await tracking.children[2].listeners.click();
+  await tracking.children.find((child) => child.textContent === "Refresh order status").listeners.click();
   const card = nodes.get("#order-detail").children[0];
   assert.equal(card.children[2].textContent, "Payment status: Paid");
   const paymentForm = card.children.find((child) => child.className === "status-update-form");
   assert.equal(paymentForm.hidden, true);
   assert.equal(paymentForm.children[1].disabled, true);
+});
+
+test("customer confirms receipt after rider delivery and sees COD reconciliation pending", async (t) => {
+  const nodes = install(t, "customer");
+  let confirmed = false;
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (url.includes("orders.get_my_orders")) return response({ orders: [order], has_more: false });
+    if (url.includes("orders.get_my_order")) return response({ ...order });
+    if (url.includes("payments.get_order_payments")) return response([]);
+    if (url.includes("customers.confirm_delivery_receipt")) {
+      confirmed = true;
+      return response({
+        order_status: "Ready for Delivery", payment_status: "Unpaid",
+        delivery: { status: "Delivered", customer_receipt_confirmed: true },
+        timeline: [],
+      });
+    }
+    if (url.includes("customers.track_order")) return response({
+      order_status: "Ready for Delivery", payment_status: "Unpaid",
+      delivery: { status: "Delivered", customer_receipt_confirmed: confirmed },
+      timeline: [],
+    });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/order-pages.js?receipt=${Date.now()}`);
+  await tick();
+  await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
+  const tracking = nodes.get("#order-detail").children[0].children.at(-1);
+  const button = tracking.children.find((child) => child.textContent === "Confirm I received this order");
+  await waitFor(() => !button.hidden);
+  assert.match(tracking.children[1].textContent, /Delivery: Delivered.*Awaiting your confirmation/);
+  await button.listeners.click();
+  assert.ok(calls.some((call) => call.url.includes("customers.confirm_delivery_receipt")
+    && call.options.body.get("order_name") === order.name));
+  assert.equal(button.hidden, true);
+  assert.match(tracking.children[3].textContent, /Finance confirmation.*cash is still pending/);
 });

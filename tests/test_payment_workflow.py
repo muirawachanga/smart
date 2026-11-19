@@ -231,7 +231,7 @@ class TestPaymentWorkflow(unittest.TestCase):
         delivery = Mock(
             name="DEL-1", status="Delivered", cash_collected=1,
             cash_collected_amount=250, cash_collected_at=datetime.now(),
-            cash_collected_by="driver@example.test",
+            cash_collected_by="driver@example.test", customer_receipt_confirmed=0,
         )
         self.order.status = "Ready for Delivery"
         self.frappe.get_doc.side_effect = lambda doctype, *args, **kwargs: (
@@ -246,10 +246,36 @@ class TestPaymentWorkflow(unittest.TestCase):
         self.assertEqual(result["status"], "Successful")
         self.assertEqual(payment.transaction_date, delivery.cash_collected_at)
         self.order.db_set.assert_called_once_with("payment_status", "Paid", update_modified=True)
-        self.order.save.assert_called_once_with(ignore_permissions=True)
-        self.assertEqual(self.order.status, "Completed")
+        self.order.save.assert_not_called()
+        self.assertEqual(self.order.status, "Ready for Delivery")
         self.save.assert_called_once_with(payment)
         audit.assert_called_once()
+
+    def test_cod_payment_completes_only_after_customer_receipt_confirmation(self):
+        payment = Mock(
+            name="PAY-COD", order="SO-1", amount=250, payment_method="Cash on Delivery",
+            status="Pending", get=lambda field: getattr(payment, field, None),
+        )
+        delivery = Mock(
+            name="DEL-1", status="Delivered", cash_collected=1,
+            cash_collected_amount=250, cash_collected_at=datetime.now(),
+            cash_collected_by="driver@example.test", customer_receipt_confirmed=1,
+        )
+        self.order.status = "Ready for Delivery"
+        self.frappe.get_doc.side_effect = lambda doctype, *args, **kwargs: (
+            self.order if doctype == "Sales Order" else delivery
+        )
+        self.frappe.db.get_value.return_value = "DEL-1"
+        fulfillment = types.ModuleType("intelligent_ordering.utils.order_fulfillment")
+        completion = Mock()
+        fulfillment.complete_order_after_customer_receipt = completion
+        self.frappe.session.user = "finance@example.test"
+        self.frappe.get_roles.return_value = ["Finance Manager"]
+        with patch.dict(sys.modules, {"intelligent_ordering.utils.order_fulfillment": fulfillment}), \
+             patch.object(self.service, "_locked_payment", return_value=payment), \
+             patch.object(self.service, "record_admin_event"):
+            self.service.confirm_cod_payment("PAY-COD")
+        completion.assert_called_once_with(self.order, delivery)
 
     def test_cod_confirmation_rejects_unverified_cash_collection(self):
         payment = Mock(

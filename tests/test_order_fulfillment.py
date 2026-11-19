@@ -97,6 +97,18 @@ class TestOrderFulfillment(unittest.TestCase):
             self.assertEqual(self.service.advance_confirmed_orders(), 1)
         self.assertEqual(self.order.status, "Ready for Delivery")
 
+    def test_completion_requires_paid_order_and_customer_confirmed_delivery(self):
+            delivery = types.SimpleNamespace(order="SO-1", status="Delivered", customer_receipt_confirmed=1)
+            self.order.status = "Ready for Delivery"
+            self.order.payment_status = "Unpaid"
+            self.assertFalse(self.service.complete_order_after_customer_receipt(self.order, delivery))
+            self.assertEqual(self.order.save.call_count, 0)
+            self.order.payment_status = "Paid"
+            self.assertTrue(self.service.complete_order_after_customer_receipt(self.order, delivery))
+            self.assertEqual(self.order.status, "Completed")
+            self.order.save.assert_called_once_with(ignore_permissions=True)
+            self.assertFalse(self.frappe.flags.processing_delivery)
+
 
 if __name__ == "__main__":
     unittest.main()

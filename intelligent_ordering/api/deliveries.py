@@ -30,6 +30,7 @@ DELIVERY_FIELDS = [
     "name", "order", "customer_name", "customer_phone", "delivery_address",
     "delivery_area", "assigned_delivery_person", "currency", "delivery_fee",
     "scheduled_delivery_date", "dispatch_date", "completion_date", "completed_by",
+    "customer_receipt_confirmed", "customer_receipt_confirmed_at",
     "cash_collected", "cash_collected_amount", "cash_collected_at", "cash_collected_by",
     "status", "delivery_notes", "location_set", "latitude", "longitude",
 ]
@@ -1013,10 +1014,6 @@ def update_delivery(delivery_name, status, notes="", confirmation=0, cash_collec
         delivery.completion_date = now_datetime()
         delivery.completed_by = frappe.session.user
     _save(delivery, order, previous_status, previous_person, notes)
-    if status == "Delivered" and order.payment_status == "Paid":
-        with _workflow():
-            order.status = "Completed"
-            order.save(ignore_permissions=True)
     return _serialize(delivery, detail=True)
 
 

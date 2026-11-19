@@ -202,6 +202,11 @@ function addCustomerTracking(card, order, updateStatus) {
   const history = text("div", "");
   const refresh = text("button", "Refresh order status", "smarto-button smarto-button-secondary");
   refresh.type = "button";
+  const confirmReceipt = text("button", "Confirm I received this order", "smarto-button");
+  confirmReceipt.type = "button";
+  confirmReceipt.hidden = true;
+  const receiptFeedback = text("p", "");
+  receiptFeedback.setAttribute("role", "status");
   const cancellation = document.createElement("form");
   cancellation.className = "smarto-checkout-form";
   cancellation.hidden = true;
@@ -219,11 +224,24 @@ function addCustomerTracking(card, order, updateStatus) {
 
   function display(result) {
     updateStatus(result);
-    state.textContent = `Order: ${result.order_status} · Payment: ${result.payment_status} · Delivery: ${result.delivery?.status || "Not assigned"} · Area: ${result.delivery?.delivery_area || "Not specified"} · Rider: ${result.delivery?.assigned_rider || "Not assigned"} · Scheduled: ${result.delivery?.scheduled_delivery_date || "Not scheduled"} · Updated: ${result.delivery?.modified || result.updated_at || ""}`;
-    history.replaceChildren(...result.timeline.map((entry) =>
-      text("p", `${entry.activity_datetime}: ${entry.from_status || "Created"} → ${entry.to_status}`)));
+    const delivery = result.delivery;
+    const receiptStatus = delivery?.status === "Delivered"
+      ? delivery.customer_receipt_confirmed ? "Receipt confirmed"
+        : "Awaiting your confirmation"
+      : "";
+    state.textContent = `Order: ${result.order_status} · Payment: ${result.payment_status} · Delivery: ${delivery?.status || "Not assigned"}${receiptStatus ? ` · ${receiptStatus}` : ""} · Area: ${delivery?.delivery_area || "Not specified"} · Rider: ${delivery?.assigned_rider || "Not assigned"} · Scheduled: ${delivery?.scheduled_delivery_date || "Not scheduled"} · Updated: ${delivery?.modified || result.updated_at || ""}`;
+    history.replaceChildren(...result.timeline.map((entry) => text("p", entry.activity_type === "Customer Receipt Confirmed"
+      ? `${entry.activity_datetime}: You confirmed receipt`
+      : `${entry.activity_datetime}: ${entry.from_status || "Created"} → ${entry.to_status}`)));
+    confirmReceipt.hidden = delivery?.status !== "Delivered" || Boolean(delivery.customer_receipt_confirmed);
+    if (delivery?.customer_receipt_confirmed) {
+      receiptFeedback.textContent = result.payment_status === "Paid"
+        ? "You confirmed receipt. Your order is complete."
+        : "You confirmed receipt. Finance confirmation of the rider's collected cash is still pending.";
+    }
     cancellation.hidden = ["Requested", "Approved"].includes(result.cancellation_request_status)
-      || ["Completed", "Cancelled"].includes(result.order_status);
+      || ["Completed", "Cancelled"].includes(result.order_status)
+      || delivery?.status === "Delivered";
     if (result.cancellation_request_status) {
       history.append(text("p", `Cancellation request: ${result.cancellation_request_status}. ${result.cancellation_response || "Awaiting staff review."}`));
     }
@@ -244,6 +262,27 @@ function addCustomerTracking(card, order, updateStatus) {
     }
   }
   refresh.addEventListener("click", refreshTracking);
+  confirmReceipt.addEventListener("click", async () => {
+    if (refreshing || request !== detailRequest) return;
+    refreshing = true;
+    confirmReceipt.disabled = refresh.disabled = true;
+    receiptFeedback.textContent = "Confirming receipt...";
+    try {
+      const result = await post("customers.confirm_delivery_receipt", { order_name: order.name });
+      if (request === detailRequest) {
+        display(result);
+        receiptFeedback.textContent = result.payment_status === "Paid"
+          ? "Receipt confirmed. Your order is complete."
+          : "Receipt confirmed. Finance confirmation of the rider's collected cash is still pending.";
+      }
+    } catch (error) {
+      if (request === detailRequest) receiptFeedback.textContent = `Receipt could not be confirmed: ${error.message}`;
+    } finally {
+      refreshing = false;
+      confirmReceipt.disabled = false;
+      refresh.disabled = false;
+    }
+  });
   cancellation.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (send.disabled || !cancellation.reportValidity()
@@ -262,7 +301,8 @@ function addCustomerTracking(card, order, updateStatus) {
       send.disabled = false;
     }
   });
-  tracking.append(text("h3", "Live order progress"), state, refresh, history, cancellation, feedback);
+  tracking.append(text("h3", "Live order progress"), state, confirmReceipt, receiptFeedback,
+    refresh, history, cancellation, feedback);
   card.append(tracking);
   refreshTracking();
   trackingTimer = window.setInterval(() => {

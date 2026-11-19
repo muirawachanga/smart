@@ -1005,8 +1005,12 @@ create deliveries from ready orders or change assignments. Delivery Managers
 can view routing areas; only System Manager, Business Admin, Store Manager and
 Order Manager can change area rates.
 Delivery staff see their assigned deliveries and minimal details of available
-offers. Only the assigned rider can confirm completion, subject to the existing
-payment or cash-on-delivery safeguards. Delivery updates do not
+offers. The assigned rider marks delivery after obtaining recipient confirmation
+and uploading proof. The customer then confirms receipt from the order tracking
+page. A paid order completes after customer confirmation; a COD order completes
+only after both customer receipt confirmation and finance verifies the rider's
+cash collection. Run `bench --site <site-name> migrate` after installing the
+receipt-confirmation fields. Delivery updates do not
 deduct inventory a second time. Manager and staff API checks remain
 authoritative even when a page is accessible.
 
@@ -1037,10 +1041,11 @@ After a rider accepts, the rider can mark the delivery **Ready for Dispatch**
 directly; the older **Preparing** step remains available for existing
 workflows. **Save delivery update** shows whether the update was saved in the
 delivery details, separately from any overview refresh error. Pickup and
-transit still require verified M-Pesa payment or an
-outstanding COD transaction. The assigned rider confirms delivery with private
-proof; COD also requires the rider to record cash collection before finance
-reconciles it and completes the order.
+transit still require verified M-Pesa payment or an outstanding COD transaction.
+The customer confirms receipt after the rider marks delivery and uploads private
+proof. COD also requires the rider to record cash collection before finance
+reconciles it; the order completes only after both payment and receipt are
+confirmed.
 
 ### Automatic delivery offers
 

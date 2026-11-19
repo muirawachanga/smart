@@ -189,6 +189,7 @@ class TestCustomerPortal(unittest.TestCase):
         with patch.object(self.api, "_profile", return_value=types.SimpleNamespace(name="OWN-PROFILE")):
             for operation in (
                 lambda: self.api.track_order("OTHER-ORDER"),
+                lambda: self.api.confirm_delivery_receipt("OTHER-ORDER"),
                 lambda: self.api.request_cancellation("OTHER-ORDER", "Reason"),
             ):
                 with self.assertRaises(AccessError):
@@ -213,6 +214,41 @@ class TestCustomerPortal(unittest.TestCase):
         self.assertEqual(result["delivery"]["assigned_rider"], "Rider One")
         self.assertNotIn("assigned_delivery_person", result["delivery"])
         self.assertEqual(result["delivery"]["delivery_area"], "Central")
+
+    def test_customer_confirms_only_delivered_owned_order_and_completes_paid_order(self):
+        order = types.SimpleNamespace(
+            name="SO-1", status="Ready for Delivery", payment_status="Paid",
+        )
+        delivery = types.SimpleNamespace(
+            name="DEL-1", order="SO-1", status="Delivered", customer_receipt_confirmed=0,
+            assigned_delivery_person="rider@example.test", scheduled_delivery_date="2026-11-19",
+            activities=[], append=Mock(), save=Mock(),
+        )
+        self.frappe.db.get_value.return_value = "DEL-1"
+        self.frappe.get_doc.return_value = delivery
+        receipt_completion = Mock()
+        fulfillment = types.ModuleType("intelligent_ordering.utils.order_fulfillment")
+        fulfillment.complete_order_after_customer_receipt = receipt_completion
+        with patch.dict(sys.modules, {"intelligent_ordering.utils.order_fulfillment": fulfillment}), \
+             patch.object(self.api, "_owned_order", return_value=order), \
+             patch.object(self.api, "track_order", return_value={"delivery": {"status": "Delivered"}}):
+            result = self.api.confirm_delivery_receipt("SO-1")
+        self.assertEqual(result["delivery"]["status"], "Delivered")
+        self.assertEqual(delivery.customer_receipt_confirmed, 1)
+        self.assertEqual(delivery.customer_receipt_confirmed_by, self.frappe.session.user)
+        delivery.append.assert_called_once()
+        delivery.save.assert_called_once_with(ignore_permissions=True)
+        receipt_completion.assert_called_once_with(order, delivery)
+
+    def test_customer_cannot_confirm_receipt_before_delivery_is_marked_delivered(self):
+        order = types.SimpleNamespace(name="SO-1")
+        delivery = types.SimpleNamespace(name="DEL-1", order="SO-1", status="In Transit")
+        self.frappe.db.get_value.return_value = "DEL-1"
+        self.frappe.get_doc.return_value = delivery
+        with patch.object(self.api, "_owned_order", return_value=order), \
+             self.assertRaisesRegex(AccessError, "only after the rider"):
+            self.api.confirm_delivery_receipt("SO-1")
+        self.frappe.db.sql.assert_called_once()
 
     def test_cancellation_request_saves_only_request_and_restores_internal_flag(self):
         order = types.SimpleNamespace(

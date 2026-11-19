@@ -4,7 +4,7 @@
   "module": "Intelligent Ordering",
   "autoname": "naming_series:",
   "engine": "InnoDB",
-  "field_order": ["naming_series", "order", "customer", "customer_name", "customer_phone", "delivery_address", "delivery_area", "location_set", "latitude", "longitude", "assigned_delivery_person", "currency", "delivery_fee", "scheduled_delivery_date", "dispatch_date", "completion_date", "completed_by", "cash_collected", "cash_collected_amount", "cash_collected_at", "cash_collected_by", "status", "delivery_notes", "broadcast_started_at", "broadcast_expires_at", "broadcast_round_minutes", "broadcast_attempts", "broadcast_escalated_at", "activities"],
+  "field_order": ["naming_series", "order", "customer", "customer_name", "customer_phone", "delivery_address", "delivery_area", "location_set", "latitude", "longitude", "assigned_delivery_person", "currency", "delivery_fee", "scheduled_delivery_date", "dispatch_date", "completion_date", "completed_by", "customer_receipt_confirmed", "customer_receipt_confirmed_at", "customer_receipt_confirmed_by", "cash_collected", "cash_collected_amount", "cash_collected_at", "cash_collected_by", "status", "delivery_notes", "broadcast_started_at", "broadcast_expires_at", "broadcast_round_minutes", "broadcast_attempts", "broadcast_escalated_at", "activities"],
   "fields": [
     {"fieldname": "naming_series", "fieldtype": "Select", "options": "DEL-.YYYY.-.#####", "default": "DEL-.YYYY.-.#####", "label": "Naming Series", "reqd": 1},
     {"fieldname": "order", "fieldtype": "Link", "options": "Sales Order", "label": "Order", "reqd": 1, "unique": 1, "read_only": 1, "in_list_view": 1},
@@ -23,6 +23,9 @@
     {"fieldname": "dispatch_date", "fieldtype": "Datetime", "label": "Dispatch Date", "read_only": 1},
     {"fieldname": "completion_date", "fieldtype": "Datetime", "label": "Completion Date", "read_only": 1},
     {"fieldname": "completed_by", "fieldtype": "Link", "options": "User", "label": "Completed By", "read_only": 1},
+    {"default": "0", "fieldname": "customer_receipt_confirmed", "fieldtype": "Check", "label": "Customer Receipt Confirmed", "read_only": 1},
+    {"fieldname": "customer_receipt_confirmed_at", "fieldtype": "Datetime", "label": "Customer Receipt Confirmed At", "read_only": 1},
+    {"fieldname": "customer_receipt_confirmed_by", "fieldtype": "Link", "options": "User", "label": "Customer Receipt Confirmed By", "read_only": 1},
     {"default": "0", "fieldname": "cash_collected", "fieldtype": "Check", "label": "Cash Collected", "read_only": 1},
     {"fieldname": "cash_collected_amount", "fieldtype": "Currency", "options": "currency", "label": "Cash Collected Amount", "read_only": 1},
     {"fieldname": "cash_collected_at", "fieldtype": "Datetime", "label": "Cash Collected At", "read_only": 1},

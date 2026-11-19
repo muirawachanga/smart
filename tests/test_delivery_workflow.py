@@ -269,7 +269,7 @@ class TestDeliveryWorkflow(unittest.TestCase):
                     self.assertEqual(self.delivery.cash_collected_amount, self.order.total)
                     self.assertEqual(self.order.status, "Ready for Delivery")
                 else:
-                    self.assertEqual(self.order.status, "Completed")
+                    self.assertEqual(self.order.status, "Ready for Delivery")
 
     def test_rejection_applies_only_to_rejecting_rider_and_busy_riders_cannot_accept(self):
         self.as_driver()
@@ -409,7 +409,7 @@ class TestDeliveryWorkflow(unittest.TestCase):
         with self.assertRaises(DeliveryError):
             self.service.list_deliveries(status="Delivered", delayed="1")
 
-    def test_paid_explicit_confirmation_completes_only_assigned_order(self):
+    def test_rider_delivery_waits_for_customer_receipt_confirmation(self):
         self.as_driver()
         calls = []
         self.save.side_effect = lambda *args: calls.append("delivery")
@@ -418,11 +418,11 @@ class TestDeliveryWorkflow(unittest.TestCase):
         self.assertEqual(self.delivery.status, "Delivered")
         self.assertEqual(self.delivery.completed_by, "driver@example.test")
         self.assertEqual(self.delivery.completion_date, datetime(2026, 1, 10, 12, 0))
-        self.assertEqual(self.order.status, "Completed")
-        self.assertEqual(calls, ["delivery", "order"])
-        self.order.save.assert_called_once_with(ignore_permissions=True)
+        self.assertEqual(self.order.status, "Ready for Delivery")
+        self.assertEqual(calls, ["delivery"])
+        self.order.save.assert_not_called()
         self.order.db_set.assert_not_called()
-        self.assertFalse(self.frappe.flags.processing_delivery)
+        self.assertFalse(getattr(self.frappe.flags, "processing_delivery", False))
 
     def test_unpaid_delivery_and_missing_confirmation_cannot_complete_order(self):
         self.as_driver()
