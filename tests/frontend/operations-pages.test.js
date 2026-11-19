@@ -123,6 +123,9 @@ function install(t, ids, pageSelector, pageValue) {
     nodes.get("#delivery-filters").elements = {
       search: new Element(), status: new Select(), area: new Element(),
     };
+    nodes.get("#delivery-filters").queries = {
+      'button[type="submit"]': new Element("button"),
+    };
   }
   const original = {};
   const setGlobal = (name, value) => {
@@ -306,7 +309,7 @@ test("successful stock save with failed refresh is not reported as a failed move
 });
 
 const deliveryIds = [
-  "delivery-feedback", "delivery-filters", "delivery-list", "delivery-detail",
+  "delivery-feedback", "delivery-filters", "delivery-search-status", "delivery-list", "delivery-detail",
   "delivery-manager", "delivery-ready-orders", "delivery-area-form",
   "delivery-previous", "delivery-next", "delivery-ready-previous", "delivery-ready-next",
   "delivery-workloads", "delivery-areas", "deliveries-link", "delivery-metrics",
@@ -609,6 +612,63 @@ test("delivery manager sees performance and routing areas without rate editing",
   assert.match(nodes.get("#delivery-performance").textContent, /3 completed/);
   assert.match(nodes.get("#delivery-performance").textContent, /75\.0% completion/);
   assert.ok(nodes.get("#delivery-metrics").children.some((item) => /Total deliveries4/.test(item.textContent)));
+});
+
+test("delivery search shows progress and filtered results without reloading the overview", async (t) => {
+  const nodes = install(t, deliveryIds, "[data-delivery-page]", {});
+  const filters = nodes.get("#delivery-filters");
+  const search = filters.querySelector('button[type="submit"]');
+  const status = nodes.get("#delivery-search-status");
+  let resolveSearch;
+  let dashboardRequests = 0;
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("deliveries.delivery_dashboard")) {
+      dashboardRequests++;
+      return response({ manager: false, summary: {} });
+    }
+    const query = new URL(url, "https://example.test").searchParams;
+    if (query.get("search") === "SO-2") {
+      assert.equal(query.get("status"), "Assigned");
+      assert.equal(query.get("page"), "1");
+      return new Promise((resolve) => { resolveSearch = resolve; });
+    }
+    return response({ deliveries: [], has_more: false });
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?search=${Date.now()}`);
+  await tick();
+  assert.match(status.textContent, /No deliveries match/);
+  filters.elements.search.value = "SO-2";
+  filters.elements.status.value = "Assigned";
+  const submitted = filters.listeners.submit({ preventDefault() {} });
+  assert.equal(search.disabled, true);
+  assert.match(status.textContent, /Searching deliveries/);
+  resolveSearch(response({ deliveries: [{ name: "DEL-2", order: "SO-2", status: "Assigned" }], has_more: false }));
+  await submitted;
+  assert.equal(dashboardRequests, 1);
+  assert.equal(search.disabled, false);
+  assert.match(status.textContent, /Showing 1 delivery/);
+  assert.match(nodes.get("#delivery-list").textContent, /DEL-2/);
+});
+
+test("delivery search can retry a list error even when the overview fails", async (t) => {
+  const nodes = install(t, deliveryIds, "[data-delivery-page]", {});
+  const filters = nodes.get("#delivery-filters");
+  const status = nodes.get("#delivery-search-status");
+  let listRequests = 0;
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("deliveries.delivery_dashboard") || ++listRequests === 1) {
+      throw new Error("Offline");
+    }
+    return response({ deliveries: [], has_more: false });
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?retry-search=${Date.now()}`);
+  await tick();
+  assert.match(nodes.get("#delivery-feedback").textContent, /Delivery overview could not be loaded/);
+  assert.match(status.textContent, /Deliveries could not be loaded.*list_deliveries/);
+  assert.equal(filters.querySelector('button[type="submit"]').disabled, false);
+  await filters.listeners.submit({ preventDefault() {} });
+  assert.equal(listRequests, 2);
+  assert.match(status.textContent, /No deliveries match/);
 });
 
 test("order assignment link opens the broadcast delivery and saves the selected rider", async (t) => {

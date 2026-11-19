@@ -70,6 +70,8 @@ export function initDeliveryDashboard() {
   const riderPage = Boolean(document.querySelector("[data-rider-page]"));
   const feedback = document.querySelector("#delivery-feedback");
   const filters = document.querySelector("#delivery-filters");
+  const searchStatus = document.querySelector("#delivery-search-status");
+  const searchButton = filters.querySelector('button[type="submit"]');
   const results = document.querySelector("#delivery-list");
   const detail = document.querySelector("#delivery-detail");
   const manager = document.querySelector("#delivery-manager");
@@ -96,6 +98,7 @@ export function initDeliveryDashboard() {
   let lastHeartbeat = 0;
   let page = 1;
   let readyPage = 1;
+  let refreshing = false;
   let dashboard = { manager: false, personnel: [], areas: [] };
   let selectedArea = null;
   const requestedOrder = !riderPage && document.querySelector("[data-delivery-page]")
@@ -562,13 +565,30 @@ export function initDeliveryDashboard() {
     detail.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  async function refresh() {
-    feedback.textContent = "Loading deliveries...";
+  async function refresh({ listOnly = false } = {}) {
+    if (refreshing) return false;
+    refreshing = true;
+    if (searchButton) searchButton.disabled = true;
+    if (searchStatus) searchStatus.textContent = "Searching deliveries...";
+    if (!listOnly) feedback.textContent = "Loading deliveries...";
     detail.hidden = true;
     try {
-      await loadDashboard();
+      if (!listOnly) {
+        try {
+          await loadDashboard();
+          feedback.textContent = "";
+        } catch (error) {
+          if (manager) manager.hidden = true;
+          if (offersSection) offersSection.hidden = true;
+          if (riderLocation) riderLocation.hidden = true;
+          if (managerPlan) managerPlan.hidden = true;
+          feedback.textContent = `Delivery overview could not be loaded: ${error.message}`;
+        }
+      }
       const deliveries = await loadList();
-      feedback.textContent = "";
+      if (searchStatus) searchStatus.textContent = deliveries.length
+        ? `Showing ${deliveries.length} ${deliveries.length === 1 ? "delivery" : "deliveries"} on page ${page}.`
+        : "No deliveries match your filters.";
       if (openRequestedOrder) {
         openRequestedOrder = false;
         const delivery = deliveries.find((row) => row.order === requestedOrder);
@@ -579,12 +599,12 @@ export function initDeliveryDashboard() {
       return true;
     } catch (error) {
       results.replaceChildren();
-      if (manager) manager.hidden = true;
-      if (offersSection) offersSection.hidden = true;
-      if (riderLocation) riderLocation.hidden = true;
-      if (managerPlan) managerPlan.hidden = true;
-      feedback.textContent = error.message;
+      previous.disabled = next.disabled = true;
+      (searchStatus || feedback).textContent = `Deliveries could not be loaded: ${error.message}`;
       return false;
+    } finally {
+      refreshing = false;
+      if (searchButton) searchButton.disabled = false;
     }
   }
 
@@ -682,12 +702,26 @@ export function initDeliveryDashboard() {
       }
     });
   });
-  filters.addEventListener("submit", (event) => { event.preventDefault(); page = 1; refresh(); });
-  previous.addEventListener("click", () => { if (page > 1) { page -= 1; refresh(); } });
-  next.addEventListener("click", () => { page += 1; refresh(); });
-  if (readyPrevious) readyPrevious.addEventListener("click", () => { if (readyPage > 1) { readyPage -= 1; refresh(); } });
-  if (readyNext) readyNext.addEventListener("click", () => { readyPage += 1; refresh(); });
-  document.querySelector("#deliveries-link")?.addEventListener("click", refresh);
+  filters.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (refreshing) return;
+    page = 1;
+    openRequestedOrder = false;
+    return refresh({ listOnly: true });
+  });
+  previous.addEventListener("click", () => {
+    if (!refreshing && page > 1) { page -= 1; return refresh({ listOnly: true }); }
+  });
+  next.addEventListener("click", () => {
+    if (!refreshing) { page += 1; return refresh({ listOnly: true }); }
+  });
+  if (readyPrevious) readyPrevious.addEventListener("click", () => {
+    if (!refreshing && readyPage > 1) { readyPage -= 1; refresh(); }
+  });
+  if (readyNext) readyNext.addEventListener("click", () => {
+    if (!refreshing) { readyPage += 1; refresh(); }
+  });
+  document.querySelector("#deliveries-link")?.addEventListener("click", () => refresh());
   if (riderPage || document.querySelector("[data-delivery-page]")) {
     const warning = document.querySelector("#smarto-page-script-warning");
     if (warning) warning.hidden = true;

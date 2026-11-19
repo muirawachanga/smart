@@ -1019,6 +1019,10 @@ date; if no rider accounts exist, the form explains that an Administrator/System
 Manager must register one at `/dashboard/accounts`. Rider accounts cannot assign
 other riders.
 
+Use **Search deliveries** to filter existing delivery records by order or
+delivery number. Search updates the list independently of the overview and
+shows progress, matching results, or errors beside the filters.
+
 The page separates rider and manager overviews, displays per-rider completion
 rates, and filters delayed active deliveries with `list_deliveries(delayed="1")`.
 The delayed filter preserves rider ownership. Reassigning before pickup resets
