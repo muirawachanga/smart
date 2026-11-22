@@ -16,42 +16,70 @@ def preparation_minutes():
 
 
 def advance_confirmed_orders():
-    names = frappe.get_all(
-        "Sales Order",
-        filters={"status": ["in", ["Confirmed", "Processing"]]},
-        fields=["name"], order_by="modified asc", limit_page_length=100,
-    )
     now = now_datetime()
     transitioned = 0
-    for row in names:
-        order = frappe.get_doc("Sales Order", row.name, for_update=True)
-        if order.status not in {"Confirmed", "Processing"}:
-            continue
-        if not order.confirmed_at or not order.preparation_minutes:
-            order.confirmed_at = order.confirmed_at or now
-            order.preparation_minutes = order.preparation_minutes or preparation_minutes()
-            if order.status == "Confirmed":
-                order.status = "Processing"
-            _save(order)
-            transitioned += 1
-            continue
-        if order.status == "Confirmed":
-            order.status = "Processing"
-        elif _datetime(order.confirmed_at) + timedelta(minutes=order.preparation_minutes) <= now:
-            is_cod = (
-                order.payment_method == "Cash on Delivery"
-                and frappe.db.exists(
-                    "Payment Transaction",
-                    {"order": order.name, "payment_method": "Cash on Delivery", "status": "Pending"},
-                )
-            )
-            if order.payment_status != "Paid" and not is_cod:
+    last_name = ""
+    while transitioned < 100:
+        rows = frappe.get_all(
+            "Sales Order",
+            filters={"status": ["in", ["Pending", "Confirmed", "Processing"]], "name": [">", last_name]},
+            or_filters=[
+                ["Sales Order", "status", "in", ["Confirmed", "Processing"]],
+                ["Sales Order", "payment_status", "=", "Paid"],
+            ],
+            fields=["name"], order_by="name asc", limit_page_length=100,
+        )
+        if not rows:
+            break
+        for row in rows:
+            last_name = row.name
+            order = frappe.get_doc("Sales Order", row.name, for_update=True)
+            if order.status == "Pending":
+                if (
+                    order.payment_method != "M-Pesa" or order.payment_status != "Paid"
+                    or not frappe.db.exists("Payment Transaction", {
+                        "order": order.name, "payment_method": "M-Pesa", "status": "Successful",
+                    })
+                ):
+                    continue
+                order.status = "Confirmed"
+            elif order.status not in {"Confirmed", "Processing"}:
                 continue
-            order.status = "Ready for Delivery"
-        else:
-            continue
-        _save(order)
-        transitioned += 1
+            elif not order.confirmed_at or not order.preparation_minutes:
+                order.confirmed_at = order.confirmed_at or now
+                order.preparation_minutes = order.preparation_minutes or preparation_minutes()
+                if order.status == "Confirmed":
+                    order.status = "Processing"
+            elif order.status == "Confirmed":
+                order.status = "Processing"
+            elif _datetime(order.confirmed_at) + timedelta(minutes=order.preparation_minutes) <= now:
+                is_cod = (
+                    order.payment_method == "Cash on Delivery"
+                    and frappe.db.exists(
+                        "Payment Transaction",
+                        {"order": order.name, "payment_method": "Cash on Delivery", "status": "Pending"},
+                    )
+                )
+                if order.payment_status != "Paid" and not is_cod:
+                    continue
+                order.status = "Ready for Delivery"
+            else:
+                continue
+            frappe.db.savepoint("fulfillment_order")
+            try:
+                _save(order)
+            except frappe.ValidationError:
+                frappe.db.rollback(save_point="fulfillment_order")
+                frappe.log_error(
+                    title="Order fulfillment blocked",
+                    message=f"Order {row.name}\n{frappe.get_traceback()}",
+                )
+                continue
+            transitioned += 1
+            if transitioned >= 100:
+                break
+        if len(rows) < 100:
+            break
     return transitioned
 
 

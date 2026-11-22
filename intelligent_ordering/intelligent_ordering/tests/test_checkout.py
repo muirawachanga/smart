@@ -1,7 +1,7 @@
 import json
 import uuid
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
@@ -226,6 +226,62 @@ class TestCheckout(FrappeTestCase):
             file_name = frappe.db.get_value("File", {"file_url": proof["file_url"]}, "name")
             if file_name:
                 frappe.delete_doc("File", file_name, ignore_permissions=True, force=True)
+
+    def test_verified_mpesa_order_automatically_reaches_rider_offer(self):
+        from intelligent_ordering.api.deliveries import delivery_offers, set_offer_presence
+        from intelligent_ordering.api.payments import _reconcile, _save
+        from intelligent_ordering.utils.order_fulfillment import advance_confirmed_orders
+
+        order_name = self._submit_order()["order"]["name"]
+        rider = self._make_user(f"mpesa-rider-{frappe.generate_hash(length=8)}@example.test", "Delivery Staff")
+        frappe.set_user("Administrator")
+        suffix = frappe.generate_hash(length=8)
+        merchant, checkout = f"merchant-{suffix}", f"checkout-{suffix}"
+        payload = {"Body": {"stkCallback": {
+            "MerchantRequestID": merchant, "CheckoutRequestID": checkout,
+            "ResultCode": 0, "ResultDesc": "Success", "CallbackMetadata": {"Item": [
+                {"Name": "Amount", "Value": 250},
+                {"Name": "PhoneNumber", "Value": 254700000000},
+                {"Name": "MpesaReceiptNumber", "Value": f"TEST{suffix.upper()}123"},
+                {"Name": "TransactionDate", "Value": 20261113083000},
+            ]},
+        }}}
+        payment = frappe.get_doc({
+            "doctype": "Payment Transaction", "order": order_name,
+            "customer": self.profile.name, "phone_number": "254700000000", "amount": 250,
+            "payment_method": "M-Pesa", "environment": "Sandbox", "status": "Pending",
+            "merchant_request_id": merchant, "checkout_request_id": checkout,
+            "callback_response": json.dumps(payload),
+        })
+        _save(payment)
+        client = Mock()
+        client.query.return_value = {
+            "ResponseCode": "0", "ResultCode": "0",
+            "MerchantRequestID": merchant, "CheckoutRequestID": checkout,
+        }
+        with patch("intelligent_ordering.api.payments._client", return_value=client):
+            _reconcile(payment)
+        self.assertEqual(frappe.db.get_value("Sales Order", order_name, "status"), "Pending")
+        advance_confirmed_orders()
+        order = frappe.get_doc("Sales Order", order_name)
+        self.assertEqual((order.status, order.payment_status), ("Confirmed", "Paid"))
+        self.assertEqual(frappe.db.count("Stock Ledger Entry", {
+            "reference_order": order_name, "transaction_type": "Reservation",
+        }), 1)
+        advance_confirmed_orders()
+        with patch(
+            "intelligent_ordering.utils.order_fulfillment.now_datetime",
+            return_value=order.confirmed_at + timedelta(minutes=order.preparation_minutes + 1),
+        ):
+            advance_confirmed_orders()
+        delivery_name = frappe.db.get_value("Delivery", {"order": order_name}, "name")
+        self.assertTrue(delivery_name)
+        frappe.set_user(rider.name)
+        set_offer_presence("1")
+        self.assertIn(delivery_name, [offer["name"] for offer in delivery_offers()["offers"]])
+        self.assertEqual(frappe.db.count("Stock Ledger Entry", {
+            "reference_order": order_name, "transaction_type": "Reservation",
+        }), 1)
 
     def test_cod_checkout_rejects_insufficient_stock_without_creating_order(self):
         quote = get_checkout(delivery_area=self.delivery_area.name)

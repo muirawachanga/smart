@@ -45,11 +45,22 @@ class SalesOrder(Document):
             and self.payment_method == "Cash on Delivery"
             and self.payment_status == "Unpaid"
         )
+        paid_confirmation = (
+            getattr(frappe.flags, "processing_order_fulfillment", False)
+            and original.status == "Pending"
+            and self.status == "Confirmed"
+            and self.payment_method == "M-Pesa"
+            and self.payment_status == "Paid"
+            and frappe.db.exists("Payment Transaction", {
+                "order": self.name, "payment_method": "M-Pesa", "status": "Successful",
+            })
+        )
         if (
             "Customer" in frappe.get_roles(frappe.session.user)
             and not getattr(frappe.flags, "processing_delivery", False)
             and not customer_request
             and not checkout_confirmation
+            and not paid_confirmation
         ):
             frappe.throw(
                 "Customers cannot modify submitted orders.",

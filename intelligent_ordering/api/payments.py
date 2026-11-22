@@ -319,8 +319,8 @@ def _reconcile(payment):
         order = frappe.get_doc("Sales Order", payment.order, for_update=True)
         if payment_amount(order.total) != payment_amount(payment.amount) or order.currency != "KES":
             frappe.throw("Order amount does not match the payment.", frappe.ValidationError)
-        # This deliberately leaves status and inventory untouched, even if a
-        # late payment arrives after staff cancellation.
+        # Confirmation and stock reservation run separately after payment is
+        # persisted; late payment never reopens a cancelled order.
         order.db_set("payment_status", "Paid", update_modified=True)
     elif code == "0":
         payment.failure_description = (

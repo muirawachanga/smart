@@ -749,9 +749,10 @@ display name once one accepts; rider account identifiers and contact details are
 not exposed. The existing payment controls are available on the tracking page.
 
 Customers can list and view only their own orders. Business Admin and Order
-Manager roles can search and inspect orders. Order confirmation remains the
-existing payment/staff workflow; after confirmation, the scheduler advances
-orders to **Processing** without a staff status click, then to **Ready for
+Manager roles can search and inspect orders. After verified M-Pesa payment, the
+scheduler confirms Pending orders through the normal stock reservation workflow,
+including previously paid Pending orders. Cash on Delivery confirms at checkout.
+The scheduler then advances orders to **Processing**, then to **Ready for
 Delivery** after the preparation interval. The default interval is 20 minutes,
 configurable per site with `"order_fulfillment": {"preparation_minutes": 20}`.
 The interval is captured on confirmation. M-Pesa orders do not become Ready for
@@ -761,7 +762,9 @@ starts the existing rider broadcast. Delivery completion and COD finance
 reconciliation retain their existing safeguards. Submitted order details and
 line prices are immutable; Completed and Cancelled are terminal. Legacy
 confirmed/processing orders without preparation timestamps are given a fresh
-interval by the scheduler rather than being dispatched immediately.
+interval by the scheduler rather than being dispatched immediately. The
+scheduler logs blocked validation failures, including insufficient stock, and
+continues with other orders; staff must resolve the underlying issue.
 
 The storefront continues to provide checkout review, customer order tracking,
 order history, and staff order controls. The dedicated `/account` and
@@ -982,9 +985,10 @@ movement keys to avoid duplicate reservations or dispatches. Orders remain
 Pending without affecting inventory until confirmation. New Cash on Delivery
 orders automatically take the normal Pending-to-Confirmed transition during
 checkout, reserving available stock atomically with order creation. Insufficient
-stock rejects checkout without clearing the cart. M-Pesa checkout remains Pending;
-existing pending orders are not auto-confirmed retroactively. Preparation and
-delivery assignment remain staff actions. Inventory screens
+stock rejects checkout without clearing the cart. M-Pesa checkout remains Pending
+until verified payment; the scheduler then confirms it and reserves stock. A paid
+order that cannot reserve stock remains Pending and requires staff attention.
+Inventory screens
 provide dashboard totals, product/warehouse stock search, movements, and
 authorized receipt/adjustment controls.
 
@@ -1301,8 +1305,8 @@ successes do not write inventory or repeat payment processing. A late verified
 payment on a cancelled order is recorded as paid without reopening the order;
 staff must resolve it with the customer outside this module.
 
-Successful payment marks only `payment_status = Paid`. Staff still confirm
-orders and inventory still reserves on confirmation and dispatches at Ready
+Successful payment marks `payment_status = Paid`. The scheduler confirms paid
+Pending M-Pesa orders, reserving stock on confirmation and dispatching at Ready
 for Delivery. For COD, the rider can dispatch and deliver while the order remains
 unpaid only after recording cash collection and private proof of delivery.
 Finance confirmation then marks it paid and completes the order. Other unpaid
