@@ -45,6 +45,9 @@ class TestOrderFulfillment(unittest.TestCase):
             payment_status="Unpaid", save=Mock(),
         )
         self.frappe.get_doc.side_effect = lambda *args, **kwargs: self.order
+        broadcast_patch = patch.object(self.service, "_ensure_broadcast")
+        self.broadcast = broadcast_patch.start()
+        self.addCleanup(broadcast_patch.stop)
 
     def test_preparation_time_uses_validated_site_configuration(self):
         self.assertEqual(self.service.preparation_minutes(), 20)
@@ -129,6 +132,29 @@ class TestOrderFulfillment(unittest.TestCase):
         self.frappe.db.exists.return_value = "PAY-1"
         self.assertEqual(self.service.advance_confirmed_orders(), 1)
         self.frappe.db.rollback.assert_called_once_with(save_point="fulfillment_order")
+        self.assertIn("SO-1", self.frappe.log_error.call_args.kwargs["message"])
+        self.assertEqual(self.order.status, "Processing")
+
+    def test_existing_confirmed_processing_and_ready_orders_get_broadcast_backfill(self):
+        for status in ("Confirmed", "Processing", "Ready for Delivery"):
+            with self.subTest(status=status):
+                self.order.status = status
+                self.service.advance_confirmed_orders()
+                self.broadcast.assert_called_with(self.order)
+                self.broadcast.reset_mock()
+
+    def test_broadcast_validation_failure_does_not_block_other_orders(self):
+        blocked = types.SimpleNamespace(name="SO-1", status="Confirmed")
+        self.order.name = "SO-2"
+        self.frappe.get_all.return_value = [
+            types.SimpleNamespace(name="SO-1"), types.SimpleNamespace(name="SO-2"),
+        ]
+        self.frappe.get_doc.side_effect = lambda doctype, name, **kwargs: (
+            blocked if name == "SO-1" else self.order
+        )
+        self.broadcast.side_effect = [FulfillmentError("Invalid broadcast settings"), None]
+        self.assertEqual(self.service.advance_confirmed_orders(), 1)
+        self.frappe.db.rollback.assert_called_once_with(save_point="fulfillment_broadcast")
         self.assertIn("SO-1", self.frappe.log_error.call_args.kwargs["message"])
         self.assertEqual(self.order.status, "Processing")
 

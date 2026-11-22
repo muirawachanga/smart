@@ -79,6 +79,7 @@ class TestDeliveryWorkflow(unittest.TestCase):
                 return "SO-1"
             if doctype == "Sales Order":
                 return types.SimpleNamespace(
+                    status=self.order.status,
                     payment_status=self.order.payment_status,
                     payment_method=self.order.payment_method,
                 )
@@ -247,7 +248,7 @@ class TestDeliveryWorkflow(unittest.TestCase):
                 self.order.payment_method = method
                 self.order.payment_status = "Paid" if method == "M-Pesa" else "Unpaid"
                 self.service._start_broadcast(self.delivery)
-                self.frappe.db.exists.return_value = method == "Cash on Delivery"
+                self.frappe.db.exists.return_value = True
                 presence = types.SimpleNamespace(offers_online=1, offers_seen_at=datetime(2026, 1, 10, 12))
                 with (patch.object(self.service, "_lock_rider"),
                       patch.object(self.service, "_presence", return_value=presence),
@@ -296,6 +297,54 @@ class TestDeliveryWorkflow(unittest.TestCase):
             busy.return_value = False
             self.service.accept_delivery_offer("DEL-1", "1")
             self.assertEqual(self.delivery.assigned_delivery_person, "other-rider@example.test")
+
+    def test_confirmed_eligible_order_creates_offer_without_duplicates(self):
+        self.order.status = "Confirmed"
+        self.order.get_doc_before_save.return_value = types.SimpleNamespace(status="Pending")
+        self.frappe.db.exists.return_value = "PAY-1"
+        self.frappe.db.get_value.return_value = None
+        with patch.object(self.service, "_create_delivery") as create:
+            self.service.broadcast_ready_order(self.order)
+            create.assert_called_once_with(self.order, automatic=True)
+            self.frappe.db.get_value.return_value = "DEL-1"
+            self.order.status = "Processing"
+            self.service.broadcast_ready_order(self.order)
+            create.assert_called_once()
+
+    def test_unpaid_mpesa_and_unconfirmed_orders_do_not_create_offers(self):
+        with patch.object(self.service, "_create_delivery") as create:
+            for status, payment in (("Confirmed", "Unpaid"), ("Pending", "Paid"), ("Cancelled", "Paid")):
+                self.order.status, self.order.payment_status = status, payment
+                self.service.ensure_order_broadcast(self.order)
+            self.order.status, self.order.payment_status = "Confirmed", "Paid"
+            self.frappe.db.exists.return_value = None
+            self.service.ensure_order_broadcast(self.order)
+            create.assert_not_called()
+
+    def test_rider_accepts_early_but_cannot_dispatch_until_prepared(self):
+        self.as_driver()
+        self.order.status = "Confirmed"
+        self.frappe.db.exists.return_value = "PAY-1"
+        self.delivery.status = "Awaiting Assignment"
+        self.delivery.assigned_delivery_person = None
+        self.service._start_broadcast(self.delivery)
+        presence = types.SimpleNamespace(offers_online=1, offers_seen_at=datetime(2026, 1, 10, 12))
+        with (patch.object(self.service, "_lock_rider"),
+              patch.object(self.service, "_presence", return_value=presence),
+              patch.object(self.service, "_rider_busy", return_value=False),
+              patch.object(self.service, "_delivery_locked", return_value=(self.delivery, self.order)),
+              patch.object(self.service, "_serialize", return_value={})):
+            self.service.accept_delivery_offer("DEL-1", "1")
+            with self.assertRaisesRegex(DeliveryError, "still being prepared"):
+                self.service.update_delivery("DEL-1", "Ready for Dispatch")
+            self.service.update_delivery("DEL-1", "Preparing")
+            self.order.status = "Processing"
+            with self.assertRaisesRegex(DeliveryError, "still being prepared"):
+                self.service.update_delivery("DEL-1", "Ready for Dispatch")
+            self.order.status = "Ready for Delivery"
+            self.service.update_delivery("DEL-1", "Ready for Dispatch")
+            self.service.update_delivery("DEL-1", "Picked Up")
+            self.assertEqual(self.delivery.status, "Picked Up")
 
     def test_expired_broadcast_notifies_manager_only_once(self):
         self.delivery.status = "Awaiting Assignment"
@@ -358,6 +407,18 @@ class TestDeliveryWorkflow(unittest.TestCase):
         self.service.assign_delivery("DEL-1", "second@example.test", "2026-01-12", "Shift change")
         self.assertEqual(self.delivery.assigned_delivery_person, "second@example.test")
         self.assertEqual(self.save.call_args.args[3], "driver@example.test")
+
+    def test_manager_can_assign_eligible_order_before_preparation_finishes(self):
+        self.order.status = "Confirmed"
+        self.delivery.status = "Awaiting Assignment"
+        self.delivery.assigned_delivery_person = None
+        self.frappe.get_roles.return_value = ["Delivery Staff"]
+        self.frappe.db.exists.return_value = None
+        with self.assertRaisesRegex(DeliveryError, "cannot be assigned"):
+            self.service.assign_delivery("DEL-1", "driver@example.test", "2026-01-11")
+        self.frappe.db.exists.return_value = "PAY-1"
+        self.service.assign_delivery("DEL-1", "driver@example.test", "2026-01-11")
+        self.assertEqual(self.delivery.assigned_delivery_person, "driver@example.test")
 
     def test_repeated_assignment_is_idempotent(self):
         self.delivery.status = "Assigned"

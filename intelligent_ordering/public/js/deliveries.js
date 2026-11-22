@@ -270,6 +270,7 @@ export function initDeliveryDashboard() {
           await loadOffers();
         }));
         card.append(text("h3", `${offer.name} · ${offer.order}`),
+          text("p", `Order: ${offer.order_status} · ${offer.order_status === "Ready for Delivery" ? "Ready for pickup" : "Preparing; pickup is not yet available"}`),
           text("p", `Area: ${offer.delivery_area || "Not specified"} · Round ${offer.round_number} expires: ${offer.expires_at}`),
           accept, reject);
         return card;
@@ -352,6 +353,7 @@ export function initDeliveryDashboard() {
       text("p", `${delivery.delivery_address} (${delivery.delivery_area})`),
       text("p", `Delivery fee: ${delivery.currency} ${delivery.delivery_fee}`),
       text("p", `Payment: ${delivery.payment_method || "Unavailable"} · ${delivery.payment_status || "Unavailable"}`),
+      ...(delivery.order_status ? [text("p", `Order status: ${delivery.order_status}${delivery.order_status !== "Ready for Delivery" ? " · Wait until preparation is complete before pickup." : ""}`)] : []),
       ...(delivery.payment_method === "Cash on Delivery" ? [
         text("p", `Cash collected: ${delivery.cash_collected ? `${delivery.currency} ${delivery.cash_collected_amount} · ${delivery.cash_collected_at} by ${delivery.cash_collected_by}` : "Not recorded; finance confirmation required after delivery"}`),
       ] : []),

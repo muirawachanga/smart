@@ -22,9 +22,9 @@ def advance_confirmed_orders():
     while transitioned < 100:
         rows = frappe.get_all(
             "Sales Order",
-            filters={"status": ["in", ["Pending", "Confirmed", "Processing"]], "name": [">", last_name]},
+            filters={"status": ["in", ["Pending", "Confirmed", "Processing", "Ready for Delivery"]], "name": [">", last_name]},
             or_filters=[
-                ["Sales Order", "status", "in", ["Confirmed", "Processing"]],
+                ["Sales Order", "status", "in", ["Confirmed", "Processing", "Ready for Delivery"]],
                 ["Sales Order", "payment_status", "=", "Paid"],
             ],
             fields=["name"], order_by="name asc", limit_page_length=100,
@@ -34,6 +34,17 @@ def advance_confirmed_orders():
         for row in rows:
             last_name = row.name
             order = frappe.get_doc("Sales Order", row.name, for_update=True)
+            if order.status in {"Confirmed", "Processing", "Ready for Delivery"}:
+                frappe.db.savepoint("fulfillment_broadcast")
+                try:
+                    _ensure_broadcast(order)
+                except frappe.ValidationError:
+                    frappe.db.rollback(save_point="fulfillment_broadcast")
+                    frappe.log_error(
+                        title="Delivery broadcast blocked",
+                        message=f"Order {row.name}\n{frappe.get_traceback()}",
+                    )
+                    continue
             if order.status == "Pending":
                 if (
                     order.payment_method != "M-Pesa" or order.payment_status != "Paid"
@@ -81,6 +92,12 @@ def advance_confirmed_orders():
         if len(rows) < 100:
             break
     return transitioned
+
+
+def _ensure_broadcast(order):
+    from intelligent_ordering.api.deliveries import ensure_order_broadcast
+
+    ensure_order_broadcast(order)
 
 
 @contextmanager

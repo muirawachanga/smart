@@ -182,6 +182,15 @@ class TestCheckout(FrappeTestCase):
 
         order_name = self._submit_order(payment_method="Cash on Delivery")["order"]["name"]
         rider = self._make_user(f"workflow-rider-{frappe.generate_hash(length=8)}@example.test", "Delivery Staff")
+        delivery_name = frappe.db.get_value("Delivery", {"order": order_name}, "name")
+        self.assertTrue(delivery_name)
+        frappe.set_user(rider.name)
+        set_offer_presence("1")
+        offer = next(row for row in delivery_offers()["offers"] if row["name"] == delivery_name)
+        self.assertEqual(offer["order_status"], "Confirmed")
+        accept_delivery_offer(delivery_name, offer["round_number"])
+        with self.assertRaises(frappe.ValidationError):
+            update_delivery(delivery_name, "Ready for Dispatch")
         frappe.set_user("Administrator")
         from intelligent_ordering.utils.order_fulfillment import advance_confirmed_orders
 
@@ -197,12 +206,7 @@ class TestCheckout(FrappeTestCase):
             return_value=order.confirmed_at + timedelta(minutes=order.preparation_minutes + 1),
         ):
             self.assertEqual(advance_confirmed_orders(), 1)
-        delivery_name = frappe.db.get_value("Delivery", {"order": order_name}, "name")
-        self.assertTrue(delivery_name)
         frappe.set_user(rider.name)
-        set_offer_presence("1")
-        offer = next(row for row in delivery_offers()["offers"] if row["name"] == delivery_name)
-        accept_delivery_offer(delivery_name, offer["round_number"])
         for status in ("Ready for Dispatch", "Picked Up", "In Transit"):
             update_delivery(delivery_name, status)
         image = ("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8"
@@ -268,17 +272,19 @@ class TestCheckout(FrappeTestCase):
         self.assertEqual(frappe.db.count("Stock Ledger Entry", {
             "reference_order": order_name, "transaction_type": "Reservation",
         }), 1)
+        delivery_name = frappe.db.get_value("Delivery", {"order": order_name}, "name")
+        self.assertTrue(delivery_name)
+        frappe.set_user(rider.name)
+        set_offer_presence("1")
+        self.assertIn(delivery_name, [offer["name"] for offer in delivery_offers()["offers"]])
+        frappe.set_user("Administrator")
         advance_confirmed_orders()
         with patch(
             "intelligent_ordering.utils.order_fulfillment.now_datetime",
             return_value=order.confirmed_at + timedelta(minutes=order.preparation_minutes + 1),
         ):
             advance_confirmed_orders()
-        delivery_name = frappe.db.get_value("Delivery", {"order": order_name}, "name")
-        self.assertTrue(delivery_name)
-        frappe.set_user(rider.name)
-        set_offer_presence("1")
-        self.assertIn(delivery_name, [offer["name"] for offer in delivery_offers()["offers"]])
+        self.assertEqual(frappe.db.get_value("Delivery", {"order": order_name}, "name"), delivery_name)
         self.assertEqual(frappe.db.count("Stock Ledger Entry", {
             "reference_order": order_name, "transaction_type": "Reservation",
         }), 1)

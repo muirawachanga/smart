@@ -36,6 +36,21 @@ DELIVERY_FIELDS = [
 ]
 MANAGE_DELIVERY_AREA_ROLES = {"System Manager", "Business Admin", "Store Manager", "Order Manager"}
 MAX_PROOF_BYTES = 5 * 1024 * 1024
+OFFER_ORDER_STATUSES = {"Confirmed", "Processing", "Ready for Delivery"}
+
+
+def _offer_eligible(order):
+    if order.status not in OFFER_ORDER_STATUSES:
+        return False
+    if order.payment_method == "M-Pesa" and order.payment_status == "Paid":
+        payment_status = "Successful"
+    elif order.payment_method == "Cash on Delivery":
+        payment_status = "Pending"
+    else:
+        return False
+    return bool(frappe.db.exists("Payment Transaction", {
+        "order": order.name, "payment_method": order.payment_method, "status": payment_status,
+    }))
 
 
 def is_manager(user=None):
@@ -103,8 +118,9 @@ def _serialize(delivery, detail=False, *, personnel=False):
     data = {field: delivery.get(field) for field in DELIVERY_FIELDS}
     if detail:
         order = frappe.db.get_value(
-            "Sales Order", delivery.order, ["payment_status", "payment_method"], as_dict=True
+            "Sales Order", delivery.order, ["status", "payment_status", "payment_method"], as_dict=True
         )
+        data["order_status"] = order.status if order else None
         data["payment_status"] = order.payment_status if order else None
         data["payment_method"] = order.payment_method if order else None
         data["items"] = frappe.get_all(
@@ -136,6 +152,11 @@ def _serialize(delivery, detail=False, *, personnel=False):
         )
         transitions = PERSONNEL_TRANSITIONS if personnel or not is_manager() else DELIVERY_TRANSITIONS
         data["allowed_statuses"] = sorted(transitions.get(delivery.status, set()))
+        if order and order.status != "Ready for Delivery":
+            data["allowed_statuses"] = [
+                status for status in data["allowed_statuses"]
+                if status not in {"Ready for Dispatch", "Picked Up", "Dispatched", "In Transit", "Delivered", "Failed"}
+            ]
         if delivery.assigned_delivery_person != frappe.session.user:
             data["allowed_statuses"] = [
                 status for status in data["allowed_statuses"] if status != "Delivered"
@@ -457,12 +478,18 @@ def _start_broadcast(delivery):
     delivery.broadcast_escalated_at = None
 
 
-def broadcast_ready_order(order, method=None):
-    original = order.get_doc_before_save()
-    if not original or original.status == order.status or order.status != "Ready for Delivery":
+def ensure_order_broadcast(order):
+    if not _offer_eligible(order):
         return
     if not frappe.db.get_value("Delivery", {"order": order.name}, "name", for_update=True):
         _create_delivery(order, automatic=True)
+
+
+def broadcast_ready_order(order, method=None):
+    original = order.get_doc_before_save()
+    if not original or original.status == order.status:
+        return
+    ensure_order_broadcast(order)
 
 
 def escalate_expired_broadcasts():
@@ -533,7 +560,7 @@ def assign_delivery(delivery_name, assigned_person, scheduled_delivery_date, not
     scheduled = _schedule(scheduled_delivery_date)
     notes = _text(notes, "Assignment notes", 1000)
     delivery, order = _delivery_locked(delivery_name)
-    if order.status != "Ready for Delivery" or delivery.status in {
+    if (order.status != "Ready for Delivery" and not _offer_eligible(order)) or delivery.status in {
         "Picked Up", "Dispatched", "In Transit", "Delivered", "Cancelled",
     }:
         frappe.throw("This delivery cannot be assigned or reassigned.", frappe.ValidationError)
@@ -639,14 +666,20 @@ def delivery_offers():
     if online and not busy:
         now = now_datetime()
         offers = frappe.db.sql(
-            """SELECT d.name, d.`order`, d.delivery_area, d.broadcast_started_at,
+            """SELECT d.name, d.`order`, d.delivery_area, o.status AS order_status, d.broadcast_started_at,
                       d.broadcast_round_minutes, d.broadcast_attempts
                FROM `tabDelivery` d
                INNER JOIN `tabSales Order` o ON o.name = d.`order`
                WHERE d.status = 'Awaiting Assignment'
                  AND COALESCE(d.assigned_delivery_person, '') = ''
                  AND d.broadcast_started_at IS NOT NULL AND d.broadcast_expires_at > %s
-                 AND o.status = 'Ready for Delivery'
+                 AND o.status IN ('Confirmed', 'Processing', 'Ready for Delivery')
+                 AND ((o.payment_method = 'M-Pesa' AND o.payment_status = 'Paid'
+                       AND EXISTS (SELECT 1 FROM `tabPayment Transaction` p WHERE p.`order` = o.name
+                                   AND p.payment_method = 'M-Pesa' AND p.status = 'Successful'))
+                   OR (o.payment_method = 'Cash on Delivery'
+                       AND EXISTS (SELECT 1 FROM `tabPayment Transaction` p WHERE p.`order` = o.name
+                                   AND p.payment_method = 'Cash on Delivery' AND p.status = 'Pending')))
                  AND NOT EXISTS (
                     SELECT 1 FROM `tabDelivery Activity` a
                     WHERE a.parent = d.name AND a.parenttype = 'Delivery'
@@ -683,7 +716,7 @@ def _locked_offer(name, rider, round_number):
     if not _is_online(_presence(rider, for_update=True)) or _rider_busy(rider):
         frappe.throw("You must be online and have no active deliveries.", frappe.ValidationError)
     delivery, order = _delivery_locked(name, offer=True)
-    if (order.status != "Ready for Delivery" or delivery.status != "Awaiting Assignment"
+    if (not _offer_eligible(order) or delivery.status != "Awaiting Assignment"
             or delivery.assigned_delivery_person or not delivery.broadcast_started_at
             or not delivery.broadcast_expires_at or delivery.broadcast_expires_at <= now_datetime()):
         frappe.throw("This delivery offer is no longer available.", frappe.ValidationError)
@@ -960,8 +993,11 @@ def update_delivery(delivery_name, status, notes="", confirmation=0, cash_collec
         return _serialize(delivery, detail=True)
     if delivery.status in {"Delivered", "Cancelled"}:
         frappe.throw("Terminal delivery history cannot be changed.", frappe.ValidationError)
-    if status != "Cancelled" and order.status != "Ready for Delivery":
-        frappe.throw("The associated order is not Ready for Delivery.", frappe.ValidationError)
+    if status != "Cancelled" and order.status not in OFFER_ORDER_STATUSES:
+        frappe.throw("The associated order is not available for delivery.", frappe.ValidationError)
+    if status in {"Ready for Dispatch", "Picked Up", "Dispatched", "In Transit", "Delivered", "Failed"} \
+            and order.status != "Ready for Delivery":
+        frappe.throw("The order is still being prepared. Wait until it is Ready for Delivery.", frappe.ValidationError)
     if status != "Cancelled" and not delivery.assigned_delivery_person:
         frappe.throw("Assign a delivery person first.", frappe.ValidationError)
     if status in {"Failed", "Cancelled"} and not notes:

@@ -757,9 +757,10 @@ Delivery** after the preparation interval. The default interval is 20 minutes,
 configurable per site with `"order_fulfillment": {"preparation_minutes": 20}`.
 The interval is captured on confirmation. M-Pesa orders do not become Ready for
 Delivery until payment is verified; Cash on Delivery orders can advance with
-their pending COD transaction. Ready for Delivery dispatches reserved stock and
-starts the existing rider broadcast. Delivery completion and COD finance
-reconciliation retain their existing safeguards. Submitted order details and
+their pending COD transaction. Confirmation starts the existing rider broadcast;
+Ready for Delivery dispatches reserved stock and permits pickup. Delivery
+completion and COD finance reconciliation retain their existing safeguards.
+Submitted order details and
 line prices are immutable; Completed and Cancelled are terminal. Legacy
 confirmed/processing orders without preparation timestamps are given a fresh
 interval by the scheduler rather than being dispatched immediately. The
@@ -1068,9 +1069,12 @@ confirmed.
 
 ### Automatic delivery offers
 
-When an order changes to **Ready for Delivery**, SmartO creates its existing
-Delivery record and starts a broadcast. Riders use their existing Delivery Staff
-accounts and choose **Go online** in the delivery workspace. They must keep the
+When an order is **Confirmed** with a pending COD transaction or verified
+successful M-Pesa payment, SmartO creates its existing Delivery record and
+starts a broadcast. Riders can accept while the order is being prepared, but
+cannot mark it ready for dispatch or pick it up until the order is **Ready for
+Delivery** and the existing payment and stock checks have passed. Riders use
+their existing Delivery Staff accounts and choose **Go online** in the delivery workspace. They must keep the
 dashboard open; presence expires after 90 seconds without a heartbeat. Riders
 with active deliveries do not receive offers. Offers show only the order,
 delivery reference and area until accepted; location sharing is not required.
@@ -1093,8 +1097,10 @@ Escalation depends on running scheduler workers and may occur after the exact
 expiry. If there are no enabled Delivery Managers, the condition is logged and
 the delivery still appears in the manager workspace.
 
-Orders already ready before this update are not broadcast retroactively; a
-manager can create their delivery to start a broadcast. Legacy orders without
+The scheduler creates missing broadcasts for eligible confirmed, processing,
+and ready orders, but does not restart an existing or expired broadcast.
+Cancellation still requires a manager to cancel the delivery before approving
+the order cancellation. Legacy orders without
 a delivery area retain their original total and may show an unspecified area.
 Run `bench --site <site-name> migrate` and rebuild assets after deploying, then
 verify competing accepts, notification delivery, and the scheduler on an

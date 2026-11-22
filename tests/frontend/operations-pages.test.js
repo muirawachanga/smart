@@ -416,7 +416,7 @@ test("rider goes online and accepts a broadcast offer on the rider page", async 
     if (url.includes("deliveries.my_deliveries")) return response({ deliveries: [], has_more: false });
     if (url.includes("deliveries.delivery_offers")) return response({
       online, busy: accepted, offers: online && !accepted
-        ? [{ name: "DEL-1", order: "SO-1", delivery_area: "Central", round_number: 1, expires_at: "12:05" }]
+        ? [{ name: "DEL-1", order: "SO-1", order_status: "Confirmed", delivery_area: "Central", round_number: 1, expires_at: "12:05" }]
         : [],
     });
     if (url.includes("deliveries.set_offer_presence")) {
@@ -428,7 +428,7 @@ test("rider goes online and accepts a broadcast offer on the rider page", async 
       return response({ name: "DEL-1" });
     }
     if (url.includes("deliveries.get_my_delivery")) return response({
-      name: "DEL-1", order: "SO-1", status: "Accepted", allowed_statuses: [], activities: [],
+      name: "DEL-1", order: "SO-1", status: "Accepted", order_status: "Processing", allowed_statuses: [], activities: [],
     });
     throw new Error(`Unexpected request: ${url}`);
   });
@@ -439,6 +439,7 @@ test("rider goes online and accepts a broadcast offer on the rider page", async 
   await tick();
   const offer = nodes.get("#delivery-offers-list").children[0];
   assert.match(offer.textContent, /Central/);
+  assert.match(offer.textContent, /Confirmed.*pickup is not yet available/);
   offer.children.find((child) => child.textContent === "Accept offer").listeners.click();
   await tick();
   const acceptance = calls.find((call) => call.url.includes("accept_delivery_offer"));
@@ -446,6 +447,7 @@ test("rider goes online and accepts a broadcast offer on the rider page", async 
   assert.equal(acceptance.options.body.get("round_number"), "1");
   assert.match(nodes.get("#delivery-offers-status").textContent, /unavailable/);
   assert.match(nodes.get("#delivery-detail").textContent, /Accepted/);
+  assert.match(nodes.get("#delivery-detail").textContent, /Processing.*Wait until preparation is complete before pickup/);
 });
 
 function installOptimization(t) {
