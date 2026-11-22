@@ -317,7 +317,7 @@ const deliveryIds = [
 ];
 const optimizationIds = [
   "delivery-location-share", "delivery-share-location", "delivery-clear-location",
-  "delivery-my-route", "delivery-my-route-results", "delivery-optimization-manager",
+  "delivery-my-route", "delivery-my-route-results", "delivery-location-feedback", "delivery-optimization-manager",
   "delivery-plan-form", "delivery-plan-results",
 ];
 const offerIds = [
@@ -329,7 +329,7 @@ test("dedicated rider page uses only rider-scoped delivery APIs", async (t) => {
   const ids = [
     "delivery-feedback", "delivery-filters", "delivery-list", "delivery-detail",
     "delivery-previous", "delivery-next", "delivery-metrics", "delivery-delayed",
-    ...offerIds, ...optimizationIds.slice(0, 5),
+    ...offerIds, ...optimizationIds.slice(0, 6),
   ];
   const nodes = install(t, ids, "[data-rider-page]", {});
   const calls = [];
@@ -462,6 +462,7 @@ function installOptimization(t) {
 test("rider explicitly shares, uses, and clears a location", async (t) => {
   const nodes = installOptimization(t);
   const calls = [];
+  window.isSecureContext = true;
   window.navigator = { geolocation: {
     getCurrentPosition: (resolve) => resolve({ coords: { latitude: -1.2, longitude: 36.8, accuracy: 10 } }),
   } };
@@ -482,14 +483,63 @@ test("rider explicitly shares, uses, and clears a location", async (t) => {
   assert.equal(nodes.get("#delivery-location-share").hidden, false);
   assert.equal(calls.filter((call) => call.url.includes("share_rider_location")).length, 0);
   await nodes.get("#delivery-share-location").listeners.click();
+  assert.match(nodes.get("#delivery-location-feedback").textContent, /Current location shared/);
   const share = calls.find((call) => call.url.includes("share_rider_location"));
   assert.equal(share.options.body.get("latitude"), "-1.2");
   await nodes.get("#delivery-my-route").listeners.click();
   assert.match(nodes.get("#delivery-my-route-results").textContent, /SO-1/);
   assert.match(nodes.get("#delivery-my-route-results").textContent, /1 assigned deliveries have no coordinates/);
   await nodes.get("#delivery-clear-location").listeners.click();
+  assert.match(nodes.get("#delivery-location-feedback").textContent, /shared location was cleared/);
   assert.equal(nodes.get("#delivery-my-route-results").textContent, "");
   assert.ok(calls.some((call) => call.url.includes("clear_rider_location")));
+});
+
+test("location sharing explains the HTTPS requirement on an insecure origin", async (t) => {
+  const nodes = installOptimization(t);
+  const calls = [];
+  window.isSecureContext = false;
+  window.navigator = { geolocation: {
+    getCurrentPosition: () => assert.fail("Geolocation must not be requested on an insecure origin"),
+  } };
+  t.mock.method(globalThis, "fetch", async (url) => {
+    calls.push(String(url));
+    if (url.includes("deliveries.delivery_dashboard")) return response({ manager: false, summary: {}, delayed_deliveries: 0 });
+    if (url.includes("deliveries.list_deliveries")) return response({ deliveries: [], has_more: false });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?insecure-gps=${Date.now()}`);
+  await tick();
+  await nodes.get("#delivery-share-location").listeners.click();
+  assert.match(nodes.get("#delivery-location-feedback").textContent, /requires HTTPS/);
+  assert.equal(calls.some((url) => url.includes("share_rider_location")), false);
+});
+
+test("location and route failures appear next to the rider controls", async (t) => {
+  const nodes = installOptimization(t);
+  window.isSecureContext = true;
+  window.navigator = { geolocation: {
+    getCurrentPosition: (_resolve, reject) => reject({ code: 1 }),
+  } };
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("deliveries.delivery_dashboard")) return response({ manager: false, summary: {}, delayed_deliveries: 0 });
+    if (url.includes("deliveries.list_deliveries")) return response({ deliveries: [], has_more: false });
+    if (url.includes("deliveries.my_delivery_route")) return {
+      ok: false, status: 417, json: async () => ({ message: "Share your current location to plan a route." }),
+    };
+    if (url.includes("deliveries.clear_rider_location")) return {
+      ok: false, status: 500, json: async () => ({}),
+    };
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/delivery-page.js?gps-errors=${Date.now()}`);
+  await tick();
+  await nodes.get("#delivery-share-location").listeners.click();
+  assert.match(nodes.get("#delivery-location-feedback").textContent, /Check browser permissions/);
+  await nodes.get("#delivery-my-route").listeners.click();
+  assert.match(nodes.get("#delivery-location-feedback").textContent, /Share your current location/);
+  await nodes.get("#delivery-clear-location").listeners.click();
+  assert.match(nodes.get("#delivery-location-feedback").textContent, /clear_rider_location, HTTP 500/);
 });
 
 test("manager reviews and assigns an optimized group", async (t) => {

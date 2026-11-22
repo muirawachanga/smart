@@ -537,7 +537,8 @@ configured. Mapping and road-routing services are not integrated.
 
 ### Gemini shopping assistant
 
-The `/assistant` page is available to signed-in Customer accounts. Obtain a
+The home page and `/assistant` provide the shopping assistant to signed-in
+Customer accounts. Obtain a
 Gemini API key from Google AI Studio and configure each site's private
 `site_config.json` (merge this object into the existing file):
 
@@ -573,6 +574,14 @@ The separate **Load my suggestions** action uses only the signed-in customer's
 completed orders and historical product categories, ranking currently enabled,
 in-stock products. It sends no purchase history to Gemini. Customers without
 completed purchase history receive an empty result.
+
+Voice input is optional and requires a supported browser in a secure context
+(HTTPS or localhost). The customer must opt in to the browser's speech
+recognition service, which may send audio to its provider. Recognized text is
+editable and is never submitted automatically; Gemini consent remains
+separate. Optional spoken replies use browser speech synthesis. Do not speak
+personal, financial or authentication information. Unsupported browsers retain
+the typed assistant.
 
 ### Forecasts
 
@@ -1091,7 +1100,10 @@ isolated Frappe site before production use.
 
 Run `bench --site <site-name> migrate` after installing the update. A rider can
 choose **Share current location** on the delivery dashboard; the browser asks
-for location permission and usually requires HTTPS. This captures a single GPS
+for location permission and requires a secure browser context: HTTPS, or
+localhost on the device running the browser. A private IP over HTTP is not a
+secure context. Location and route action results appear beside their buttons.
+This captures a single GPS
 position, not continuous tracking. Only the rider can share or clear their own
 position. The latest position and its reported accuracy are stored in the
 Delivery Rider Location DocType, visible only to delivery-management roles.

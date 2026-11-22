@@ -7,8 +7,72 @@ const conversation = document.querySelector("#assistant-conversation");
 const status = document.querySelector("#assistant-status");
 const products = document.querySelector("#assistant-products");
 const submit = form.querySelector('button[type="submit"]');
+const voiceButton = document.querySelector("#assistant-voice-input");
+const voiceConsent = document.querySelector("#assistant-voice-consent");
+const voiceStatus = document.querySelector("#assistant-voice-status");
+const speakReplies = document.querySelector("#assistant-speak-replies");
 let history = [];
 let cartBusy = false;
+let recognition = null;
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SpeechRecognition || window.isSecureContext === false) {
+  voiceButton.disabled = true;
+  voiceStatus.textContent = window.isSecureContext === false
+    ? "Voice input requires HTTPS or localhost on this device."
+    : "Voice input is not supported by this browser. You can type your question instead.";
+}
+if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+  speakReplies.disabled = true;
+}
+
+voiceConsent.addEventListener("change", () => {
+  if (!voiceConsent.checked && recognition) recognition.abort();
+});
+speakReplies.addEventListener("change", () => {
+  if (!speakReplies.checked && window.speechSynthesis) window.speechSynthesis.cancel();
+});
+voiceButton.addEventListener("click", () => {
+  if (recognition || voiceButton.disabled) return;
+  if (!voiceConsent.checked) {
+    voiceStatus.textContent = "Agree to the browser voice recognition service before using the microphone.";
+    return;
+  }
+  try {
+    recognition = new SpeechRecognition();
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      if (!voiceConsent.checked) return;
+      const transcript = event.results[0]?.[0]?.transcript?.trim();
+      if (!transcript) {
+        voiceStatus.textContent = "No speech was recognized. Try again or type your question.";
+        return;
+      }
+      const message = [form.elements.message.value.trim(), transcript].filter(Boolean).join(" ");
+      form.elements.message.value = message.slice(0, 1000);
+      voiceStatus.textContent = message.length > 1000
+        ? "The question was shortened to 1,000 characters. Review it before submitting."
+        : "Review the recognized question before submitting.";
+    };
+    recognition.onerror = (event) => {
+      voiceStatus.textContent = event.error === "not-allowed" || event.error === "service-not-allowed"
+        ? "Microphone or speech service access was denied. Check browser permissions."
+        : "Voice recognition failed. Try again or type your question.";
+    };
+    recognition.onend = () => {
+      recognition = null;
+      voiceButton.disabled = false;
+      if (!voiceConsent.checked) voiceStatus.textContent = "Voice recognition stopped.";
+    };
+    voiceButton.disabled = true;
+    voiceStatus.textContent = "Listening...";
+    recognition.start();
+  } catch {
+    recognition = null;
+    voiceButton.disabled = false;
+    voiceStatus.textContent = "Voice recognition could not start. Check browser permissions or type your question.";
+  }
+});
 
 function text(tag, value) {
   const element = document.createElement(tag);
@@ -48,6 +112,10 @@ function showProducts(container, items) {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (submit.disabled || !form.reportValidity()) return;
+  if (recognition) {
+    voiceStatus.textContent = "Wait for voice recognition to finish before submitting.";
+    return;
+  }
   const message = form.elements.message.value.trim();
   if (!message) return;
   submit.disabled = true;
@@ -61,6 +129,16 @@ form.addEventListener("submit", async (event) => {
     form.elements.message.value = "";
     showProducts(products, result.products);
     status.textContent = result.notice || "Review suggestions before adding them to your cart.";
+    if (speakReplies.checked && !speakReplies.disabled) {
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new window.SpeechSynthesisUtterance(result.reply);
+        utterance.onerror = () => { voiceStatus.textContent = "The reply could not be read aloud."; };
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        voiceStatus.textContent = "The reply could not be read aloud.";
+      }
+    }
   } catch (error) {
     status.textContent = error.message;
   } finally {

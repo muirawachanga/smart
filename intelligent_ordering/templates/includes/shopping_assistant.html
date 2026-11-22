@@ -1,0 +1,28 @@
+<section class="smarto-home-section" aria-labelledby="shopping-assistant-heading">
+  <h2 id="shopping-assistant-heading">Shopping assistant</h2>
+  <p>Sign in with a customer account to ask about products or ordering.</p>
+  <p>Your messages, recent conversation and matching public product information are sent to Google Gemini. Do not enter names, addresses, phone numbers, email addresses, payment details, passwords or PINs. AI answers can be inaccurate; verify product details and use the normal cart and checkout.</p>
+  <a href="/login?redirect-to=%2Fassistant">Sign in</a>
+  <div id="assistant-conversation" aria-live="polite"></div>
+  <form id="assistant-form" class="smarto-checkout-form">
+    <label>What would you like help with?
+      <textarea name="message" maxlength="1000" required></textarea>
+    </label>
+    <p>Voice input may send audio to your browser's speech recognition provider. Do not speak private or sensitive information.</p>
+    <label><input id="assistant-voice-consent" type="checkbox"> I agree to use my browser's voice recognition service.</label>
+    <button id="assistant-voice-input" class="smarto-button smarto-button-secondary" type="button">Speak your question</button>
+    <label><input id="assistant-speak-replies" type="checkbox"> Read assistant replies aloud using the browser.</label>
+    <p id="assistant-voice-status" role="status" aria-live="polite"></p>
+    <label><input name="consent" type="checkbox" required> I agree to send this conversation to Google Gemini.</label>
+    <button class="smarto-button" type="submit">Ask assistant</button>
+  </form>
+  <p id="assistant-status" role="status" aria-live="polite"></p>
+  <div id="assistant-products" class="smarto-product-grid"></div>
+  <section aria-labelledby="recommendations-heading">
+    <h3 id="recommendations-heading">Suggestions based on your purchases</h3>
+    <p>These use your completed orders within this site; your order history is not sent to Gemini.</p>
+    <button id="assistant-recommendations" class="smarto-button smarto-button-secondary" type="button">Load my suggestions</button>
+    <div id="assistant-recommendation-products" class="smarto-product-grid"></div>
+  </section>
+  <a href="/cart">Review cart and checkout</a>
+</section>

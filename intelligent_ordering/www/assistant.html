@@ -6,26 +6,7 @@
 <main class="smarto-page" data-shopping-assistant>
   {% include "templates/includes/page_script_warning.html" %}
   <h1>Shopping assistant</h1>
-  <p>Ask about products or how to order. Sign in with a customer account to use the assistant.</p>
-  <p>Your messages, recent conversation and matching public product information are sent to Google Gemini. Do not enter names, addresses, phone numbers, email addresses, payment details, passwords or PINs. AI answers can be inaccurate; verify product details and use the normal cart and checkout.</p>
-  <a href="/login?redirect-to=%2Fassistant">Sign in</a>
-  <div id="assistant-conversation" aria-live="polite"></div>
-  <form id="assistant-form" class="smarto-checkout-form">
-    <label>What would you like help with?
-      <textarea name="message" maxlength="1000" required></textarea>
-    </label>
-    <label><input name="consent" type="checkbox" required> I agree to send this conversation to Google Gemini.</label>
-    <button class="smarto-button" type="submit">Ask assistant</button>
-  </form>
-  <p id="assistant-status" role="status" aria-live="polite"></p>
-  <div id="assistant-products" class="smarto-product-grid"></div>
-  <section aria-labelledby="recommendations-heading">
-    <h2 id="recommendations-heading">Suggestions based on your purchases</h2>
-    <p>These use your completed orders within this site; your order history is not sent to Gemini.</p>
-    <button id="assistant-recommendations" class="smarto-button smarto-button-secondary" type="button">Load my suggestions</button>
-    <div id="assistant-recommendation-products" class="smarto-product-grid"></div>
-  </section>
-  <a href="/cart">Review cart and checkout</a>
+  {% include "templates/includes/shopping_assistant.html" %}
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/assistant.js"></script>
 {% endblock %}

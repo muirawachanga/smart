@@ -43,7 +43,8 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 test("assistant requires consent and adds reviewed products through the existing cart API", async (t) => {
   const nodes = install(t, [
     "assistant-form", "assistant-conversation", "assistant-status", "assistant-products",
-    "assistant-recommendations", "assistant-recommendation-products",
+    "assistant-recommendations", "assistant-recommendation-products", "assistant-voice-input",
+    "assistant-voice-consent", "assistant-voice-status", "assistant-speak-replies",
   ]);
   const form = nodes.get("#assistant-form");
   form.submit = new Element();
@@ -75,6 +76,70 @@ test("assistant requires consent and adds reviewed products through the existing
   assert.equal(add.options.body.get("quantity"), "2");
   await nodes.get("#assistant-recommendations").listeners.click();
   assert.match(nodes.get("#assistant-recommendation-products").textContent, /Yogurt/);
+});
+
+test("voice input needs consent, requires review, and reads replies only when enabled", async (t) => {
+  const nodes = install(t, [
+    "assistant-form", "assistant-conversation", "assistant-status", "assistant-products",
+    "assistant-recommendations", "assistant-recommendation-products", "assistant-voice-input",
+    "assistant-voice-consent", "assistant-voice-status", "assistant-speak-replies",
+  ]);
+  const form = nodes.get("#assistant-form");
+  form.submit = new Element();
+  form.elements = { message: new Element(), consent: new Element() };
+  let listening;
+  const spoken = [];
+  window.isSecureContext = true;
+  window.SpeechRecognition = class {
+    constructor() { listening = this; }
+    start() {}
+    abort() { this.onend(); }
+  };
+  window.SpeechSynthesisUtterance = class { constructor(value) { this.text = value; } };
+  window.speechSynthesis = { cancel() {}, speak: (utterance) => spoken.push(utterance.text) };
+  let requests = 0;
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("assistant.converse")) {
+      requests += 1;
+      return response({ reply: "Consider milk.", products: [] });
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/assistant.js?voice=${Date.now()}`);
+  nodes.get("#assistant-voice-input").listeners.click();
+  assert.match(nodes.get("#assistant-voice-status").textContent, /Agree/);
+  assert.equal(listening, undefined);
+  nodes.get("#assistant-voice-consent").checked = true;
+  nodes.get("#assistant-voice-input").listeners.click();
+  listening.onresult({ results: [[{ transcript: "Find milk" }]] });
+  await form.listeners.submit({ preventDefault() {} });
+  assert.equal(requests, 0);
+  listening.onend();
+  assert.equal(form.elements.message.value, "Find milk");
+  assert.equal(requests, 0);
+  form.elements.consent.checked = true;
+  await form.listeners.submit({ preventDefault() {} });
+  assert.equal(requests, 1);
+  assert.deepEqual(spoken, []);
+  nodes.get("#assistant-speak-replies").checked = true;
+  form.elements.message.value = "More milk";
+  await form.listeners.submit({ preventDefault() {} });
+  assert.deepEqual(spoken, ["Consider milk."]);
+});
+
+test("voice input offers a typed alternative without secure browser support", async (t) => {
+  const nodes = install(t, [
+    "assistant-form", "assistant-conversation", "assistant-status", "assistant-products",
+    "assistant-recommendations", "assistant-recommendation-products", "assistant-voice-input",
+    "assistant-voice-consent", "assistant-voice-status", "assistant-speak-replies",
+  ]);
+  const form = nodes.get("#assistant-form");
+  form.submit = new Element();
+  form.elements = { message: new Element(), consent: new Element() };
+  window.isSecureContext = false;
+  await import(`../../intelligent_ordering/public/js/assistant.js?no-voice=${Date.now()}`);
+  assert.equal(nodes.get("#assistant-voice-input").disabled, true);
+  assert.match(nodes.get("#assistant-voice-status").textContent, /HTTPS/);
 });
 
 test("forecast widgets display labeled estimates and insufficient history", async (t) => {

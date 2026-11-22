@@ -649,7 +649,11 @@ export function initDeliveryDashboard() {
     const share = document.querySelector("#delivery-share-location");
     const clear = document.querySelector("#delivery-clear-location");
     const route = document.querySelector("#delivery-my-route");
+    const locationFeedback = document.querySelector("#delivery-location-feedback");
     share.addEventListener("click", () => act(share, async () => {
+      if (window.isSecureContext === false) {
+        throw new Error("Location sharing requires HTTPS. Open the rider page using your secure HTTPS address.");
+      }
       if (!window.navigator?.geolocation) throw new Error("Location sharing is unavailable in this browser or connection.");
       const position = await new Promise((resolve, reject) => {
         window.navigator.geolocation.getCurrentPosition(resolve,
@@ -661,16 +665,16 @@ export function initDeliveryDashboard() {
         accuracy_meters: position.coords.accuracy,
       });
       routeResults.replaceChildren();
-      feedback.textContent = "Current location shared for delivery planning.";
-    }));
+      locationFeedback.textContent = "Current location shared for delivery planning.";
+    }, locationFeedback));
     clear.addEventListener("click", () => act(clear, async () => {
       await post("deliveries.clear_rider_location");
       routeResults.replaceChildren();
-      feedback.textContent = "Your shared location was cleared.";
-    }));
+      locationFeedback.textContent = "Your shared location was cleared.";
+    }, locationFeedback));
     route.addEventListener("click", () => act(route, async () => {
       renderRoute(routeResults, await get("deliveries.my_delivery_route"));
-    }));
+    }, locationFeedback));
   }
 
   if (planForm) {
