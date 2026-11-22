@@ -1,10 +1,13 @@
+import hashlib
 import json
 from unittest.mock import Mock, patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request
 
-from intelligent_ordering.api.payments import _reconcile, _save, reconcile_payment
+from intelligent_ordering.api.payments import _reconcile, _save, callback, reconcile_payment
 
 
 class TestPaymentTransaction(FrappeTestCase):
@@ -95,6 +98,36 @@ class TestPaymentTransaction(FrappeTestCase):
             "Stock Ledger Entry", {"reference_order": self.order.name}
         ))
         client.query.assert_called_once()
+
+    def test_json_callback_uses_query_token_even_when_frappe_form_dict_omits_it(self):
+        from frappe.app import make_form_dict
+
+        token = "x" * 43
+        payload = self.payment.callback_response
+        self.payment.callback_response = ""
+        self.payment.callback_token_hash = hashlib.sha256(token.encode()).hexdigest()
+        _save(self.payment)
+        client = Mock()
+        client.query.return_value = {
+            "ResponseCode": "0", "ResultCode": "0",
+            "MerchantRequestID": self.payment.merchant_request_id,
+            "CheckoutRequestID": self.payment.checkout_request_id,
+        }
+        request = Request(EnvironBuilder(
+            method="POST", query_string={"token": token},
+            data=payload, content_type="application/json",
+        ).get_environ())
+        with patch.object(frappe.local, "request", request, create=True), \
+             patch.object(frappe.local, "form_dict", frappe._dict(), create=True), \
+             patch("intelligent_ordering.api.payments._client", return_value=client):
+            make_form_dict(request)
+            self.assertNotIn("token", frappe.form_dict)
+            result = frappe.call(callback, **frappe.form_dict)
+        self.assertEqual(result["ResultCode"], 0)
+        self.payment.reload()
+        self.order.reload()
+        self.assertEqual(self.payment.status, "Successful")
+        self.assertEqual(self.order.payment_status, "Paid")
 
     def test_payment_records_cannot_be_manually_modified_or_deleted(self):
         self.payment.status = "Successful"

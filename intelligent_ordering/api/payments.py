@@ -216,10 +216,12 @@ def initiate_payment(order_name, phone):
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
-def callback(token=None):
+def callback():
     """Token-authenticated callback plus an independent authenticated STK query."""
-    if not isinstance(token, str) or not 40 <= len(token) <= 64:
+    tokens = frappe.request.args.getlist("token")
+    if len(tokens) != 1 or not 40 <= len(tokens[0]) <= 64:
         frappe.throw("Invalid payment callback.", frappe.PermissionError)
+    token = tokens[0]
     payment_name = frappe.db.get_value(
         "Payment Transaction",
         {"callback_token_hash": hashlib.sha256(token.encode()).hexdigest()}, "name",

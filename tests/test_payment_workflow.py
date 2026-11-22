@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 import sqlite3
 import sys
@@ -321,8 +322,12 @@ class TestPaymentWorkflow(unittest.TestCase):
             self.service.get_transaction("PAY-1")
 
     def test_invalid_callback_token_is_rejected(self):
-        with self.assertRaises(PaymentError):
-            self.service.callback(token="bad")
+        self.frappe.request = Mock()
+        for tokens in ([], ["bad"], ["x" * 43, "y" * 43]):
+            with self.subTest(tokens=tokens), self.assertRaises(PaymentError):
+                self.frappe.request.args.getlist.return_value = tokens
+                self.service.callback()
+        self.frappe.db.get_value.assert_not_called()
 
     def test_initiation_commits_attempt_before_external_side_effect(self):
         self.payment.status = "Initiated"
@@ -366,15 +371,20 @@ class TestPaymentWorkflow(unittest.TestCase):
         self.frappe.db.get_value.return_value = "PAY-1"
         self.payment.callback_response = ""
         self.frappe.request = Mock()
+        self.frappe.request.args.getlist.return_value = ["x" * 43]
         self.frappe.request.get_data.return_value = json.dumps(success_callback()).encode()
         with patch.object(self.service, "_locked_payment", return_value=self.payment):
-            first = self.service.callback(token="x" * 43)
+            first = self.service.callback()
             self.frappe.request.get_data.return_value = json.dumps(
                 success_callback(), sort_keys=True
             ).encode()
-            duplicate = self.service.callback(token="x" * 43)
+            duplicate = self.service.callback()
         self.assertEqual(first["ResultCode"], 0)
         self.assertEqual(duplicate["ResultCode"], 0)
+        self.frappe.db.get_value.assert_called_with(
+            "Payment Transaction",
+            {"callback_token_hash": hashlib.sha256(("x" * 43).encode()).hexdigest()}, "name",
+        )
         self.order.db_set.assert_called_once()
 
     def test_failed_callback_is_verified_against_query(self):
@@ -384,10 +394,11 @@ class TestPaymentWorkflow(unittest.TestCase):
         payload["Body"]["stkCallback"]["ResultCode"] = 1032
         payload["Body"]["stkCallback"].pop("CallbackMetadata")
         self.frappe.request = Mock()
+        self.frappe.request.args.getlist.return_value = ["x" * 43]
         self.frappe.request.get_data.return_value = json.dumps(payload).encode()
         self.client.query.return_value.update(ResultCode="1032", ResultDesc="Cancelled")
         with patch.object(self.service, "_locked_payment", return_value=self.payment):
-            result = self.service.callback(token="x" * 43)
+            result = self.service.callback()
         self.assertEqual(result["ResultCode"], 0)
         self.assertEqual(self.payment.status, "Cancelled")
         self.order.db_set.assert_not_called()
@@ -395,9 +406,10 @@ class TestPaymentWorkflow(unittest.TestCase):
     def test_invalid_callback_body_does_not_mutate_payment(self):
         self.frappe.db.get_value.return_value = "PAY-1"
         self.frappe.request = Mock()
+        self.frappe.request.args.getlist.return_value = ["x" * 43]
         self.frappe.request.get_data.return_value = b'{"Body": {}}'
         with self.assertRaises(PaymentError):
-            self.service.callback(token="x" * 43)
+            self.service.callback()
         self.save.assert_not_called()
 
     def test_unknown_stk_outcome_stays_initiated_and_blocks_automatic_retry(self):

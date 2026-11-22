@@ -1238,7 +1238,9 @@ unresolved. Keep test and live sites separate. Apply DocTypes with
 Set the site's system timezone to `Africa/Nairobi` for Daraja transaction dates.
 
 Every attempt generates a random callback bearer token; only its SHA-256 hash
-is stored. The callback URL sent to Daraja includes the token. Treat callback
+is stored. The callback URL sent to Daraja includes the token. The callback
+reads exactly one token from the URL query, including for JSON requests, and
+rejects missing or duplicate tokens. Treat callback
 URLs as credentials: redact query strings in reverse-proxy/access/error logs,
 disable caching on payment endpoints, and do not forward callback requests to
 analytics. Enforce HTTPS, site request rate limits, and a 16 KB callback body
