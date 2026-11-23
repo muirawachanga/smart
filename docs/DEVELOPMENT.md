@@ -764,8 +764,8 @@ Submitted order details and
 line prices are immutable; Completed and Cancelled are terminal. Legacy
 confirmed/processing orders without preparation timestamps are given a fresh
 interval by the scheduler rather than being dispatched immediately. The
-scheduler logs blocked validation failures, including insufficient stock, and
-continues with other orders; staff must resolve the underlying issue.
+scheduler logs blocked validation and permission failures, including insufficient
+stock, and continues with other orders; staff must resolve the underlying issue.
 
 The storefront continues to provide checkout review, customer order tracking,
 order history, and staff order controls. The dedicated `/account` and

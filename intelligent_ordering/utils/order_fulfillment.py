@@ -38,7 +38,7 @@ def advance_confirmed_orders():
                 frappe.db.savepoint("fulfillment_broadcast")
                 try:
                     _ensure_broadcast(order)
-                except frappe.ValidationError:
+                except (frappe.ValidationError, frappe.PermissionError):
                     frappe.db.rollback(save_point="fulfillment_broadcast")
                     frappe.log_error(
                         title="Delivery broadcast blocked",
@@ -79,7 +79,7 @@ def advance_confirmed_orders():
             frappe.db.savepoint("fulfillment_order")
             try:
                 _save(order)
-            except frappe.ValidationError:
+            except (frappe.ValidationError, frappe.PermissionError):
                 frappe.db.rollback(save_point="fulfillment_order")
                 frappe.log_error(
                     title="Order fulfillment blocked",

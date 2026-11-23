@@ -14,11 +14,16 @@ class FulfillmentError(Exception):
     pass
 
 
+class FulfillmentPermissionError(Exception):
+    pass
+
+
 def load_service():
     frappe = types.ModuleType("frappe")
     frappe.conf = {}
     frappe.flags = types.SimpleNamespace()
     frappe.ValidationError = FulfillmentError
+    frappe.PermissionError = FulfillmentPermissionError
     frappe.throw = Mock(side_effect=lambda message, *args: (_ for _ in ()).throw(FulfillmentError(message)))
     frappe.get_all = Mock(return_value=[types.SimpleNamespace(name="SO-1")])
     frappe.get_doc = Mock()
@@ -33,6 +38,36 @@ def load_service():
     with patch.dict(sys.modules, {"frappe": frappe, "frappe.utils": utils}):
         spec.loader.exec_module(module)
     return module, frappe
+
+
+def load_order_controller(frappe):
+    model = types.ModuleType("frappe.model")
+    document = types.ModuleType("frappe.model.document")
+    document.Document = type("Document", (), {})
+    utils = types.ModuleType("frappe.utils")
+    utils.flt = float
+    utils.now_datetime = lambda: datetime(2026, 11, 18, 12)
+    cart = types.ModuleType("intelligent_ordering.utils.cart")
+    cart.round_money = lambda value: value
+    checkout = types.ModuleType("intelligent_ordering.utils.checkout")
+    checkout.validate_order_status_transition = lambda current, target: target
+    checkout.validate_request_token = lambda token: token
+    rates = types.ModuleType("intelligent_ordering.utils.delivery_rates")
+    rates.get_area_quote = Mock()
+    fulfillment = types.ModuleType("intelligent_ordering.utils.order_fulfillment")
+    fulfillment.preparation_minutes = lambda: 20
+    path = ROOT / "intelligent_ordering/intelligent_ordering/doctype/sales_order/sales_order.py"
+    spec = importlib.util.spec_from_file_location("sales_order_fulfillment_test", path)
+    module = importlib.util.module_from_spec(spec)
+    with patch.dict(sys.modules, {
+        "frappe": frappe, "frappe.model": model, "frappe.model.document": document,
+        "frappe.utils": utils, "intelligent_ordering.utils.cart": cart,
+        "intelligent_ordering.utils.checkout": checkout,
+        "intelligent_ordering.utils.delivery_rates": rates,
+        "intelligent_ordering.utils.order_fulfillment": fulfillment,
+    }):
+        spec.loader.exec_module(module)
+    return module.SalesOrder
 
 
 class TestOrderFulfillment(unittest.TestCase):
@@ -134,6 +169,54 @@ class TestOrderFulfillment(unittest.TestCase):
         self.frappe.db.rollback.assert_called_once_with(save_point="fulfillment_order")
         self.assertIn("SO-1", self.frappe.log_error.call_args.kwargs["message"])
         self.assertEqual(self.order.status, "Processing")
+
+    def test_permission_failure_does_not_stop_later_orders(self):
+        blocked = types.SimpleNamespace(
+            name="SO-1", status="Confirmed", confirmed_at=self.confirmed_at,
+            preparation_minutes=20, save=Mock(side_effect=FulfillmentPermissionError("Denied")),
+        )
+        self.order.name = "SO-2"
+        self.frappe.get_all.return_value = [
+            types.SimpleNamespace(name="SO-1"), types.SimpleNamespace(name="SO-2"),
+        ]
+        self.frappe.get_doc.side_effect = lambda doctype, name, **kwargs: (
+            blocked if name == "SO-1" else self.order
+        )
+        self.assertEqual(self.service.advance_confirmed_orders(), 1)
+        self.frappe.db.rollback.assert_called_once_with(save_point="fulfillment_order")
+        self.assertIn("SO-1", self.frappe.log_error.call_args.kwargs["message"])
+        self.assertEqual(self.order.status, "Processing")
+
+    def test_customer_role_only_allows_internal_preparation_transitions(self):
+        self.frappe.session = types.SimpleNamespace(user="scheduler@example.test")
+        self.frappe.get_roles = Mock(return_value=["Customer"])
+        controller = load_order_controller(self.frappe)
+        for original_status, status, internal, allowed in (
+            ("Confirmed", "Processing", True, True),
+            ("Processing", "Processing", True, True),
+            ("Processing", "Ready for Delivery", True, True),
+            ("Confirmed", "Processing", False, False),
+            ("Processing", "Ready for Delivery", False, False),
+            ("Ready for Delivery", "Completed", True, False),
+        ):
+            with self.subTest(original=original_status, status=status, internal=internal):
+                original = Mock(status=original_status, confirmed_at=self.confirmed_at, preparation_minutes=20)
+                original.get.return_value = None
+                order = Mock()
+                order.is_new.return_value = False
+                order.get_doc_before_save.return_value = original
+                order.get.return_value = None
+                order.status = status
+                order.confirmed_at = self.confirmed_at
+                order.preparation_minutes = 20
+                self.frappe.flags.processing_order_fulfillment = internal
+                if allowed:
+                    controller.validate(order)
+                    order._validate_unchanged_order_data.assert_called_once_with(original)
+                    order._validate_status_transition.assert_called_once_with(original_status)
+                else:
+                    with self.assertRaises(FulfillmentError):
+                        controller.validate(order)
 
     def test_existing_confirmed_processing_and_ready_orders_get_broadcast_backfill(self):
         for status in ("Confirmed", "Processing", "Ready for Delivery"):

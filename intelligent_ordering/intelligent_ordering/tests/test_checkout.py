@@ -231,6 +231,28 @@ class TestCheckout(FrappeTestCase):
             if file_name:
                 frappe.delete_doc("File", file_name, ignore_permissions=True, force=True)
 
+    def test_customer_role_does_not_block_internal_preparation(self):
+        from intelligent_ordering.utils.order_fulfillment import advance_confirmed_orders
+
+        order_name = self._submit_order(payment_method="Cash on Delivery")["order"]["name"]
+        order = frappe.get_doc("Sales Order", order_name)
+        with patch(
+            "intelligent_ordering.utils.order_fulfillment.now_datetime",
+            return_value=order.confirmed_at,
+        ):
+            advance_confirmed_orders()
+        self.assertEqual(frappe.db.get_value("Sales Order", order_name, "status"), "Processing")
+        with patch(
+            "intelligent_ordering.utils.order_fulfillment.now_datetime",
+            return_value=order.confirmed_at + timedelta(minutes=order.preparation_minutes + 1),
+        ):
+            advance_confirmed_orders()
+        self.assertEqual(frappe.db.get_value("Sales Order", order_name, "status"), "Ready for Delivery")
+        order = frappe.get_doc("Sales Order", order_name)
+        order.status = "Completed"
+        with self.assertRaises(frappe.PermissionError):
+            order.save(ignore_permissions=True)
+
     def test_verified_mpesa_order_automatically_reaches_rider_offer(self):
         from intelligent_ordering.api.deliveries import delivery_offers, set_offer_presence
         from intelligent_ordering.api.payments import _reconcile, _save
