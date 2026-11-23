@@ -19,6 +19,7 @@ def _customer_only(user):
 
 
 def _customer_read_permission(doc, ptype, user, linked_profile=None):
+    # Returning None delegates to Frappe's normal permission checks.
     if doc is None or ptype not in {"read", "select"} or not _customer_only(user):
         return None
     if "Customer" not in frappe.get_roles(user):

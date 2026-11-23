@@ -186,6 +186,7 @@ def send_pending_sms():
             _save_notification(notification)
             frappe.db.commit()
             continue
+        # Persist the attempt before the external call; an unknown outcome is not safe to retry.
         notification.status = "Sending"
         notification.attempts = (notification.attempts or 0) + 1
         notification.attempted_at = now_datetime()

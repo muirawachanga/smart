@@ -80,6 +80,7 @@ def handle_order_status_change(doc, method=None):
 
 
 def reserve_order_stock(order):
+    # Consistent product ordering prevents competing stock operations locking in opposite order.
     products = sorted({item.product for item in order.items})
     _lock_products(products)
 
@@ -150,6 +151,7 @@ def dispatch_order_stock(order):
         if existing_dispatch:
             continue
 
+        # Dispatch only quantities still reserved for this order, by warehouse.
         reservations = frappe.db.sql(
             """
             SELECT warehouse,
@@ -233,6 +235,7 @@ def cancel_order_stock(order):
                 ),
                 remarks=f"Released reservation for cancelled order {order.name}",
             )
+        # Physical stock already dispatched must be returned before cancellation.
         if dispatched.get(item.product, 0) > returned.get(item.product, 0):
             frappe.throw(
                 "Dispatched items must be returned through inventory before cancelling this order.",

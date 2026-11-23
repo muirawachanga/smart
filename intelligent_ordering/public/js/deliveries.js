@@ -292,6 +292,7 @@ export function initDeliveryDashboard() {
       await loadOffers();
     }));
     const updateOffers = async () => {
+      // A hidden dashboard stops heartbeats, allowing stale rider presence to expire.
       if (!dashboard.rider || document.visibilityState === "hidden") return;
       try {
         if (offersOnline && Date.now() - lastHeartbeat >= 30000) {

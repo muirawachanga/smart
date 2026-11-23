@@ -12,6 +12,7 @@ export async function loadCart() {
   if (cart.is_guest) {
     writeGuestCart(cart.items);
   } else {
+    // Keep the guest cart until the server confirms the merge succeeded.
     if (guestItems.length) {
       cart = await post("cart.merge_guest_cart", { guest_items: JSON.stringify(guestItems) });
     }

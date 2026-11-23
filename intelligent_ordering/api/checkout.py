@@ -63,6 +63,7 @@ def get_checkout_attempt(request_token):
         request_token = validate_request_token(request_token)
     except ValueError as error:
         frappe.throw(str(error), frappe.ValidationError)
+    # The token makes retrying a lost checkout response safe, but remains owner-scoped.
     previous_order = frappe.db.get_value(
         "Sales Order",
         {"checkout_token": request_token},
@@ -175,6 +176,7 @@ def create_order(
             "unit_price": unit_price,
             "currency": (product.currency or "KES").upper(),
         })
+    # Compare against locked server prices, not the browser's earlier quote.
     current_revision = checkout_cart_revision(locked_items)
     if not compare_digest(cart_revision, current_revision):
         frappe.throw(
@@ -235,6 +237,7 @@ def create_order(
     if payment_method == "Cash on Delivery":
         from intelligent_ordering.api.payments import create_cod_transaction
 
+        # Confirmation invokes stock reservation and rider broadcast in this transaction.
         create_cod_transaction(order)
         previous_confirmation = getattr(frappe.flags, "confirming_cod_order", None)
         frappe.flags.confirming_cod_order = order.name

@@ -183,6 +183,7 @@ async function submitOrder(event) {
     const fingerprint = await checkoutFingerprint(
       submission, requestToken ? sessionStorage.getItem(FINGERPRINT_KEY) : null,
     );
+    // Reuse a pending token only for the same submission after an uncertain response.
     if (requestToken) {
       if (sessionStorage.getItem(FINGERPRINT_KEY) !== fingerprint) {
         throw new Error("This pending checkout has different details. Retry the original details or contact the store before placing another order.");

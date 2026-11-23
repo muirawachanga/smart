@@ -481,6 +481,7 @@ def _start_broadcast(delivery):
 def ensure_order_broadcast(order):
     if not _offer_eligible(order):
         return
+    # Existing deliveries, including expired broadcasts, must never be restarted here.
     if not frappe.db.get_value("Delivery", {"order": order.name}, "name", for_update=True):
         _create_delivery(order, automatic=True)
 
@@ -720,6 +721,7 @@ def _locked_offer(name, rider, round_number):
             or delivery.assigned_delivery_person or not delivery.broadcast_started_at
             or not delivery.broadcast_expires_at or delivery.broadcast_expires_at <= now_datetime()):
         frappe.throw("This delivery offer is no longer available.", frappe.ValidationError)
+    # Reject a stale round even if the broadcast itself is still active.
     current_round, _ = _offer_round(delivery, now_datetime())
     if str(round_number) != str(current_round):
         frappe.throw("This delivery offer has expired. Refresh the offers.", frappe.ValidationError)
@@ -839,6 +841,7 @@ def clear_delivery_coordinates(delivery_name):
 
 
 def _plan_signature(rider, location, deliveries):
+    # Bind the proposed group to the locations used when it was planned.
     snapshot = [
         rider, str(location.location_updated_at), float(location.latitude), float(location.longitude),
         sorted((row.name, row.delivery_area, float(row.latitude), float(row.longitude)) for row in deliveries),
@@ -995,6 +998,7 @@ def update_delivery(delivery_name, status, notes="", confirmation=0, cash_collec
         frappe.throw("Terminal delivery history cannot be changed.", frappe.ValidationError)
     if status != "Cancelled" and order.status not in OFFER_ORDER_STATUSES:
         frappe.throw("The associated order is not available for delivery.", frappe.ValidationError)
+    # Early acceptance is allowed, but physical handover waits for order preparation.
     if status in {"Ready for Dispatch", "Picked Up", "Dispatched", "In Transit", "Delivered", "Failed"} \
             and order.status != "Ready for Delivery":
         frappe.throw("The order is still being prepared. Wait until it is Ready for Delivery.", frappe.ValidationError)

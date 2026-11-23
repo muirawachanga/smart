@@ -18,6 +18,7 @@ def login_destination(requested=""):
         frappe.throw("Authentication is required.", frappe.AuthenticationError)
     roles = set(frappe.get_roles(user))
     if isinstance(requested, str) and len(requested) <= 2048:
+        # Validate the decoded destination to reject encoded external or unauthorized paths.
         decoded = unquote(requested)
         if decoded.startswith("/") and not decoded.startswith("//") and not any(
             ord(char) < 32 or char == "\\" for char in decoded

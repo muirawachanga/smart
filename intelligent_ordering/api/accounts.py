@@ -144,6 +144,7 @@ def update_access(user_name, role, enabled, modified):
     user.save()
     from frappe.sessions import clear_sessions
 
+    # Role or enabled changes must also apply to already authenticated sessions.
     clear_sessions(user=user.name, force=True)
     return {"message": "Access updated. Existing sessions were revoked; the user must sign in again."}
 
