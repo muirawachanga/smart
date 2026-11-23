@@ -19,6 +19,7 @@ def advance_confirmed_orders():
     now = now_datetime()
     transitioned = 0
     last_name = ""
+    # Page by name even when orders are skipped, so blocked orders cannot starve later ones.
     while transitioned < 100:
         rows = frappe.get_all(
             "Sales Order",
@@ -35,6 +36,7 @@ def advance_confirmed_orders():
             last_name = row.name
             order = frappe.get_doc("Sales Order", row.name, for_update=True)
             if order.status in {"Confirmed", "Processing", "Ready for Delivery"}:
+                # Backfill missing deliveries without restarting existing broadcasts.
                 frappe.db.savepoint("fulfillment_broadcast")
                 try:
                     _ensure_broadcast(order)
@@ -64,6 +66,7 @@ def advance_confirmed_orders():
             elif order.status == "Confirmed":
                 order.status = "Processing"
             elif _datetime(order.confirmed_at) + timedelta(minutes=order.preparation_minutes) <= now:
+                # Readiness is timer-based, not a physical staff approval.
                 is_cod = (
                     order.payment_method == "Cash on Delivery"
                     and frappe.db.exists(

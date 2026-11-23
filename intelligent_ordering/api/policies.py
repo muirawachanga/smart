@@ -38,6 +38,7 @@ def require_acceptance(terms_version, privacy_version, accept_terms, acknowledge
     if not policies["available"]:
         frappe.throw("Registration is unavailable until Terms and Privacy policies are published.",
                      frappe.ValidationError)
+    # Reject stale acceptance when newer versions were published after the page loaded.
     if terms_version != policies["terms"]["name"] or privacy_version != policies["privacy"]["name"]:
         frappe.throw("Policies have changed. Reload registration and review the current versions.",
                      frappe.ValidationError)

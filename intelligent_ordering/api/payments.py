@@ -99,6 +99,7 @@ def _locked_payment(name):
     order_name = frappe.db.get_value("Payment Transaction", name, "order")
     if not order_name:
         frappe.throw("Payment transaction not found.", frappe.DoesNotExistError)
+    # Match delivery and receipt workflows' order-before-child lock ordering.
     _lock_order(order_name)
     frappe.db.sql(
         "SELECT name FROM `tabPayment Transaction` WHERE name = %s FOR UPDATE", name
@@ -218,6 +219,7 @@ def initiate_payment(order_name, phone):
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 def callback():
     """Token-authenticated callback plus an independent authenticated STK query."""
+    # Frappe JSON requests may not include query parameters as method arguments.
     tokens = frappe.request.args.getlist("token")
     if len(tokens) != 1 or not 40 <= len(tokens[0]) <= 64:
         frappe.throw("Invalid payment callback.", frappe.PermissionError)
@@ -305,6 +307,7 @@ def _reconcile(payment):
         _save(payment)
         return
     code = str(response.get("ResultCode"))
+    # Query success alone lacks the callback's verified amount and receipt.
     if code == "0" and payment.callback_response:
         parsed = parse_callback(json.loads(payment.callback_response))
         _validate_callback(payment, parsed)

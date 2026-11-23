@@ -28,6 +28,7 @@ def distance_km(origin, destination):
 
 
 def nearest_delivery_route(origin, deliveries):
+    # Greedy nearest-neighbor routing is deterministic but not a globally optimal route.
     remaining = list(deliveries)
     route = []
     current = origin

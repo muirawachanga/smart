@@ -43,6 +43,7 @@ doc_events = {
     },
     "Sales Order": {
         "on_update": [
+            # Reserve or dispatch stock before creating offers and notifications.
             "intelligent_ordering.utils.inventory.handle_order_status_change",
             "intelligent_ordering.api.deliveries.broadcast_ready_order",
             "intelligent_ordering.utils.fulfillment_notifications.handle_order_status_change",

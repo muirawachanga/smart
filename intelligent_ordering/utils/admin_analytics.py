@@ -71,6 +71,7 @@ def spreadsheet_cell(value):
         import json
 
         value = json.dumps(value, ensure_ascii=False)
+    # Prevent exported text from being interpreted as a spreadsheet formula.
     if isinstance(value, str) and value.startswith(("=", "+", "-", "@", "\t", "\r")):
         return "'" + value
     return value
@@ -88,6 +89,7 @@ def forecast_daily(observations, first_day, last_day, horizon=7):
     mean = sum(values) / days
     denominator = sum((index - center) ** 2 for index in range(days))
     slope = sum((index - center) * (value - mean) for index, value in enumerate(values)) / denominator
+    # Remove the trend before averaging each weekday, then restore it for forecasts.
     seasonal = {day: [] for day in range(7)}
     for index, value in enumerate(values):
         weekday = (first_day + timedelta(days=index)).weekday()

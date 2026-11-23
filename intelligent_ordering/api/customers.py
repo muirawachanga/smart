@@ -242,6 +242,7 @@ def track_order(order_name):
             "User", assigned_person, "full_name",
         )
     if delivery:
+        # Customer tracking exposes the rider's display name, not their account identifier.
         delivery.pop("assigned_delivery_person", None)
     timeline = frappe.get_all(
         "Delivery Activity", filters={"parent": delivery.get("name"), "parenttype": "Delivery", "parentfield": "activities"},
@@ -288,6 +289,7 @@ def confirm_delivery_receipt(order_name):
             delivery.save(ignore_permissions=True)
         from intelligent_ordering.utils.order_fulfillment import complete_order_after_customer_receipt
 
+        # COD completion can remain pending until finance confirms payment.
         complete_order_after_customer_receipt(order, delivery)
     return track_order(order.name)
 

@@ -82,6 +82,7 @@ def _candidate_products(message, history):
 
 
 def _request_gemini(config, message, history, products):
+    # Catalog context contains public product fields rather than account records.
     public_products = [{
         "id": product["name"], "name": product["product_name"],
         "category": product.get("category") or "", "price": str(product["price"]),

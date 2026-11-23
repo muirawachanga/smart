@@ -38,6 +38,7 @@ class SalesOrder(Document):
             ))
         ):
             frappe.throw("Customers can only request cancellation, not approve it.", frappe.PermissionError)
+        # These narrowly scoped workflow exceptions do not let customers edit submitted orders.
         checkout_confirmation = (
             getattr(frappe.flags, "confirming_cod_order", None) == self.name
             and original.status == "Pending"
@@ -69,6 +70,7 @@ class SalesOrder(Document):
         self._validate_unchanged_order_data(original)
         self._validate_status_transition(original.status)
         if self.status == "Confirmed" and original.status != "Confirmed":
+            # Capture the site's preparation interval at confirmation, not at each scheduler run.
             self.confirmed_at = now_datetime()
             self.preparation_minutes = preparation_minutes()
         elif not getattr(frappe.flags, "processing_order_fulfillment", False) and (
