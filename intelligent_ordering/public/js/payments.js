@@ -228,6 +228,9 @@ export function initPaymentDashboard() {
           `Rider cash collection: ${collection.cash_collected ? `${formatCurrency(collection.cash_collected_amount)} recorded` : "Not recorded"}` +
           (collection.cash_collected_at ? ` · ${collection.cash_collected_at} by ${collection.cash_collected_by}` : "")));
       }
+      if (transaction.payment_method === "Cash on Delivery" && transaction.cod_confirmation_message) {
+        output.append(text("p", transaction.cod_confirmation_message));
+      }
       if (transaction.order_summary) {
         const order = transaction.order_summary;
         output.append(text("h4", "Associated order"),

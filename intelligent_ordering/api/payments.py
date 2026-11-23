@@ -468,28 +468,40 @@ def get_transaction(payment_name):
         ["status", "cash_collected", "cash_collected_amount", "cash_collected_at", "cash_collected_by"],
         as_dict=True,
     )
+    order = frappe.db.get_value(
+        "Sales Order", payment.order,
+        ["name", "status", "payment_status", "currency", "total", "order_datetime"],
+        as_dict=True,
+    )
+    cod_message = None
+    can_confirm_cod = False
+    if payment.payment_method == "Cash on Delivery":
+        if payment.status == "Successful":
+            cod_message = "Cash payment has already been confirmed."
+        elif payment.status != "Pending":
+            cod_message = f"Cash confirmation is unavailable for a {payment.status} payment."
+        elif not _can_reconcile():
+            cod_message = "Cash confirmation requires a System Manager, Business Admin, or Finance Manager."
+        elif not order:
+            cod_message = "The associated order was not found. Contact an administrator."
+        elif order.get("status") in {"Cancelled", "Completed"} or order.get("payment_status") == "Paid":
+            cod_message = "The associated order is not eligible for cash confirmation. Contact an administrator."
+        elif not delivery or delivery.get("status") != "Delivered":
+            cod_message = "Cash confirmation is available after the rider marks the delivery as delivered."
+        elif not delivery.get("cash_collected") or not delivery.get("cash_collected_at") or not delivery.get("cash_collected_by"):
+            cod_message = "The rider has not recorded cash collection. Contact the delivery manager."
+        elif delivery.get("cash_collected_amount") != payment.amount or payment.amount != order.get("total"):
+            cod_message = "The cash amount does not match the payment and order total. Contact the delivery manager."
+        else:
+            can_confirm_cod = True
     return {
         **_public(payment), "checkout_request_id": payment.checkout_request_id,
         "merchant_request_id": payment.merchant_request_id,
         "callback_response": payment.callback_response, "query_response": payment.query_response,
         "can_reconcile": payment.payment_method == "M-Pesa" and _can_reconcile(),
         "cash_collection": delivery,
-        "can_confirm_cod": bool(
-            payment.payment_method == "Cash on Delivery"
-            and payment.status == "Pending"
-            and _can_reconcile()
-            and delivery
-            and delivery.status == "Delivered"
-            and delivery.cash_collected
-            and delivery.cash_collected_amount == payment.amount
-            and delivery.cash_collected_at
-            and delivery.cash_collected_by
-        ),
-        "order_summary": frappe.db.get_value(
-            "Sales Order", payment.order,
-            ["name", "status", "payment_status", "currency", "total", "order_datetime"],
-            as_dict=True,
-        ),
+        "can_confirm_cod": can_confirm_cod, "cod_confirmation_message": cod_message,
+        "order_summary": order,
     }
 
 

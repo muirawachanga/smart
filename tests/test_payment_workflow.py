@@ -166,6 +166,42 @@ class TestPaymentWorkflow(unittest.TestCase):
                 self.assertEqual(result["order_summary"]["name"], "SO-1")
         self.payment.check_permission.assert_called_with("read")
 
+    def test_cod_confirmation_explains_eligibility(self):
+        self.frappe.session.user = "finance@example.test"
+        self.frappe.get_roles.return_value = ["Finance Manager"]
+        self.frappe.get_doc.return_value = self.payment
+        self.payment.payment_method = "Cash on Delivery"
+        order = {"status": "Ready for Delivery", "payment_status": "Unpaid", "total": 250}
+        delivery = {
+            "status": "Delivered", "cash_collected": 1, "cash_collected_amount": 250,
+            "cash_collected_at": datetime.now(), "cash_collected_by": "rider@example.test",
+        }
+        self.frappe.db.get_value.side_effect = lambda doctype, *args, **kwargs: (
+            delivery if doctype == "Delivery" else order
+        )
+        result = self.service.get_transaction("PAY-1")
+        self.assertTrue(result["can_confirm_cod"])
+        self.assertIsNone(result["cod_confirmation_message"])
+
+        for scenario, expected in (
+            ("successful", "already been confirmed"),
+            ("not_delivered", "after the rider marks"),
+            ("missing_cash", "has not recorded"),
+            ("mismatch", "does not match"),
+            ("unauthorized", "requires a System Manager"),
+            ("paid_order", "not eligible"),
+        ):
+            with self.subTest(scenario=scenario):
+                self.payment.status = "Successful" if scenario == "successful" else "Pending"
+                delivery["status"] = "In Transit" if scenario == "not_delivered" else "Delivered"
+                delivery["cash_collected"] = 0 if scenario == "missing_cash" else 1
+                delivery["cash_collected_amount"] = 200 if scenario == "mismatch" else 250
+                self.frappe.get_roles.return_value = ["Store Manager" if scenario == "unauthorized" else "Finance Manager"]
+                order["payment_status"] = "Paid" if scenario == "paid_order" else "Unpaid"
+                result = self.service.get_transaction("PAY-1")
+                self.assertFalse(result["can_confirm_cod"])
+                self.assertIn(expected, result["cod_confirmation_message"])
+
     def test_verified_payment_marks_paid_without_confirming_or_touching_inventory(self):
         self.service._reconcile(self.payment)
         self.assertEqual(self.payment.status, "Successful")

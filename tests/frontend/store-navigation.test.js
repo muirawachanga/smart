@@ -249,6 +249,30 @@ test("finance can confirm COD only when the server reports rider cash collection
   assert.ok(!calls.some((url) => url.includes("payments.reconcile_payment")));
 });
 
+test("COD payment detail explains why confirmation is unavailable", async (t) => {
+  const { node } = install(t, "");
+  let message = "Cash payment has already been confirmed.";
+  t.mock.method(globalThis, "fetch", async (url) => {
+    const target = String(url);
+    const result = target.includes("payments.get_transaction")
+      ? { name: "PAY-COD", order: "SO-COD", status: "Successful", amount: 250,
+        payment_method: "Cash on Delivery", can_confirm_cod: false, cod_confirmation_message: message }
+      : target.includes("payment_summary") ? []
+        : { transactions: [{ name: "PAY-COD", order: "SO-COD", status: "Successful", amount: 250,
+          payment_method: "Cash on Delivery" }], has_more: false };
+    return { ok: true, json: async () => ({ message: result }) };
+  });
+  initPaymentDashboard();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const view = node("#payment-transactions").children[0].children.find((child) => child.textContent === "View payment");
+  await view.listeners.click();
+  assert.match(displayedText(node("#payment-detail")), /already been confirmed/);
+  assert.ok(!node("#payment-detail").children.some((child) => child.textContent === "Confirm cash received"));
+  message = "Cash confirmation is available after the rider marks the delivery as delivered.";
+  await view.listeners.click();
+  assert.match(displayedText(node("#payment-detail")), /after the rider marks/);
+});
+
 test("view payment shows loading feedback and a visible error when detail access fails", async (t) => {
   const { node } = install(t, "#payment-dashboard");
   let rejectDetails;
