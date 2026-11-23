@@ -160,9 +160,12 @@ export function initPaymentDashboard() {
         card.append(
           heading,
           text("p", `Payment reference: ${transaction.name}`),
-          text("p", `${formatCurrency(transaction.amount)} · ${transaction.payment_method || "M-Pesa"}`),
-          text("p", `Receipt: ${transaction.mpesa_receipt_number || "Not received"} · ` +
-            `${transaction.transaction_date || "No transaction date"}`),
+          text("p", `${formatCurrency(transaction.amount)} · ${transaction.payment_method || "Payment method not recorded"}`),
+          text("p", transaction.payment_method === "Cash on Delivery"
+            ? `Cash collection date: ${transaction.transaction_date || "Not confirmed"}`
+            : transaction.payment_method === "M-Pesa"
+              ? `M-Pesa receipt: ${transaction.mpesa_receipt_number || "Not received"} · ${transaction.transaction_date || "No transaction date"}`
+              : `Transaction date: ${transaction.transaction_date || "Not recorded"}`),
         );
         const view = text("button", "View payment");
         view.type = "button";
@@ -212,9 +215,11 @@ export function initPaymentDashboard() {
         text("p", `Amount: ${formatCurrency(transaction.amount)}`),
         text("p", transaction.payment_method === "Cash on Delivery"
           ? "Method: Cash on Delivery"
-          : `Method: ${transaction.payment_method || "M-Pesa"} · Phone: ${transaction.phone_number || "Not recorded"}`),
-        text("p", `Receipt: ${transaction.mpesa_receipt_number || "Not received"} · ` +
-          `Transaction date: ${transaction.transaction_date || "Not recorded"}`),
+          : `Method: ${transaction.payment_method || "Not recorded"}` +
+            (transaction.payment_method === "M-Pesa" ? ` · Phone: ${transaction.phone_number || "Not recorded"}` : "")),
+        text("p", transaction.payment_method === "M-Pesa"
+          ? `M-Pesa receipt: ${transaction.mpesa_receipt_number || "Not received"} · Transaction date: ${transaction.transaction_date || "Not recorded"}`
+          : `Transaction date: ${transaction.transaction_date || "Not recorded"}`),
         text("p", `Created: ${transaction.creation || "Not recorded"}`),
       );
       if (transaction.payment_method === "Cash on Delivery" && transaction.cash_collection) {
@@ -271,7 +276,7 @@ export function initPaymentDashboard() {
         confirm.type = "button";
         confirm.addEventListener("click", async () => {
           if (!window.confirm(
-            `Confirm ${formatCurrency(transaction.amount)} cash for ${transaction.order}? This records payment and completes the order.`,
+            `Confirm ${formatCurrency(transaction.amount)} cash for ${transaction.order}? This records payment; the order completes once the customer confirms receipt.`,
           )) return;
           confirm.disabled = true;
           try {

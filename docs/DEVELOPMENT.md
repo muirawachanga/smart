@@ -1181,6 +1181,11 @@ persisted workflows. Pending orders remain the existing new-order queue.
 
 ## M-Pesa configuration and operations
 
+On `/dashboard/sales`, the payment transactions list can be filtered by
+M-Pesa or Cash on Delivery as well as status and order number. Its summary
+totals remain unfiltered. Open a COD payment to review the rider's recorded
+cash collection before an authorized finance user confirms receipt.
+
 Successful checkout (including a recovered/repeated submission) opens the
 owner-only order confirmation, with a link to `/payment?order=<order-name>`.
 For M-Pesa orders, the payment page displays the server-calculated order total

@@ -426,19 +426,26 @@ def get_order_payments(order_name):
 
 
 @frappe.whitelist()
-def list_transactions(search="", status="", page=1, page_size=20):
+def list_transactions(search="", status="", page=1, page_size=20, payment_method=""):
     _staff()
     if not isinstance(search, str) or len(search) > 140:
         frappe.throw("Invalid payment search.", frappe.ValidationError)
     if status not in ("", "Initiated", "Pending", "Successful", "Failed", "Cancelled", "Reversed"):
         frappe.throw("Invalid payment status filter.", frappe.ValidationError)
+    if payment_method not in ("", "M-Pesa", "Cash on Delivery"):
+        frappe.throw("Invalid payment method filter.", frappe.ValidationError)
     try:
         page, page_size = validate_pagination(page, page_size)
     except ValueError as error:
         frappe.throw(str(error), frappe.ValidationError)
+    filters = {}
+    if status:
+        filters["status"] = status
+    if payment_method:
+        filters["payment_method"] = payment_method
     rows = frappe.get_list(
         "Payment Transaction", fields=PUBLIC_FIELDS,
-        filters={"status": status} if status else {},
+        filters=filters,
         or_filters=[
             ["name", "like", f"%{search}%"],
             ["order", "like", f"%{search}%"],

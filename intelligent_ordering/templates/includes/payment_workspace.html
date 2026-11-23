@@ -1,6 +1,6 @@
 <section id="payment-dashboard" class="smarto-admin-section" aria-labelledby="payments-heading">
   <h2 id="payments-heading">Payment transactions</h2>
-  <p>Search payment references, review associated orders, and reconcile uncertain transactions with Safaricom. Pending attempts are not collected revenue.</p>
+  <p>Filter transactions by payment method and status. Review M-Pesa transactions or rider cash collection before confirming payment. Pending attempts are not collected revenue. Summary totals cover all transactions.</p>
   <div id="payment-summary" class="smarto-admin-metrics" aria-label="Payment totals by environment and status"></div>
   <form id="payment-filters" class="smarto-catalog-form">
     <label>Payment reference, order number or M-Pesa receipt
@@ -11,6 +11,13 @@
         <option value="">All statuses</option>
         <option>Initiated</option><option>Pending</option><option>Successful</option>
         <option>Failed</option><option>Cancelled</option><option>Reversed</option>
+      </select>
+    </label>
+    <label>Payment method
+      <select name="payment_method">
+        <option value="">All methods</option>
+        <option value="M-Pesa">M-Pesa</option>
+        <option value="Cash on Delivery">Cash on Delivery</option>
       </select>
     </label>
     <button class="smarto-button" type="submit">Search payments</button>

@@ -136,6 +136,24 @@ class TestPaymentWorkflow(unittest.TestCase):
                 self.service.finance_overview()
         self.frappe.db.sql.assert_not_called()
 
+    def test_transaction_list_filters_method_with_status_and_pagination(self):
+        self.frappe.get_roles.return_value = ["Finance Manager"]
+        self.frappe.get_list = Mock(return_value=[])
+        for method in ("M-Pesa", "Cash on Delivery"):
+            with self.subTest(method=method):
+                self.service.list_transactions(
+                    search="SO-1", status="Pending", page=2, page_size=10, payment_method=method,
+                )
+                kwargs = self.frappe.get_list.call_args.kwargs
+                self.assertEqual(kwargs["filters"], {"status": "Pending", "payment_method": method})
+                self.assertEqual(kwargs["limit_start"], 10)
+                self.assertEqual(kwargs["limit_page_length"], 11)
+                self.assertTrue(kwargs["or_filters"])
+        self.service.list_transactions()
+        self.assertEqual(self.frappe.get_list.call_args.kwargs["filters"], {})
+        with self.assertRaisesRegex(PaymentError, "Invalid payment method"):
+            self.service.list_transactions(payment_method="Other")
+
     def test_transaction_detail_returns_linked_order_and_server_reconciliation_authority(self):
         self.frappe.session.user = "staff@example.test"
         self.frappe.get_doc.return_value = self.payment

@@ -108,6 +108,37 @@ test("payments load on a direct dashboard URL and when returning through hash na
   assert.equal(calls.length, 4);
 });
 
+test("payment method filter is sent to the server and cash does not show M-Pesa receipt", async (t) => {
+  const { node } = install(t, "");
+  let method = "";
+  globalThis.FormData = class {
+    *[Symbol.iterator]() { yield ["search", ""]; yield ["status", "Pending"]; yield ["payment_method", method]; }
+  };
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    calls.push(String(url));
+    const message = String(url).includes("payment_summary") ? [] : {
+      transactions: [
+        { name: "PAY-MP", order: "SO-1", status: "Pending", amount: 100, payment_method: "M-Pesa" },
+        { name: "PAY-COD", order: "SO-2", status: "Pending", amount: 200, payment_method: "Cash on Delivery" },
+      ], has_more: false,
+    };
+    return { ok: true, json: async () => ({ message }) };
+  });
+  initPaymentDashboard();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(displayedText(node("#payment-transactions").children[0]), /M-Pesa receipt: Not received/);
+  const cash = displayedText(node("#payment-transactions").children[1]);
+  assert.match(cash, /Cash on Delivery.*Cash collection date: Not confirmed/);
+  assert.doesNotMatch(cash, /receipt/i);
+  method = "Cash on Delivery";
+  node("#payment-filters").listeners.submit({ preventDefault() {} });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const listing = calls.filter((url) => url.includes("payments.list_transactions")).at(-1);
+  assert.equal(new URL(listing, "https://example.test").searchParams.get("payment_method"), method);
+  assert.equal(new URL(listing, "https://example.test").searchParams.get("status"), "Pending");
+});
+
 test("payment details emphasize transaction fields and keep provider diagnostics collapsible", async (t) => {
   const { node } = install(t, "#payment-dashboard");
   t.mock.method(globalThis, "fetch", async (url) => {
