@@ -1,7 +1,8 @@
-import { get } from "./api.js";
+import { ApiError, get } from "./api.js";
 import { changeCart, loadCart } from "./cart-service.js";
 import { formatPrice } from "./components/order-display.js";
 import { productImage } from "./components/product-image.js";
+import { displayError, ERROR_MESSAGES } from "./error-messages.js";
 
 const page = document.querySelector("[data-catalog-page]");
 const kind = page.dataset.catalogPage;
@@ -109,7 +110,7 @@ async function initializeCart() {
       cartFeedback.textContent = `${result.removed_products.length} unavailable item(s) were removed from your cart.`;
     }
   } catch (error) {
-    cartFeedback.textContent = `Cart unavailable: ${error.message} Open your cart to resolve cart issues.`;
+    cartFeedback.textContent = `Cart unavailable: ${displayError(error)} Open your cart to resolve cart issues.`;
   } finally {
     renderProducts();
   }
@@ -133,7 +134,7 @@ async function addToCart(product, quantity) {
     nextStep.href = "/cart";
     cartFeedback.append(element("span", " "), nextStep);
   } catch (error) {
-    cartFeedback.textContent = `Could not add to cart: ${error.message}`;
+    cartFeedback.textContent = `Could not add to cart: ${displayError(error)}`;
   } finally {
     cartBusy = false;
     renderProducts();
@@ -166,9 +167,9 @@ async function loadHomeOrCategories() {
         : "Best-selling products will appear here after completed orders are recorded.";
     }
   } catch (error) {
-    document.querySelector("#categories-status").textContent = `Categories could not be loaded: ${error.message}`;
+    document.querySelector("#categories-status").textContent = `Categories could not be loaded: ${displayError(error)}`;
     if (kind === "home") {
-      document.querySelector("#home-products-status").textContent = `Products could not be loaded: ${error.message}`;
+      document.querySelector("#home-products-status").textContent = `Products could not be loaded: ${displayError(error)}`;
     }
   }
 }
@@ -180,7 +181,7 @@ async function loadDetail() {
     const id = path.startsWith("/products/")
       ? decodeURIComponent(path.slice("/products/".length))
       : new URLSearchParams(window.location.search).get("product");
-    if (!id) throw new Error("A product reference is required.");
+    if (!id) throw new ApiError(ERROR_MESSAGES.missing);
     products = [await get("catalog.get_product", { product: id })];
     renderProducts();
     status.textContent = "";
@@ -188,7 +189,7 @@ async function loadDetail() {
   } catch (error) {
     products = [];
     renderProducts();
-    status.textContent = `Product could not be loaded: ${error.message}`;
+    status.textContent = `Product could not be loaded: ${displayError(error)}`;
   }
 }
 
@@ -207,7 +208,7 @@ async function loadRelatedProducts(product) {
     renderRelatedProducts();
     status.textContent = relatedProducts.length ? "" : "No related products are available.";
   } catch (error) {
-    status.textContent = `Related products could not be loaded: ${error.message}`;
+    status.textContent = `Related products could not be loaded: ${displayError(error)}`;
   }
 }
 
@@ -259,7 +260,7 @@ function setupProductListing() {
       pagination.hidden = result.total === 0;
     } catch (error) {
       if (id !== requestId) return;
-      status.textContent = `Products could not be loaded: ${error.message}`;
+      status.textContent = `Products could not be loaded: ${displayError(error)}`;
     }
   }
 

@@ -40,7 +40,7 @@ function install(t, kind, search = "") {
       querySelector: (selector) => selector === "[data-auth-page]" ? page : nodes.get(selector),
       querySelectorAll: () => [],
     },
-    window: { location: { search, origin: "https://shop.example.test", assign: (target) => redirects.push(target) } },
+    window: { location: { pathname: "/login", search, origin: "https://shop.example.test", assign: (target) => redirects.push(target) } },
     FormData: class {
       constructor(target) { this.target = target; }
       *[Symbol.iterator]() {
@@ -91,8 +91,8 @@ test("invalid login credentials show feedback without a success redirect", async
   t.mock.method(globalThis, "fetch", async () => response({}, 401));
   await start("invalid");
   await submit(form);
-  assert.match(nodes.get("#auth-error").textContent, /Invalid credentials/);
-  assert.match(nodes.get("#auth-error").textContent, /authentication\.login, HTTP 401/);
+  assert.match(nodes.get("#auth-error").textContent, /email or password.*reset your password/);
+  assert.doesNotMatch(nodes.get("#auth-error").textContent, /HTTP|authentication\.login/);
   assert.deepEqual(redirects, []);
 });
 
@@ -103,7 +103,7 @@ test("login displays a network error without exposing credentials or browser det
   form.elements.password.value = "private password";
   await submit(form);
   const message = nodes.get("#auth-error").textContent;
-  assert.match(message, /Could not connect.*authentication\.login/);
+  assert.match(message, /connect.*try again/);
   assert.doesNotMatch(message, /private password|secret transport detail/);
 });
 
@@ -115,8 +115,8 @@ test("login reports destination errors without exposing redirect parameters", as
   await start("destination-error");
   await submit(form);
   const message = nodes.get("#auth-error").textContent;
-  assert.match(message, /authentication\.destination, HTTP 500/);
-  assert.doesNotMatch(message, /private|secret/);
+  assert.match(message, /temporarily unavailable/);
+  assert.doesNotMatch(message, /private|secret|HTTP|authentication\.destination/);
 });
 
 test("two-factor login submits only the Frappe challenge and verification code", async (t) => {
@@ -174,10 +174,10 @@ test("password confirmation and missing reset tokens fail before making requests
   form.elements.password.value = "long unique test passphrase";
   form.elements.confirm_password.value = "different";
   await submit(form);
-  assert.match(nodes.get("#auth-error").textContent, /Passwords do not match/);
+  assert.match(nodes.get("#auth-error").textContent, /Passwords don't match/);
   form.elements.confirm_password.value = form.elements.password.value;
   await submit(form);
-  assert.match(nodes.get("#auth-error").textContent, /reset link from your email/);
+  assert.match(nodes.get("#auth-error").textContent, /reset link.*new one/);
   assert.equal(fetch.mock.callCount(), 0);
 });
 
@@ -191,5 +191,5 @@ test("reset token errors never hide the form or show a reset success", async (t)
   form.elements.password.value = form.elements.confirm_password.value = "long unique test passphrase";
   await submit(form);
   assert.equal(form.hidden, false);
-  assert.match(nodes.get("#auth-error").textContent, /expired/);
+  assert.match(nodes.get("#auth-error").textContent, /reset link.*new one/);
 });

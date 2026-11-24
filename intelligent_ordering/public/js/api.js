@@ -1,10 +1,24 @@
+import { customerError, ERROR_MESSAGES, isCustomerPage } from "./error-messages.js";
+
 const API_ROOT = "/api/method/intelligent_ordering.api";
+
+export async function fetchWithTimeout(url, options, operation, responseOptions = {}, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return await readResponse(response, operation, responseOptions);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export class ApiError extends Error {
   constructor(message, status) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.customerSafe = true;
   }
 }
 
@@ -31,30 +45,46 @@ export async function post(endpoint, parameters = {}) {
 }
 
 async function request(url, operation, options) {
-  let response;
   try {
-    response = await fetch(url, {
+    const requestOptions = {
       ...options,
       credentials: "same-origin",
-    });
-  } catch {
-    throw new Error(`Could not connect to the server. Check your connection and try again. (Operation: ${operation})`);
+    };
+    const payload = isCustomerPage()
+      ? await fetchWithTimeout(url, requestOptions, operation)
+      : await readResponse(await fetch(url, requestOptions), operation);
+    return payload.message;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (isCustomerPage() && typeof CustomEvent === "function") {
+      window.dispatchEvent?.(new CustomEvent("smarto:connection-error"));
+    }
+    const message = isCustomerPage()
+      ? (operation === "payments.initiate_payment" ? ERROR_MESSAGES.paymentUnknown : ERROR_MESSAGES.connection)
+      : `Could not connect to the server. Check your connection and try again. (Operation: ${operation})`;
+    throw new ApiError(message);
   }
-  const payload = await readResponse(response, operation);
-  return payload.message;
 }
 
-export async function readResponse(response, operation, { login = false } = {}) {
+export async function readResponse(response, operation, { login = false, customer = isCustomerPage() } = {}) {
   let payload;
   try {
     payload = await response.json();
-  } catch {
+  } catch (error) {
+    if (error?.name === "AbortError") throw error;
+    if (customer) throw new ApiError(
+      response.ok ? (operation === "payments.initiate_payment" ? ERROR_MESSAGES.paymentUnknown : ERROR_MESSAGES.unexpected)
+        : customerError(response.status, operation), response.status,
+    );
     const status = Number.isInteger(response.status) ? `, HTTP ${response.status}` : "";
-    throw new Error(`The server returned an invalid response. Try again or contact support. (Operation: ${operation}${status})`);
+    throw new ApiError(`The server returned an invalid response. Try again or contact support. (Operation: ${operation}${status})`);
   }
 
   if (!response.ok) {
     const status = response.status;
+    if (customer) {
+      throw new ApiError(customerError(status, operation, serverErrorMessage(payload)), status);
+    }
     let message;
     if (login && status === 401) message = "Invalid credentials. Please try again.";
     else if (status === 401) message = "Your session may have expired. Sign in and try again.";

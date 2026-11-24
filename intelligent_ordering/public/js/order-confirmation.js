@@ -1,7 +1,8 @@
-import { get } from "./api.js";
+import { ApiError, get } from "./api.js";
 import { formatPrice, orderConfirmationUrl, orderPaymentUrl, orderTrackingUrl, renderOrderItems, text } from "./components/order-display.js";
 import { mountOrderPayment } from "./payments.js";
 import { FINGERPRINT_KEY, ORDER_KEY, TOKEN_KEY } from "./checkout-recovery.js";
+import { displayError, ERROR_MESSAGES } from "./error-messages.js";
 
 const status = document.querySelector("#order-status");
 const target = document.querySelector("#order-detail");
@@ -14,7 +15,7 @@ async function loadOrder() {
     const id = path.startsWith("/order-confirmation/")
       ? decodeURIComponent(path.slice("/order-confirmation/".length))
       : new URLSearchParams(window.location.search).get("order");
-    if (!id) throw new Error("An order reference is required.");
+    if (!id) throw new ApiError(ERROR_MESSAGES.missing);
     const order = await get("orders.get_my_order", { order_name: id });
     if (order.requires_login) {
       login.href = `/login?${new URLSearchParams({ "redirect-to": paymentPage ? orderPaymentUrl(id) : orderConfirmationUrl(id) })}`;
@@ -73,7 +74,7 @@ async function loadOrder() {
           : "Order details and current status are shown below.";
     }
   } catch (error) {
-    status.textContent = `Order could not be loaded: ${error.message}`;
+    status.textContent = `Order could not be loaded: ${displayError(error)}`;
   }
 }
 

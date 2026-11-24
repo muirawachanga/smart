@@ -2,6 +2,7 @@ import { changeCart, loadCart } from "./cart-service.js";
 import { clearGuestCart } from "./cart-storage.js";
 import { formatPrice, text } from "./components/order-display.js";
 import { productImage } from "./components/product-image.js";
+import { displayError } from "./error-messages.js";
 
 const status = document.querySelector("#cart-status");
 const feedback = document.querySelector("#cart-feedback");
@@ -36,7 +37,7 @@ function render() {
     }
     if (!item.available) {
       row.append(text("p", item.stock_status === "Unavailable"
-        ? "This product is unavailable."
+        ? "This product is unavailable. Remove it from your cart to continue."
         : `Only ${item.available_quantity} available. Adjust the quantity or remove this item.`));
     }
     const label = text("label", "Quantity ");
@@ -78,7 +79,7 @@ async function initialize() {
   } catch (error) {
     cart = null;
     status.textContent = "Cart could not be loaded.";
-    feedback.textContent = error.message;
+    feedback.textContent = displayError(error);
     clearGuestButton.hidden = false;
   }
   render();
@@ -95,7 +96,7 @@ async function mutate(endpoint, parameters = {}) {
       feedback.textContent = `${cart.removed_products.length} unavailable item(s) were removed from your cart.`;
     }
   } catch (error) {
-    feedback.textContent = `Cart could not be updated: ${error.message}`;
+    feedback.textContent = `Cart could not be updated: ${displayError(error)}`;
   } finally {
     busy = false;
     render();
@@ -108,7 +109,7 @@ clearGuestButton.addEventListener("click", () => {
     clearGuestCart();
     initialize();
   } catch (error) {
-    feedback.textContent = `Browser-saved cart could not be cleared: ${error.message}`;
+    feedback.textContent = `Browser-saved cart could not be cleared: ${displayError(error)}`;
   }
 });
 initialize();

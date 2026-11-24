@@ -22,6 +22,7 @@ CANCELLATION_FIELDS = (
     "cancellation_request_status", "cancellation_reason", "cancellation_requested_at",
     "cancellation_resolved_at", "cancellation_resolved_by", "cancellation_response",
 )
+REGISTRATION_MESSAGE = "If your details can be used, you can sign in or reset your password to continue."
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
@@ -51,21 +52,30 @@ def register(email, full_name, phone="", password="", confirm_password="",
         frappe.throw("Invalid marketing consent.", frappe.ValidationError)
     validate_new_password(password, confirm_password, (full_name, email, phone))
     if frappe.db.exists("User", email):
-        frappe.throw("An account already uses this email. Sign in or reset your password.", frappe.ValidationError)
+        return {"message": REGISTRATION_MESSAGE}
     user = frappe.get_doc({
         "doctype": "User", "email": email, "first_name": escape_html(full_name),
         "enabled": 1, "user_type": "Website User", "send_welcome_email": 0,
         "new_password": password, "mobile_no": phone,
         "roles": [{"role": "Customer"}],
     })
-    user.insert(ignore_permissions=True)
+    frappe.db.savepoint("customer_registration")
+    message_count = len(frappe.local.message_log)
+    try:
+        user.insert(ignore_permissions=True)
+    except frappe.DuplicateEntryError as error:
+        frappe.db.rollback(save_point="customer_registration")
+        if error.args[:2] != ("User", email):
+            raise
+        del frappe.local.message_log[message_count:]
+        return {"message": REGISTRATION_MESSAGE}
     profile = _save_customer_profile(email, full_name, phone)
     frappe.get_doc({
         "doctype": "SmartO Policy Acceptance", "user": email, "customer": profile.name,
         "terms_version": terms_version, "privacy_version": privacy_version,
         "marketing_consent": int(marketing_consent),
     }).insert(ignore_permissions=True)
-    return {"message": "Account created. Sign in to start shopping."}
+    return {"message": REGISTRATION_MESSAGE}
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])

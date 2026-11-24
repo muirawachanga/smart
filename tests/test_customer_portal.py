@@ -14,12 +14,18 @@ class AccessError(Exception):
     pass
 
 
+class DuplicateError(Exception):
+    pass
+
+
 def load_customers():
     frappe = types.ModuleType("frappe")
     frappe.whitelist = lambda **kwargs: lambda function: function
     frappe.ValidationError = frappe.PermissionError = AccessError
+    frappe.DuplicateEntryError = DuplicateError
     frappe.throw = Mock(side_effect=lambda message, *args: (_ for _ in ()).throw(AccessError(message)))
     frappe.session = types.SimpleNamespace(user="customer@example.test")
+    frappe.local = types.SimpleNamespace(message_log=[])
     frappe.flags = types.SimpleNamespace()
     frappe.db = Mock()
     frappe.get_doc = Mock()
@@ -79,7 +85,7 @@ class TestCustomerPortal(unittest.TestCase):
         self.assertEqual(doc["user_type"], "Website User")
         self.assertEqual(doc["email"], "customer@example.test")
         self.assertEqual(doc["first_name"], "Test Customer")
-        self.assertIn("Account created", result["message"])
+        self.assertEqual(result["message"], self.api.REGISTRATION_MESSAGE)
         consent = self.frappe.get_doc.call_args_list[1].args[0]
         self.assertEqual(consent["terms_version"], "TERMS-1")
         self.assertEqual(consent["privacy_version"], "PRIVACY-1")
@@ -94,8 +100,9 @@ class TestCustomerPortal(unittest.TestCase):
             self.api.register("customer@example.test", "Customer", "+254700000000")
         signup.is_signup_disabled.return_value = False
         self.frappe.db.exists.return_value = True
-        with patch.dict(sys.modules, self.modules), self.assertRaises(AccessError):
-            self.api.register("customer@example.test", "Customer", "+254700000000")
+        with patch.dict(sys.modules, self.modules):
+            result = self.api.register("customer@example.test", "Customer", "+254700000000")
+        self.assertEqual(result["message"], self.api.REGISTRATION_MESSAGE)
         self.frappe.get_doc.assert_not_called()
 
     def test_registration_with_missing_acceptance_does_not_create_a_user(self):
@@ -104,6 +111,29 @@ class TestCustomerPortal(unittest.TestCase):
         with patch.dict(sys.modules, self.modules), self.assertRaises(AccessError):
             self.api.register("customer@example.test", "Customer", "+254700000000")
         self.frappe.get_doc.assert_not_called()
+
+    def test_registration_race_does_not_reveal_existing_account(self):
+        self.frappe.session.user = "Guest"
+        self.frappe.db.exists.return_value = False
+        self.frappe.local.message_log = [{"message": "Existing notice"}]
+
+        def duplicate(**_kwargs):
+            self.frappe.local.message_log.append({"message": "User already exists"})
+            raise DuplicateError("User", "customer@example.test", Exception("duplicate"))
+
+        self.frappe.get_doc.return_value.insert.side_effect = duplicate
+        with patch.dict(sys.modules, self.modules):
+            result = self.api.register("customer@example.test", "Customer", "+254700000000")
+        self.assertEqual(result["message"], self.api.REGISTRATION_MESSAGE)
+        self.frappe.db.rollback.assert_called_once_with(save_point="customer_registration")
+        self.assertEqual(self.frappe.local.message_log, [{"message": "Existing notice"}])
+
+    def test_registration_does_not_hide_unrelated_duplicate_errors(self):
+        self.frappe.session.user = "Guest"
+        self.frappe.db.exists.return_value = False
+        self.frappe.get_doc.return_value.insert.side_effect = DuplicateError("Has Role", "other")
+        with patch.dict(sys.modules, self.modules), self.assertRaises(DuplicateError):
+            self.api.register("customer@example.test", "Customer", "+254700000000")
 
     def test_alternate_signup_cannot_bypass_customer_policy_consent(self):
         with self.assertRaises(AccessError):

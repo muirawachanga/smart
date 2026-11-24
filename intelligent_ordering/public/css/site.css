@@ -2387,3 +2387,63 @@
     height: 3.75rem;
   }
 }
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border: 2px solid #a52727;
+}
+
+.smarto-field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  color: #842020;
+  font-size: 0.9rem;
+  margin-top: 0.3rem;
+}
+
+.smarto-field-error > span:first-child {
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  display: inline-flex;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  flex: 0 0 1.2rem;
+  font-weight: 700;
+}
+
+.smarto-error-banner:not([hidden]) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+  border: 1px solid #a52727;
+  border-radius: 0.5rem;
+  background: #fff3f1;
+  color: #741b1b;
+}
+
+.smarto-error-banner p { margin: 0; }
+.smarto-error-banner button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.smarto-network-toast:not([hidden]) {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  max-width: min(24rem, calc(100vw - 2rem));
+  padding: 0.85rem 1rem;
+  border-radius: 0.5rem;
+  background: #283a37;
+  color: #fff;
+  box-shadow: 0 0.25rem 1rem #0003;
+}

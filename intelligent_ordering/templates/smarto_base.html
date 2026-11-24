@@ -14,7 +14,7 @@
 {% include "templates/includes/smarto_header.html" %}
 <p id="smarto-session-error" class="smarto-script-warning" role="alert" hidden></p>
 <p id="smarto-unexpected-error" class="smarto-script-warning" role="alert" hidden></p>
-<script src="/assets/intelligent_ordering/js/error-monitor.js"></script>
+<script type="module" src="/assets/intelligent_ordering/js/error-monitor.js"></script>
 <div class="smarto-main" id="main-content">
   <nav class="smarto-breadcrumb" aria-label="Breadcrumb">
     <ol>
@@ -28,5 +28,10 @@
 </div>
 </div>
 <p id="smarto-nav-status" class="smarto-visually-hidden" role="status" aria-live="polite"></p>
+<div id="smarto-network-toast" class="smarto-network-toast" role="status" aria-live="polite" hidden></div>
+<script type="module">
+  import { initErrorUI } from "/assets/intelligent_ordering/js/error-ui.js";
+  initErrorUI();
+</script>
 <script type="module" src="/assets/intelligent_ordering/js/site.js"></script>
 {% endblock %}

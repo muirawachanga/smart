@@ -599,6 +599,18 @@ not modify orders, payments or inventory.
 
 ## Tests and checks
 
+Customer pages use `public/js/error-messages.js` for safe API and validation
+copy and `error-ui.js` for inline validation, dismissible feedback and
+connection notices. Customer registration returns the same message for new and
+existing accounts; existing credentials are never changed. Checkout retries
+still use the existing recovery token and must not automatically resubmit orders.
+Website error responses use `utils/website_errors.py` and retain their original
+status. Errors raised before Frappe initializes the site, maintenance responses
+generated outside the app, framework HTTP exceptions that bypass response hooks,
+and reverse-proxy failures need equivalent safe
+error pages configured at the hosting layer. Verify the installed Frappe version,
+browser accessibility, and actual error responses on a staging site.
+
 Run the standalone validation tests from the repository root:
 
 ```bash

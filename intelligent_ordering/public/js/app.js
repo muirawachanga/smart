@@ -1,4 +1,5 @@
 import { get, post } from "./api.js";
+import { displayError } from "./error-messages.js";
 import {
   clearGuestCart,
   readGuestCart,
@@ -215,7 +216,7 @@ async function loadCatalog() {
     }
   } catch (error) {
     statusElement.textContent = "Products could not be loaded.";
-    showFeedback(feedbackElement, error.message);
+    showFeedback(feedbackElement, displayError(error));
   }
 }
 
@@ -247,7 +248,7 @@ async function loadCart() {
     showRemovedProducts(result.removed_products);
   } catch (error) {
     state.cartError = true;
-    showFeedback(feedbackElement, error.message);
+    showFeedback(feedbackElement, displayError(error));
   } finally {
     state.cartBusy = false;
     renderCart();
@@ -293,7 +294,7 @@ async function updateCart(endpoint, parameters) {
     setCart(result);
     showRemovedProducts(result.removed_products);
   } catch (error) {
-    showFeedback(feedbackElement, error.message);
+    showFeedback(feedbackElement, displayError(error));
   } finally {
     state.cartBusy = false;
     renderCart();
@@ -332,10 +333,10 @@ async function clearCart() {
           "The browser-saved guest cart was cleared locally, but the server did not respond.",
         );
       } catch (storageError) {
-        showFeedback(feedbackElement, storageError.message);
+        showFeedback(feedbackElement, displayError(storageError));
       }
     } else {
-      showFeedback(feedbackElement, error.message);
+      showFeedback(feedbackElement, displayError(error));
     }
   } finally {
     state.cartBusy = false;
@@ -582,7 +583,7 @@ async function openCheckout() {
     submitOrderButton.disabled = true;
   } catch (error) {
     checkoutStatus.textContent = "Checkout could not be loaded.";
-    showFeedback(feedbackElement, error.message);
+    showFeedback(feedbackElement, displayError(error));
   }
 }
 
@@ -616,7 +617,7 @@ async function refreshDeliveryQuote() {
     if (request !== state.deliveryQuoteRequest) return;
     checkoutFee.textContent = "Unavailable";
     checkoutTotal.textContent = "Refresh the delivery quote before submitting";
-    checkoutStatus.textContent = error.message;
+    checkoutStatus.textContent = displayError(error);
   }
 }
 
@@ -654,8 +655,10 @@ async function submitOrder(event) {
     orderConfirmation.scrollIntoView({ behavior: "smooth" });
     loadCustomerOrders();
   } catch (error) {
-    checkoutStatus.textContent = "Your order was not submitted.";
-    showFeedback(feedbackElement, error.message);
+    checkoutStatus.textContent = error.status >= 400 && error.status < 500 && error.status !== 408
+      ? "Your order was not submitted. Check your details and try again."
+      : "We couldn't confirm your order. Check My orders or contact the store before trying again.";
+    showFeedback(feedbackElement, displayError(error));
     submitOrderButton.disabled = false;
   } finally {
     state.checkoutBusy = false;
@@ -722,7 +725,7 @@ async function loadCustomerOrders(append = false) {
     );
   } catch (error) {
     customerOrdersStatus.textContent = "Your orders could not be loaded.";
-    showFeedback(feedbackElement, error.message);
+    showFeedback(feedbackElement, displayError(error));
   }
 }
 
@@ -755,7 +758,7 @@ async function loadStaffOrders(append = false) {
     );
   } catch (error) {
     staffOrdersStatus.textContent = "Orders could not be loaded.";
-    showFeedback(feedbackElement, error.message);
+    showFeedback(feedbackElement, displayError(error));
   }
 }
 
@@ -819,7 +822,7 @@ async function loadOrderDetail(orderName, staffMode) {
     renderOrderDetail(target, order, staffMode);
   } catch (error) {
     target.textContent = "Order details could not be loaded.";
-    showFeedback(feedbackElement, error.message);
+    showFeedback(feedbackElement, displayError(error));
   }
 }
 
@@ -906,7 +909,7 @@ function appendStatusForm(container, order) {
       renderOrderDetail(container, updated, true);
       loadStaffOrders();
     } catch (error) {
-      showFeedback(feedbackElement, error.message);
+      showFeedback(feedbackElement, displayError(error));
       submit.disabled = false;
     }
   });
@@ -922,7 +925,7 @@ async function loadInventoryDashboard() {
     renderMovementRows(inventoryMovements, result.recent_movements);
   } catch (error) {
     inventoryStatus.textContent = "Inventory dashboard could not be loaded.";
-    showFeedback(feedbackElement, error.message);
+    showFeedback(feedbackElement, displayError(error));
   }
 }
 
@@ -975,7 +978,7 @@ async function loadStock(append = false) {
     }
   } catch (error) {
     inventoryStatus.textContent = "Stock could not be loaded.";
-    showFeedback(feedbackElement, error.message);
+    showFeedback(feedbackElement, displayError(error));
   }
 }
 
@@ -1079,7 +1082,7 @@ async function submitStockAdjustment(event) {
     loadStock();
     loadStockMovements();
   } catch (error) {
-    showFeedback(feedbackElement, error.message);
+    showFeedback(feedbackElement, displayError(error));
   } finally {
     submit.disabled = false;
   }
@@ -1107,7 +1110,7 @@ async function submitStockReturn(event) {
     loadStock();
     loadStockMovements();
   } catch (error) {
-    showFeedback(feedbackElement, error.message);
+    showFeedback(feedbackElement, displayError(error));
   } finally {
     submit.disabled = false;
   }
@@ -1138,7 +1141,7 @@ async function loadStockMovements(append = false) {
     }
   } catch (error) {
     inventoryMovements.textContent = "Stock movements could not be loaded.";
-    showFeedback(feedbackElement, error.message);
+    showFeedback(feedbackElement, displayError(error));
   }
 }
 

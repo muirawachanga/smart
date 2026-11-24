@@ -1,4 +1,6 @@
 import { get, post } from "./api.js";
+import { ERROR_MESSAGES, displayError } from "./error-messages.js";
+import { createFormAlert, setupPhoneValidation } from "./error-ui.js";
 
 function text(tag, value) {
   const element = document.createElement(tag);
@@ -20,6 +22,11 @@ function statusBadge(value) {
   return badge;
 }
 
+function paymentFailureMessage(transaction) {
+  return ["Initiated", "Pending"].includes(transaction.status)
+    ? ERROR_MESSAGES.paymentUnknown : ERROR_MESSAGES.payment;
+}
+
 export function mountOrderPayment(container, order) {
   const paymentStatus = text("p", `Payment: ${order.payment_status || "Unpaid"}`);
   container.append(paymentStatus);
@@ -32,6 +39,7 @@ export function mountOrderPayment(container, order) {
   }
   const form = document.createElement("form");
   form.className = "status-update-form";
+  const alert = createFormAlert();
   const label = text("label", "M-Pesa mobile number");
   const phone = document.createElement("input");
   phone.type = "tel";
@@ -39,6 +47,7 @@ export function mountOrderPayment(container, order) {
   phone.required = true;
   phone.maxLength = 20;
   phone.value = order.customer_phone || "";
+  setupPhoneValidation(phone);
   label.append(phone);
   const pay = text("button", "Pay with M-Pesa");
   pay.type = "submit";
@@ -56,7 +65,7 @@ export function mountOrderPayment(container, order) {
       "p",
       `${transaction.status} - KES ${transaction.amount}` +
         (transaction.mpesa_receipt_number ? ` - ${transaction.mpesa_receipt_number}` : "") +
-        (transaction.failure_description ? ` - ${transaction.failure_description}` : ""),
+        (transaction.failure_description ? ` - ${paymentFailureMessage(transaction)}` : ""),
     )));
     pay.disabled = order.payment_status === "Paid" || ["Cancelled", "Completed"].includes(order.status)
       || transactions.some((transaction) =>
@@ -70,22 +79,24 @@ export function mountOrderPayment(container, order) {
     event.preventDefault();
     if (pay.disabled || !form.reportValidity()) return;
     pay.disabled = true;
+    alert.clear();
     try {
       const transaction = await post("payments.initiate_payment", {
         order_name: order.name, phone: phone.value,
       });
       feedback.textContent = transaction.status === "Pending"
         ? "Check your phone for the M-Pesa prompt. Never share your PIN."
-        : transaction.failure_description || `Payment: ${transaction.status}`;
+        : transaction.failure_description ? "" : `Payment: ${transaction.status}`;
+      if (transaction.failure_description) alert.show(paymentFailureMessage(transaction));
       await load();
     } catch (error) {
       // An interrupted response may still have initiated a charge. Refresh the
       // existing attempt rather than automatically sending another STK push.
-      feedback.textContent = error.message;
+      alert.show(displayError(error));
       try {
         await load();
       } catch (refreshError) {
-        feedback.textContent = `${error.message} Payment status could not be refreshed: ${refreshError.message}`;
+        alert.show(`${displayError(error)} Payment status could not be refreshed. ${displayError(refreshError)}`);
       }
     }
   });
@@ -94,14 +105,14 @@ export function mountOrderPayment(container, order) {
     try {
       await load();
     } catch (error) {
-      feedback.textContent = error.message;
+      alert.show(displayError(error));
     } finally {
       refresh.disabled = false;
     }
   });
-  form.append(label, pay, refresh);
+  form.append(alert.element, label, pay, refresh);
   container.append(form, feedback, history);
-  load().catch((error) => { feedback.textContent = error.message; });
+  load().catch((error) => { alert.show(displayError(error)); });
   return (current) => {
     order.status = current.status;
     order.payment_status = current.payment_status;

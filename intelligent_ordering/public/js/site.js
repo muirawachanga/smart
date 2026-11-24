@@ -1,6 +1,7 @@
 import { get, post } from "./api.js";
 import { readGuestCart } from "./cart-storage.js";
 import { initStaffSidebar } from "./staff-sidebar.js";
+import { ERROR_MESSAGES, displayError, isCustomerPage } from "./error-messages.js";
 
 const menuButton = document.querySelector("#smarto-menu-toggle");
 const primaryNavigation = document.querySelector("#smarto-primary-navigation");
@@ -186,7 +187,7 @@ async function loadCartCount(user) {
     if (revision === cartCountRevision) cartCount.textContent = String(count);
   } catch (error) {
     if (user?.roles?.includes("Customer")) {
-      pageStatus.textContent = `Cart count could not be loaded: ${error.message}`;
+      pageStatus.textContent = `Cart count could not be loaded: ${displayError(error)}`;
       return;
     }
     try {
@@ -194,7 +195,7 @@ async function loadCartCount(user) {
       if (revision === cartCountRevision) cartCount.textContent = String(count);
     } catch (cartError) {
       if (revision === cartCountRevision) cartCount.textContent = "0";
-      pageStatus.textContent = cartError.message;
+      pageStatus.textContent = displayError(cartError);
     }
   }
 }
@@ -210,13 +211,14 @@ async function signOut(event) {
       headers: { "X-Frappe-CSRF-Token": window.frappe?.csrf_token || "" },
     });
     if (!response.ok) {
-      throw new Error(`SmartO could not end this session. Try again. (Operation: authentication.logout, HTTP ${response.status})`);
+      throw new Error(isCustomerPage() ? ERROR_MESSAGES.unexpected
+        : `SmartO could not end this session. Try again. (Operation: authentication.logout, HTTP ${response.status})`);
     }
     window.location.assign("/logged-out");
   } catch (error) {
     const sessionError = document.querySelector("#smarto-session-error");
     const message = error instanceof TypeError
-      ? "Could not connect to the server. Check your connection and try again. (Operation: authentication.logout)"
+      ? (isCustomerPage() ? ERROR_MESSAGES.connection : "Could not connect to the server. Check your connection and try again. (Operation: authentication.logout)")
       : error.message;
     if (sessionError) {
       sessionError.textContent = message;

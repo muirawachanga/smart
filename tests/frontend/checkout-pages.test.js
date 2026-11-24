@@ -16,6 +16,7 @@ class Element {
   add(node) { this.children.push(node); }
   addEventListener(name, handler) { this.listeners[name] = handler; }
   setAttribute(name, value) { this[name] = value; }
+  setCustomValidity(value) { this.validationMessage = value; }
   reportValidity() { return true; }
 }
 
@@ -296,7 +297,7 @@ test("failed delivery quotes never enable order submission", async (t) => {
   nodes.get("#checkout-area").value = "Central";
   await nodes.get("#checkout-area").listeners.change();
   assert.equal(nodes.get("#checkout-submit").disabled, true);
-  assert.match(nodes.get("#checkout-feedback").textContent, /Delivery area unavailable/);
+  assert.match(nodes.get("#checkout-feedback").textContent, /check your details.*try again/i);
 });
 
 test("confirmation shows only the server-returned order and clears its recovery state", async (t) => {
@@ -330,7 +331,7 @@ test("confirmation does not show details when the owner-scoped request fails", a
   await import(`../../intelligent_ordering/public/js/order-confirmation.js?denied=${Date.now()}`);
   await tick();
   assert.equal(nodes.get("#order-detail").children.length, 0);
-  assert.match(nodes.get("#order-status").textContent, /unavailable/);
+  assert.match(nodes.get("#order-status").textContent, /try again/);
 });
 
 test("COD confirmation explains preparation and links to payment details", async (t) => {
@@ -419,14 +420,14 @@ test("payment page loads an owned order and initiates only the existing M-Pesa A
     node.textContent === "Track delivery and confirm receipt").href, "/track-order?order=SO-1");
   assert.equal(calls.some((call) => call.url.includes("initiate_payment")), false);
   const form = nodes.get("#order-detail").children.find((node) => node.className === "status-update-form");
-  assert.equal(form.children[1].textContent, "Pay with M-Pesa");
-  assert.equal(form.children[1].disabled, false);
+  assert.equal(form.children[2].textContent, "Pay with M-Pesa");
+  assert.equal(form.children[2].disabled, false);
   await form.listeners.submit({ preventDefault() {} });
   const call = calls.find((entry) => entry.url.includes("initiate_payment"));
   assert.equal(call.options.body.get("order_name"), "SO-1");
   assert.equal(call.options.body.get("phone"), "+254700000000");
   assert.equal(call.options.body.has("amount"), false);
-  assert.equal(form.children[1].disabled, true);
+  assert.equal(form.children[2].disabled, true);
 });
 
 test("confirmed Cash on Delivery order explains preparation without an M-Pesa prompt", async (t) => {

@@ -21,9 +21,9 @@ test("unexpected errors show a safe message without exposing error details", asy
   await import(`../../intelligent_ordering/public/js/error-monitor.js?test=${Date.now()}`);
   events.error({ message: "private secret", filename: "private-url" });
   assert.equal(alert.hidden, false);
-  assert.match(alert.textContent, /PAGE-ERROR.*Time:/);
+  assert.match(alert.textContent, /Reload.*contact the store/);
   assert.doesNotMatch(alert.textContent, /private|secret/);
   events.unhandledrejection({ reason: new Error("private secret") });
-  assert.match(alert.textContent, /PAGE-REQUEST.*Time:/);
+  assert.match(alert.textContent, /Reload.*contact the store/);
   assert.doesNotMatch(alert.textContent, /private|secret/);
 });

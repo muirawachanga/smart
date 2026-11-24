@@ -1,4 +1,6 @@
-import { get, readResponse } from "./api.js";
+import { ApiError, fetchWithTimeout, get } from "./api.js";
+import { ERROR_MESSAGES, displayError } from "./error-messages.js";
+import { showValidationError } from "./error-ui.js";
 
 const page = document.querySelector("[data-auth-page]");
 const kind = page.dataset.authPage;
@@ -12,9 +14,8 @@ async function request(endpoint, values) {
   const operation = kind === "login" ? "authentication.login"
     : kind === "register" ? "customers.register"
       : kind === "forgot" ? "authentication.forgot_password" : "authentication.reset_password";
-  let response;
   try {
-    response = await fetch(endpoint, {
+    return await fetchWithTimeout(endpoint, {
       method: "POST",
       credentials: "same-origin",
       headers: {
@@ -23,11 +24,11 @@ async function request(endpoint, values) {
         "X-Frappe-CSRF-Token": page.dataset.authCsrf,
       },
       body: new URLSearchParams(values),
-    });
-  } catch {
-    throw new Error(`Could not connect to the server. Check your connection and try again. (Operation: ${operation})`);
+    }, operation, { login: kind === "login", customer: true });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(ERROR_MESSAGES.connection);
   }
-  return readResponse(response, operation, { login: kind === "login" });
 }
 
 async function finishLogin(payload) {
@@ -68,7 +69,8 @@ async function submit(event, activeForm) {
   if (busy || !activeForm.reportValidity()) return;
   const values = Object.fromEntries(new FormData(activeForm));
   if (values.confirm_password !== undefined && values.password !== values.confirm_password) {
-    error.textContent = "Passwords do not match.";
+    error.textContent = ERROR_MESSAGES.passwordMatch;
+    showValidationError(activeForm.elements.confirm_password, ERROR_MESSAGES.passwordMatch);
     return;
   }
   busy = true;
@@ -89,7 +91,7 @@ async function submit(event, activeForm) {
       }
       if (kind === "reset") {
         values.key = new URLSearchParams(window.location.search).get("key") || "";
-        if (!values.key) throw new Error("Open the reset link from your email to set a new password.");
+        if (!values.key) throw new ApiError(ERROR_MESSAGES.reset);
       }
       const endpoint = kind === "register" ? "customers.register"
         : kind === "forgot" ? "authentication.forgot_password" : "authentication.reset_password";
@@ -102,7 +104,7 @@ async function submit(event, activeForm) {
     }
   } catch (failure) {
     status.textContent = "Could not complete this request.";
-    error.textContent = failure.message;
+    error.textContent = displayError(failure);
   } finally {
     busy = false;
     button.disabled = false;

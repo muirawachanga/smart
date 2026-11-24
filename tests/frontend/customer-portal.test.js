@@ -53,7 +53,7 @@ function install(t, kind) {
       : selector === "#customer-form" && ["payments", "notifications"].includes(kind) ? null : nodes.get(selector),
     createElement: () => new Element(),
   });
-  setGlobal("window", { frappe: {}, confirm: () => true });
+  setGlobal("window", { location: { pathname: "/account/payments" }, frappe: {}, confirm: () => true });
   setGlobal("FormData", class {
     *[Symbol.iterator]() {
       for (const [key, field] of Object.entries(form.elements)) yield [key, field.value];
@@ -134,7 +134,8 @@ test("unauthorized portal requests show an error and login without customer reco
   await tick();
   assert.equal(nodes.get("#customer-list").children.length, 0);
   assert.equal(nodes.get("#customer-login").hidden, false);
-  assert.match(nodes.get("#customer-feedback").textContent, /permission.*customers\.payment_history, HTTP 403/);
+  assert.match(nodes.get("#customer-feedback").textContent, /can't access.*sign in/i);
+  assert.doesNotMatch(nodes.get("#customer-feedback").textContent, /HTTP|customers\.payment_history/);
 });
 
 test("customers search their payment history and filters persist across pages and refresh", async (t) => {

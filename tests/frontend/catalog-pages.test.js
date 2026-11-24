@@ -140,7 +140,7 @@ test("detail page reports an unavailable product without fabricating data", asyn
   });
   await import(`../../intelligent_ordering/public/js/catalog-pages.js?detail=${Date.now()}`);
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.match(nodes.get("#product-status").textContent, /unavailable/);
+  assert.match(nodes.get("#product-status").textContent, /try again/);
   assert.equal(nodes.get("#product-detail").children.length, 0);
 });
 
@@ -207,7 +207,7 @@ test("out of stock products cannot be added and cart failures are shown", async 
   const card = nodes.get("#product-detail").children[0];
   assert.equal(card.children.at(-1).disabled, true);
   assert.ok(card.children.some((node) => node.textContent === "Out of stock"));
-  assert.match(nodes.get("#cart-feedback").textContent, /Cart is unavailable/);
+  assert.match(nodes.get("#cart-feedback").textContent, /Cart unavailable.*try again/);
 });
 
 test("catalog submits filters and advances through server-sorted pages", async (t) => {
@@ -254,6 +254,6 @@ test("a rejected addition shows an error instead of a checkout success action", 
   await import(`../../intelligent_ordering/public/js/catalog-pages.js?rejected=${Date.now()}`);
   await new Promise((resolve) => setTimeout(resolve, 0));
   await nodes.get("#catalog-products").children[0].children.at(-1).listeners.click();
-  assert.match(nodes.get("#cart-feedback").textContent, /Could not add to cart: Insufficient stock/);
+  assert.match(nodes.get("#cart-feedback").textContent, /no longer available.*Update your cart/);
   assert.equal(nodes.get("#cart-feedback").children.length, 0);
 });

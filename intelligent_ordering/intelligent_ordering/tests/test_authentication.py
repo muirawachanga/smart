@@ -64,9 +64,8 @@ class TestAuthentication(FrappeTestCase):
         with self.assertRaises(frappe.ValidationError):
             self.register(accept_terms=0)
         self.assertFalse(frappe.db.exists("User", self.email))
-        self.register()
-        with self.assertRaises(frappe.ValidationError):
-            self.register()
+        first = self.register()
+        self.assertEqual(self.register(), first)
         self.assertEqual(frappe.db.count("SmartO Policy Acceptance", {"user": self.email}), 1)
 
     def test_new_policy_publication_preserves_old_acceptance_and_published_content(self):

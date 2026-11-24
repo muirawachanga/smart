@@ -2,6 +2,8 @@ import { get, post } from "./api.js";
 import { formatPrice, renderOrderItems, text } from "./components/order-display.js";
 import { mountOrderPayment } from "./payments.js";
 import { FINGERPRINT_KEY, ORDER_KEY, TOKEN_KEY } from "./checkout-recovery.js";
+import { displayError } from "./error-messages.js";
+import { createFormAlert } from "./error-ui.js";
 
 const mode = document.querySelector("[data-orders-page]").dataset.ordersPage;
 const staff = mode === "staff" || mode === "support";
@@ -83,7 +85,7 @@ async function loadOrders() {
   } catch (error) {
     if (request === listRequest) {
       clearDetail();
-      status.textContent = `Orders could not be loaded: ${error.message}`;
+      status.textContent = `Orders could not be loaded: ${displayError(error)}`;
     }
   }
 }
@@ -137,7 +139,7 @@ async function loadDetail(name) {
     }
     renderDetail(order);
   } catch (error) {
-    if (request === detailRequest) detail.textContent = `Order could not be loaded: ${error.message}`;
+    if (request === detailRequest) detail.textContent = `Order could not be loaded: ${displayError(error)}`;
   }
 }
 
@@ -212,6 +214,7 @@ function addCustomerTracking(card, order, updateStatus) {
   const cancellation = document.createElement("form");
   cancellation.className = "smarto-checkout-form";
   cancellation.hidden = true;
+  const cancellationAlert = createFormAlert();
   const label = text("label", "Reason for cancellation request");
   const reason = document.createElement("textarea");
   reason.required = true;
@@ -221,7 +224,7 @@ function addCustomerTracking(card, order, updateStatus) {
   send.type = "submit";
   const feedback = text("p", "");
   feedback.setAttribute("role", "alert");
-  cancellation.append(label, send);
+  cancellation.append(cancellationAlert.element, label, send);
   let refreshing = false;
   let canConfirmReceipt = false;
 
@@ -269,7 +272,7 @@ function addCustomerTracking(card, order, updateStatus) {
     } catch (error) {
       if (request === detailRequest) {
         canConfirmReceipt = false;
-        state.textContent = `Order status could not be refreshed: ${error.message}`;
+        state.textContent = `Order status could not be refreshed: ${displayError(error)}`;
       }
     } finally {
       refreshing = false;
@@ -289,7 +292,7 @@ function addCustomerTracking(card, order, updateStatus) {
         display(result);
       }
     } catch (error) {
-      if (request === detailRequest) receiptFeedback.textContent = `Receipt could not be confirmed: ${error.message}`;
+      if (request === detailRequest) receiptFeedback.textContent = `Receipt could not be confirmed: ${displayError(error)}`;
     } finally {
       refreshing = false;
       confirmReceipt.disabled = !canConfirmReceipt;
@@ -302,6 +305,7 @@ function addCustomerTracking(card, order, updateStatus) {
       || !window.confirm("Submit a cancellation request for staff approval? This will not cancel or refund the order immediately.")) return;
     send.disabled = true;
     feedback.textContent = "";
+    cancellationAlert.clear();
     try {
       const result = await post("customers.request_cancellation", { order_name: order.name, reason: reason.value });
       if (request === detailRequest) {
@@ -309,7 +313,7 @@ function addCustomerTracking(card, order, updateStatus) {
         feedback.textContent = "Cancellation requested. Staff must approve it; no payment has been refunded.";
       }
     } catch (error) {
-      if (request === detailRequest) feedback.textContent = `Request could not be submitted: ${error.message}`;
+      if (request === detailRequest) cancellationAlert.show(`Request could not be submitted: ${displayError(error)}`);
     } finally {
       send.disabled = false;
     }
@@ -355,7 +359,7 @@ function addCancellationReview(card, order) {
       loadOrders();
       loadOrderOverview();
     } catch (error) {
-      feedback.textContent = error.message;
+      feedback.textContent = displayError(error);
       save.disabled = false;
     }
   });
@@ -390,7 +394,7 @@ function addStatusForm(card, order) {
       loadOrderOverview();
     } catch (error) {
       if (request === detailRequest) {
-        feedback.textContent = `Status could not be updated: ${error.message}`;
+        feedback.textContent = `Status could not be updated: ${displayError(error)}`;
         button.disabled = false;
       }
     }
@@ -423,6 +427,6 @@ function loadOrderOverview() {
         card.append(text("span", value), text("strong", counts.get(value) || 0));
         return card;
       }));
-  }).catch((error) => { status.textContent = `Order overview could not be loaded: ${error.message}`; });
+  }).catch((error) => { status.textContent = `Order overview could not be loaded: ${displayError(error)}`; });
 }
 loadOrderOverview();

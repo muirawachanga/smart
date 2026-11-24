@@ -1,6 +1,7 @@
 import { get, post } from "./api.js";
 import { changeCart, loadCart } from "./cart-service.js";
 import { formatPrice } from "./components/order-display.js";
+import { displayError } from "./error-messages.js";
 
 const form = document.querySelector("#assistant-form");
 const conversation = document.querySelector("#assistant-conversation");
@@ -98,7 +99,7 @@ function showProducts(container, items) {
         await changeCart("cart.add_item", { product: item.name, quantity: item.quantity }, cart.is_guest);
         status.textContent = "Added to cart. Review the cart before checkout.";
       } catch (error) {
-        status.textContent = `Could not add to cart: ${error.message}`;
+        status.textContent = `Could not add to cart: ${displayError(error)}`;
       } finally {
         cartBusy = false;
         add.disabled = false;
@@ -140,7 +141,7 @@ form.addEventListener("submit", async (event) => {
       }
     }
   } catch (error) {
-    status.textContent = error.message;
+    status.textContent = displayError(error);
   } finally {
     submit.disabled = false;
   }
@@ -156,7 +157,7 @@ recommendations.addEventListener("click", async () => {
       result.products.map((product) => ({ ...product, quantity: 1 })));
     status.textContent = result.products.length ? result.basis : "No personalized suggestions are available yet.";
   } catch (error) {
-    status.textContent = error.message;
+    status.textContent = displayError(error);
   } finally {
     recommendations.disabled = false;
   }

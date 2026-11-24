@@ -1,5 +1,6 @@
 import { get, post } from "./api.js";
 import { formatPrice, text } from "./components/order-display.js";
+import { displayError } from "./error-messages.js";
 
 const kind = document.querySelector("[data-customer-page]").dataset.customerPage;
 const status = document.querySelector("#customer-status");
@@ -17,7 +18,7 @@ const paymentSearch = document.querySelector("#customer-payment-search");
 let paymentFilters = { search: "", search_by: "phone" };
 
 function showError(error) {
-  feedback.textContent = error.message;
+  feedback.textContent = displayError(error);
   if (error.status === 403 || error.status === 401) {
     const login = document.querySelector("#customer-login");
     if (login) login.hidden = false;
@@ -82,8 +83,10 @@ function renderPayments(transactions) {
     card.append(
       heading,
       text("p", `${payment.payment_method} · ${payment.status} · ${formatPrice(payment.amount, payment.currency)}`),
-      text("p", `${payment.transaction_date || payment.creation || ""} · Receipt: ${payment.mpesa_receipt_number || "Not available"}`),
-      text("p", `Payment phone: ${payment.phone_number || "Not recorded"}`),
+      ...(payment.payment_method === "M-Pesa" ? [
+        text("p", `${payment.transaction_date || payment.creation || ""} · M-Pesa receipt: ${payment.mpesa_receipt_number || "Not available"}`),
+        text("p", `Payment phone: ${payment.phone_number || "Not recorded"}`),
+      ] : [text("p", `Date: ${payment.transaction_date || payment.creation || "Not recorded"}`)]),
     );
     return card;
   }));

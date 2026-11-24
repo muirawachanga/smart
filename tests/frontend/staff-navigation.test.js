@@ -188,7 +188,7 @@ test("logout failures are visibly reported with an operation and HTTP status", a
   };
   Object.defineProperty(globalThis, "document", { value: document, configurable: true });
   Object.defineProperty(globalThis, "window", {
-    value: { location: { pathname: "/store" }, frappe: {} }, configurable: true,
+    value: { location: { pathname: "/store", hash: "#payment-dashboard" }, frappe: {} }, configurable: true,
   });
   t.mock.method(globalThis, "fetch", async (url) => url.includes("current_user")
     ? { ok: true, json: async () => ({ message: { user: "test@example.test", roles: ["Customer"] } }) }

@@ -35,6 +35,7 @@ role_home_page = {
     "Customer Support": "/dashboard/support",
 }
 update_website_context = "intelligent_ordering.utils.business.update_website_context"
+after_request = ["intelligent_ordering.utils.website_errors.customer_error_response"]
 
 doc_events = {
     "Website Settings": {

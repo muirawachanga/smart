@@ -37,6 +37,7 @@ class Element {
   add(node) { this.children.push(node); }
   addEventListener(name, handler) { this.listeners[name] = handler; }
   setAttribute(name, value) { this[name] = value; }
+  setCustomValidity(value) { this.validationMessage = value; }
   reportValidity() { return true; }
 }
 
@@ -59,7 +60,7 @@ function install(t, mode) {
     createElement: () => new Element(),
   });
   setGlobal("window", {
-    frappe: {}, location: { pathname: "/track-order", search: "" },
+    frappe: {}, location: { pathname: mode === "customer" ? "/track-order" : "/dashboard/orders", search: "" },
     setInterval: () => 1, clearInterval() {}, confirm: () => true,
   });
   setGlobal("Option", class extends Element {
@@ -213,10 +214,60 @@ test("payment button stays disabled until payment history is loaded", async (t) 
     .some((child) => child.className === "status-update-form"));
   const card = nodes.get("#order-detail").children[0];
   const form = card.children.find((child) => child.className === "status-update-form");
-  assert.equal(form.children[1].disabled, true);
+  assert.equal(form.children[2].disabled, true);
   resolvePayments(response([{ status: "Pending", amount: 110 }]));
   await tick();
-  assert.equal(form.children[1].disabled, true);
+  assert.equal(form.children[2].disabled, true);
+});
+
+test("payment failure shows a dismissible warning to check payment status", async (t) => {
+  const nodes = install(t, "customer");
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("orders.get_my_orders")) return response({ orders: [order], has_more: false });
+    if (url.includes("orders.get_my_order")) return response(order);
+    if (url.includes("customers.track_order")) return response({ order_status: "Pending", payment_status: "Unpaid", timeline: [] });
+    if (url.includes("payments.get_order_payments")) return response([]);
+    if (url.includes("payments.initiate_payment")) throw new Error("network details");
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/order-pages.js?payment-error=${Date.now()}`);
+  await tick();
+  await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
+  const form = nodes.get("#order-detail").children[0].children.find((child) => child.className === "status-update-form");
+  await waitFor(() => !form.children[2].disabled);
+  form.children[1].children[0].value = "+254700000000";
+  await form.listeners.submit({ preventDefault() {} });
+  const banner = form.children[0];
+  assert.equal(banner.hidden, false);
+  assert.match(banner.children[0].textContent, /Check your payment status/);
+  assert.equal(form.children[1].children[0].value, "+254700000000");
+  banner.children[1].listeners.click();
+  assert.equal(banner.hidden, true);
+});
+
+test("an unresolved provider response is not described as a failed payment", async (t) => {
+  const nodes = install(t, "customer");
+  let initiated = false;
+  const pending = { status: "Initiated", amount: 110, failure_description: "Provider outcome unknown" };
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("orders.get_my_orders")) return response({ orders: [order], has_more: false });
+    if (url.includes("orders.get_my_order")) return response(order);
+    if (url.includes("customers.track_order")) return response({ order_status: "Pending", payment_status: "Unpaid", timeline: [] });
+    if (url.includes("payments.get_order_payments")) return response(initiated ? [pending] : []);
+    if (url.includes("payments.initiate_payment")) { initiated = true; return response(pending); }
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/order-pages.js?unknown-payment=${Date.now()}`);
+  await tick();
+  await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
+  const card = nodes.get("#order-detail").children[0];
+  const form = card.children.find((child) => child.className === "status-update-form");
+  await waitFor(() => !form.children[2].disabled);
+  await form.listeners.submit({ preventDefault() {} });
+  assert.match(form.children[0].children[0].textContent, /Check your payment status/);
+  assert.match(renderedText(card), /Check your payment status/);
+  assert.doesNotMatch(renderedText(card), /Payment couldn't be completed|Provider outcome unknown/);
+  assert.equal(form.children[2].disabled, true);
 });
 
 test("staff can filter and update an order through existing APIs", async (t) => {
@@ -324,7 +375,7 @@ test("customer live tracking refreshes persisted status and requests cancellatio
   assert.match(tracking.children[1].textContent, /Order: Confirmed.*Delivery: Assigned/);
   const form = tracking.children.find((child) => child.className === "smarto-checkout-form");
   assert.equal(form.hidden, false);
-  form.children[0].children[0].value = "Please cancel";
+  form.children[1].children[0].value = "Please cancel";
   await form.listeners.submit({ preventDefault() {} });
   const call = calls.find((call) => call.url.includes("request_cancellation"));
   assert.equal(call.options.body.get("reason"), "Please cancel");
@@ -337,7 +388,34 @@ test("customer live tracking refreshes persisted status and requests cancellatio
   assert.equal(card.children[2].textContent, "Payment status: Paid");
   const paymentForm = card.children.find((child) => child.className === "status-update-form");
   assert.equal(paymentForm.hidden, true);
-  assert.equal(paymentForm.children[1].disabled, true);
+  assert.equal(paymentForm.children[2].disabled, true);
+});
+
+test("cancellation failure preserves the reason and shows a dismissible warning", async (t) => {
+  const nodes = install(t, "customer");
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("orders.get_my_orders")) return response({ orders: [order], has_more: false });
+    if (url.includes("orders.get_my_order")) return response(order);
+    if (url.includes("payments.get_order_payments")) return response([]);
+    if (url.includes("customers.request_cancellation")) return { ok: false, status: 500, json: async () => ({ message: "private details" }) };
+    if (url.includes("customers.track_order")) return response({ order_status: "Pending", payment_status: "Unpaid", timeline: [] });
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  await import(`../../intelligent_ordering/public/js/order-pages.js?cancellation-error=${Date.now()}`);
+  await tick();
+  await nodes.get("#orders-list").children[0].children.at(-1).listeners.click();
+  const tracking = nodes.get("#order-detail").children[0].children.at(-1);
+  const form = tracking.children.find((child) => child.className === "smarto-checkout-form");
+  const reason = form.children[1].children[0];
+  reason.value = "Please cancel";
+  await form.listeners.submit({ preventDefault() {} });
+  const banner = form.children[0];
+  assert.equal(banner.hidden, false);
+  assert.match(banner.children[0].textContent, /try again later/i);
+  assert.doesNotMatch(banner.children[0].textContent, /private details/);
+  assert.equal(reason.value, "Please cancel");
+  banner.children[1].listeners.click();
+  assert.equal(banner.hidden, true);
 });
 
 test("customer confirms receipt after rider delivery and sees COD reconciliation pending", async (t) => {

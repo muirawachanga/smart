@@ -2,6 +2,7 @@ import { ApiError, get, post } from "./api.js";
 import { loadCart } from "./cart-service.js";
 import { formatPrice, orderTrackingUrl, renderOrderItems } from "./components/order-display.js";
 import { checkoutFingerprint, createCheckoutToken, FINGERPRINT_KEY, ORDER_KEY, TOKEN_KEY } from "./checkout-recovery.js";
+import { displayError } from "./error-messages.js";
 
 const status = document.querySelector("#checkout-status");
 const feedback = document.querySelector("#checkout-feedback");
@@ -79,7 +80,7 @@ async function initialize() {
 
     const cart = await loadCart();
     const checkout = await get("checkout.get_checkout");
-    if (checkout.requires_login) throw new Error("Sign in again before checking out.");
+    if (checkout.requires_login) throw new ApiError("Sign in again before checking out.");
     if (cart.removed_products?.length) {
       feedback.textContent = `${cart.removed_products.length} unavailable item(s) were removed from your cart.`;
     }
@@ -124,7 +125,7 @@ async function initialize() {
         : `No delivery areas are configured for ${checkout.cart.currency}. Contact the store manager.`;
   } catch (error) {
     status.textContent = "Checkout could not be loaded.";
-    feedback.textContent = error.message;
+    feedback.textContent = displayError(error);
   }
 }
 
@@ -143,7 +144,7 @@ async function refreshQuote() {
   try {
     const checkout = await get("checkout.get_checkout", { delivery_area: area.value });
     if (request !== quoteRequest) return;
-    if (checkout.requires_login) throw new Error("Sign in again before checking out.");
+    if (checkout.requires_login) throw new ApiError("Sign in again before checking out.");
     revision = checkout.cart_revision;
     syncPaymentOptions(checkout.cart.currency);
     quote = checkout.delivery_quote;
@@ -159,7 +160,7 @@ async function refreshQuote() {
     deliveryFee.textContent = "Unavailable";
     total.textContent = "Refresh the delivery quote";
     status.textContent = "The delivery quote could not be loaded.";
-    feedback.textContent = error.message;
+    feedback.textContent = displayError(error);
   }
 }
 
@@ -185,7 +186,7 @@ async function submitOrder(event) {
     );
     if (requestToken) {
       if (sessionStorage.getItem(FINGERPRINT_KEY) !== fingerprint) {
-        throw new Error("This pending checkout has different details. Retry the original details or contact the store before placing another order.");
+        throw new ApiError("This pending checkout has different details. Retry the original details or contact the store before placing another order.");
       }
     } else {
       requestToken = createCheckoutToken();
@@ -206,13 +207,13 @@ async function submitOrder(event) {
       } catch (storageError) {
         uncertain = true;
         status.textContent = "The order was rejected, but checkout recovery state could not be cleared.";
-        feedback.textContent = storageError.message;
+        feedback.textContent = displayError(storageError);
       }
     } else {
       uncertain = Boolean(requestToken);
       status.textContent = "The order result could not be confirmed. Retry the same submission or reload checkout to check it.";
     }
-    if (!feedback.textContent) feedback.textContent = error.message;
+    if (!feedback.textContent) feedback.textContent = displayError(error);
     submit.disabled = false;
   } finally {
     submitting = false;
