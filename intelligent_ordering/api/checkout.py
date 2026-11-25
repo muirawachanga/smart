@@ -7,6 +7,7 @@ from intelligent_ordering.api.cart import get_cart
 from intelligent_ordering.utils.delivery_rates import get_area_quote, list_checkout_areas
 from intelligent_ordering.utils.cart import round_money
 from intelligent_ordering.utils.inventory import validate_checkout_stock
+from intelligent_ordering.utils.contact_verification import require_verified_contacts
 from intelligent_ordering.utils.checkout import (
     checkout_cart_revision,
     validate_address,
@@ -134,6 +135,8 @@ def create_order(
         )
     except ValueError as error:
         frappe.throw(str(error), frappe.ValidationError)
+
+    require_verified_contacts(user, phone)
 
     if not isinstance(cart_revision, str) or not re.fullmatch(
         r"[0-9a-f]{64}", cart_revision

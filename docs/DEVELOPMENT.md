@@ -102,6 +102,56 @@ field to products.
 
 ## Business onboarding and launch checks
 
+### Staged staff authenticator MFA
+
+SmartO uses Frappe's password login and OTP verification, not a second
+authentication store. No MFA settings are enabled by installation or migration.
+Use a staging site first and verify behavior on your deployed Frappe version.
+Authenticator apps supporting TOTP, such as Google Authenticator or Microsoft
+Authenticator, work with Frappe's **OTP App** method.
+
+Before activation, test outgoing email delivery to each pilot user's registered
+address, HTTPS, the scheduler/email workers, and a restricted administrator
+recovery path. First-time Frappe enrollment emails a temporary QR setup link;
+SmartO shows the server's instructions and keeps the login challenge in memory.
+Expired challenges require restarting sign-in. Do not log codes or setup links.
+
+Preview a small pilot role from your Bench directory:
+
+```bash
+bench --site <site-name> execute intelligent_ordering.utils.staff_mfa.configure \
+  --kwargs '{"roles":["Finance Manager"]}'
+```
+
+Review **all users holding that role**, including users with multiple roles.
+Then explicitly activate, replacing the confirmation with the exact site name:
+
+```bash
+bench --site <site-name> execute intelligent_ordering.utils.staff_mfa.configure \
+  --kwargs '{"roles":["Finance Manager"],"activate":true,"confirmation":"<site-name>","email_verified":true}'
+```
+
+This enables OTP App globally but flags only selected staff roles, preserving
+previously flagged staff roles. It clears the **All** flag that Frappe sets on
+initial activation so customer-only accounts are not enrolled. Existing broader,
+non-authenticator or IP-bypass MFA policies are rejected for manual review.
+The utility is Bench-only and records activation in Admin Audit Log.
+Do not later enable MFA on **All**, **Customer** or **Guest** for this rollout.
+
+Test a fresh password login for an enrolled and a first-time pilot user, an
+incorrect code, an expired challenge and a customer-only account. After the
+pilot, repeat with remaining staff roles, including System Manager and Business
+Admin. Selected roles require MFA at subsequent password logins; existing
+sessions and API tokens are not revoked by this command. Review/revoke those
+separately before declaring staff access protected. SSO needs its own MFA policy.
+
+For a lost device, a System Manager must verify identity out of band and use
+Frappe's OTP-secret reset in User settings; test that recovery and session
+revocation procedure on staging. Do not disable site-wide MFA as routine
+recovery. There is no custom recovery endpoint or backup-code store.
+
+### Business setup report
+
 After updating the app, run `bench --site <site-name> migrate` and build assets.
 Migration adds SmartO public business identity fields to the existing
 **Website Settings** singleton, without a second business/settings DocType.
@@ -131,6 +181,11 @@ same-origin callback. An installed product without stock does not imply it is
 saleable. The stock check requires at least one saleable product, not stock for
 every catalog item. Optional SMS/Gemini integrations show their enabled state
 only, not validated credentials.
+The catalog, stock, delivery and M-Pesa blockers describe the current SmartO
+ordering workflow; they are not a readiness assessment for other service or
+fulfillment workflows. A blocked check identifies a missing condition, while
+configured indicates only that its database or configuration conditions pass.
+Use Refresh checks after making changes.
 
 These are configuration/database checks, not external probes: an HTTPS string
 does not prove a valid certificate; enabled scheduler flags do not prove a
@@ -346,9 +401,10 @@ The existing Customer role is a website-only role. `/register` creates real
 Frappe Website Users with only Customer assigned; native `/login` signup uses the
 same restricted path, ignoring configurable Portal Settings signup roles.
 Registration respects Frappe's disabled-signup setting and is rate-limited.
-Frappe sends the password setup email when email delivery is configured.
-Without an outgoing email account, registration explicitly asks the customer to
-contact the store; it does not pretend that an email was sent. Native `/login`,
+Self-registration sets the chosen password; it does not claim to send a
+welcome or password-setup email. Customers then sign in and request contact
+verification from My profile. Missing email/SMS configuration is reported
+explicitly when requesting verification. Native `/login`,
 password recovery, and session logout remain the authentication authority.
 Customers land on the storefront homepage (`/`) after login by default.
 My account remains available at `/account`; explicit authorized return links
@@ -397,6 +453,69 @@ list. Selecting another order moves the detail view to that card.
 The notification list and mark-read operation are recipient-scoped. SMS is an
 independent, optional delivery channel described below; historical notification
 events are not backfilled.
+
+### Customer email and phone ownership verification
+
+After deployment, migrate the site, rebuild SmartO assets, restart web processes
+and clear the site cache. Verification fields and timestamps live on the
+existing **Customer Profile**; the email destination comes from **User.email**,
+and the phone destination is the profile's saved phone. Neither destination nor
+a customer identifier is accepted from a verification request.
+
+New self-registered accounts and customers invited through SmartO accounts
+management require both contacts verified before a new order can be created.
+Existing profiles keep `contact_verification_required = 0` and are not blocked
+or falsely marked verified. Profiles created directly through Desk retain that
+legacy default; administrators must not use that path to bypass the new-account
+policy. Existing orders and idempotent retries remain accessible.
+
+Customers sign in and open `/account/profile`. They save their phone, request
+an email link and an SMS code, and confirm each separately. For email, sign in
+first and reopen the email link in that same browser. The link opens a
+confirmation form; simply opening a link does not verify it. The token is in
+the URL fragment, not a server query parameter, and is removed from the address
+bar by the page. A different signed-in account cannot consume the link.
+Phone verification accepts a six-digit SMS code. Provider acceptance alone
+never verifies either contact.
+
+Challenges expire in ten minutes, have a 60-second resend cooldown and permit
+at most five confirmation attempts. Resending replaces the previous challenge.
+The authenticated POST-only API is
+`intelligent_ordering.api.contact_verification.request(channel)` and
+`.confirm(channel, token)`, with five requests per hour and twenty confirmations
+per ten minutes under Frappe's rate limiter. Challenge digests, attempt counters
+and expiration are site-scoped in Redis; no plaintext code is stored there.
+Redis locks serialize challenge consumption and attempt updates survive failed
+database transactions. Losing Redis state invalidates outstanding challenges.
+Redis must be private and protected like all other Frappe session infrastructure.
+
+Phone changes through the profile, checkout or Desk clear the phone proof and
+pending challenge. User email changes clear the email proof; status and checkout
+also compare saved evidence against the current contacts. Read-only proof fields
+cannot be fabricated through ordinary profile saves. A new customer must verify
+their replacement phone in My profile before using it at checkout.
+Email editing is not added as a self-service feature; existing administrator
+account-management procedures still apply.
+
+Configure Frappe's default outgoing **Email Account** and the site-specific
+`fulfillment_notifications` Africa's Talking settings documented below.
+Verification reuses the SMS provider client, but not the order-notification
+outbox: verification is requested interactively and makes no fulfillment event.
+Sandbox SMS is for development only; use production credentials, approved routing
+and adequate balance for actual customer verification. SMTP/SMS outcomes that
+cannot be confirmed are shown as errors; the contact stays unverified. If a
+message subsequently arrives, its current challenge can still be confirmed.
+Apply provider spending limits and monitor abuse; an enabled flag alone is not
+proof that verification messages will reach customers.
+
+Before accepting new registrations in production, verify delivery to real test
+contacts, replay rejection, incorrect/expired codes, contact changes, cross-user
+isolation, blocked unverified checkout and continued ordering by legacy profiles.
+Do not log verification request bodies, email setup links or SMS codes.
+Native Frappe password-reset email links continue to prove mailbox access for
+password recovery; this feature does not introduce phone-based recovery or
+treat an unverified phone as a recovery factor. Contact ownership is not legal
+identity verification and is separate from authenticator MFA.
 
 ### Africa's Talking SMS
 

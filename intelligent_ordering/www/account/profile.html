@@ -9,6 +9,27 @@
       <h1>My profile.</h1>
       <p>Keep your contact details up to date for orders and delivery.</p>
     </div>
+    <section class="smarto-account-section" id="contact-verification" aria-labelledby="contact-verification-heading">
+      <h2 id="contact-verification-heading">Verify your contact details</h2>
+      <p id="contact-verification-status" role="status" aria-live="polite">Loading verification status...</p>
+      <p>New customers must verify both contacts before ordering. Save phone changes above before requesting a code.
+        Changing a contact removes its verification. Each link or code expires after 10 minutes.</p>
+      <p id="contact-verification-feedback" role="status" aria-live="polite"></p>
+      <button id="contact-email-send" type="button" class="smarto-button smarto-button-secondary" disabled>Send email verification link</button>
+      <form id="contact-email-confirm" class="smarto-checkout-form" hidden>
+        <p>Confirm that you opened the verification link sent to your email address.</p>
+        <button type="submit" class="smarto-button">Confirm my email</button>
+      </form>
+      <button id="contact-phone-send" type="button" class="smarto-button smarto-button-secondary" disabled>Send phone verification SMS</button>
+      <form id="contact-phone-confirm" class="smarto-checkout-form">
+        <label>SMS verification code
+          <input name="token" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required>
+        </label>
+        <button type="submit" class="smarto-button" disabled>Verify phone</button>
+      </form>
+      <p>Never share verification links or codes. Request at most once per minute. After five incorrect attempts,
+        request a new challenge. This verifies contact ownership, not your legal identity.</p>
+    </section>
   </header>
   {% include "templates/includes/customer_navigation.html" %}
   <p id="customer-status" class="smarto-inline-status" role="status" aria-live="polite">Loading profile...</p>
@@ -31,4 +52,5 @@
   </section>
 </main>
 <script type="module" src="/assets/intelligent_ordering/js/customer-portal.js"></script>
+<script type="module" src="/assets/intelligent_ordering/js/contact-verification.js"></script>
 {% endblock %}

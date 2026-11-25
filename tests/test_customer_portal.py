@@ -91,6 +91,10 @@ class TestCustomerPortal(unittest.TestCase):
         self.assertEqual(consent["privacy_version"], "PRIVACY-1")
         self.assertEqual(consent["marketing_consent"], 0)
         self.assertNotIn(doc["new_password"], repr(result))
+        self.frappe.db.set_value.assert_called_once_with(
+            "Customer Profile", self.api._save_customer_profile.return_value.name,
+            "contact_verification_required", 1,
+        )
 
     def test_disabled_registration_and_existing_accounts_do_not_mutate_users(self):
         self.frappe.session.user = "Guest"

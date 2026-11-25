@@ -21,7 +21,7 @@ class Element {
 function install(t, writable = true) {
   const nodes = new Map([
     "setup-business-form", "setup-business-fields", "setup-status", "setup-error",
-    "setup-refresh", "setup-checks", "setup-optional", "setup-manual",
+    "setup-refresh", "setup-checks", "setup-optional", "setup-manual", "smarto-page-script-warning",
   ].map((id) => [`#${id}`, new Element()]));
   const form = nodes.get("#setup-business-form");
   form.submit = writable ? new Element() : null;
@@ -58,6 +58,7 @@ test("setup renders honest checks and saves only public identity fields", async 
   await import(`../../intelligent_ordering/public/js/onboarding.js?save=${Date.now()}`);
   await tick();
   assert.equal(inputs.get("name").value, "<Shop>");
+  assert.equal(nodes.get("#smarto-page-script-warning").hidden, true);
   assert.match(nodes.get("#setup-status").textContent, /1 configuration blockers/);
   assert.match(nodes.get("#setup-manual").textContent, /not verified/);
   assert.equal(nodes.get("#setup-business-fields").disabled, false);
@@ -69,6 +70,23 @@ test("setup renders honest checks and saves only public identity fields", async 
   assert.deepEqual([...save.options.body.keys()], ["name", "email", "phone", "address"]);
   assert.equal(save.options.body.get("name"), "Updated Shop");
   assert.match(nodes.get("#setup-status").textContent, /Business details saved/);
+});
+
+test("saving reloads the normalized business details from the server", async (t) => {
+  const { form, inputs } = install(t);
+  let saved = false;
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.includes("save_business")) {
+      saved = true;
+      return response({ business: { ...report.business, name: "Updated Shop" } });
+    }
+    return response(saved ? { ...report, business: { ...report.business, name: "Updated Shop" } } : report);
+  });
+  await import(`../../intelligent_ordering/public/js/onboarding.js?normalized=${Date.now()}`);
+  await tick();
+  inputs.get("name").value = "  Updated Shop  ";
+  await form.listeners.submit({ preventDefault() {} });
+  assert.equal(inputs.get("name").value, "Updated Shop");
 });
 
 test("setup is read-only for business admins and failed refresh removes stale results", async (t) => {

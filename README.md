@@ -72,6 +72,12 @@ Desk tools. The report checks database/configuration state, makes no provider
 calls, and cannot certify that credentials, staff workflows or infrastructure
 actually work.
 
+New customer accounts created through SmartO must verify email and phone before
+ordering. Customers request an email link and an Africa's Talking SMS code from
+**My profile**. Existing profiles remain unblocked. Configure outgoing Frappe email
+and SMS before accepting new registrations; see
+[contact verification setup](docs/DEVELOPMENT.md#customer-email-and-phone-ownership-verification).
+
 For bulk master data, use the standard Frappe Data Import tool with its supported
 templates and test a small import first. Receive stock through inventory APIs;
 do not import stock balances, payment success states or order transitions to

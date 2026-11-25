@@ -114,7 +114,8 @@ def create_account(email, full_name, phone, role):
         frappe.throw("Site defaults changed the requested roles. Review User configuration in Desk.",
                      frappe.ValidationError)
     if role == "Customer":
-        _save_customer_profile(user.name, full_name, phone)
+        profile = _save_customer_profile(user.name, full_name, phone)
+        frappe.db.set_value("Customer Profile", profile.name, "contact_verification_required", 1)
     # Avoid Frappe's notification wrapper, which suppresses outgoing-mail errors.
     _send_invitation(user)
     record_admin_event("Account invitation requested", "User", user.name, f"Assigned role: {role}")

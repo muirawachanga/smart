@@ -4,6 +4,8 @@
 {% block auth_heading %}Your SmartO account starts here{% endblock %}
 {% block auth_form %}
 <h2>Create a customer account</h2>
+<p>After registering, sign in and open <a href="/account/profile">My profile</a> to verify your email and phone
+  before placing your first order. Phone verification is sent by SMS.</p>
 {% if registration_policies.available %}
 <form id="auth-form" class="smarto-checkout-form">
   <label>Full name <input name="full_name" maxlength="140" autocomplete="name" required></label>

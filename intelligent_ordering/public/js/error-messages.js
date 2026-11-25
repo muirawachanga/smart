@@ -20,6 +20,7 @@ export const ERROR_MESSAGES = Object.freeze({
   payment: "Payment couldn't be completed. Check your payment details or contact the store before trying again.",
   paymentUnknown: "We couldn't confirm the payment request. Check your payment status or contact the store before trying again.",
   stock: "This item is no longer available in the requested quantity. Update your cart and try again.",
+  verifyContacts: "Verify your email and phone in My profile before ordering. Use your verified phone at checkout.",
 });
 
 export function isCustomerPage() {
@@ -40,6 +41,15 @@ export function customerError(status, operation = "", message = "") {
   if (status === 401) return ERROR_MESSAGES.session;
   if (status === 403) return ERROR_MESSAGES.access;
   if (status === 404) return ERROR_MESSAGES.missing;
+  if (operation === "checkout.create_order" && message === ERROR_MESSAGES.verifyContacts) return message;
+  if (operation.startsWith("contact_verification.") && [
+    "This verification link or code is invalid or expired. Request a new one.",
+    "Contact verification is unavailable. Contact the store.",
+    "Delivery could not be confirmed. If it arrives, use it; otherwise wait before resending.",
+    "Wait at least 60 seconds before requesting another verification.",
+    "Save a valid contact before requesting verification.",
+    "Save your customer profile before verifying contacts.",
+  ].includes(message)) return message;
   if (/stock|available quantity|out of stock/i.test(message)) return ERROR_MESSAGES.stock;
   if (/phone|mobile number/i.test(message)) return ERROR_MESSAGES.phone;
   if (operation.startsWith("payments.")) return ERROR_MESSAGES.payment;

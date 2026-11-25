@@ -135,7 +135,7 @@ def readiness():
 
     mpesa = frappe.conf.get("mpesa")
     payment_valid = False
-    if isinstance(mpesa, Mapping):
+    if isinstance(mpesa, Mapping) and mpesa.get("environment", "Sandbox") in ("Sandbox", "Production"):
         try:
             DarajaClient(mpesa)
             callback = urlparse(mpesa.get("callback_url", ""))

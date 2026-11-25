@@ -22,7 +22,8 @@ CANCELLATION_FIELDS = (
     "cancellation_request_status", "cancellation_reason", "cancellation_requested_at",
     "cancellation_resolved_at", "cancellation_resolved_by", "cancellation_response",
 )
-REGISTRATION_MESSAGE = "If your details can be used, you can sign in or reset your password to continue."
+REGISTRATION_MESSAGE = ("If your details can be used, sign in and verify your email and phone in My profile "
+                        "before ordering. Existing customers can sign in or reset their password.")
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
@@ -70,6 +71,7 @@ def register(email, full_name, phone="", password="", confirm_password="",
         del frappe.local.message_log[message_count:]
         return {"message": REGISTRATION_MESSAGE}
     profile = _save_customer_profile(email, full_name, phone)
+    frappe.db.set_value("Customer Profile", profile.name, "contact_verification_required", 1)
     frappe.get_doc({
         "doctype": "SmartO Policy Acceptance", "user": email, "customer": profile.name,
         "terms_version": terms_version, "privacy_version": privacy_version,
@@ -91,7 +93,7 @@ def _profile(lock=False):
     name = frappe.db.get_value("Customer Profile", {"user": user}, "name")
     if not name:
         return None
-    profile = frappe.get_doc("Customer Profile", name)
+    profile = frappe.get_doc("Customer Profile", name, for_update=lock)
     if not profile.enabled:
         frappe.throw("Your customer profile is disabled. Contact the store.", frappe.PermissionError)
     return profile
@@ -113,10 +115,15 @@ def _page(page, page_size):
 @frappe.whitelist()
 def get_profile():
     profile = _profile()
+    from intelligent_ordering.utils.contact_verification import status
+
     return {
-        "email": frappe.session.user,
+        "email": frappe.db.get_value("User", frappe.session.user, "email"),
         "full_name": profile.full_name if profile else frappe.db.get_value("User", frappe.session.user, "full_name"),
         "phone": profile.phone if profile else "",
+        "verification": status(profile) if profile else {
+            "email_verified": False, "phone_verified": False, "required_for_ordering": False,
+        },
     }
 
 

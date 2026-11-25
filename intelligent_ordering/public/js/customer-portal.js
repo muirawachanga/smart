@@ -189,6 +189,7 @@ if (form) form.addEventListener("submit", async (event) => {
     } else if (kind === "profile") {
       await post("customers.save_profile", values);
       status.textContent = "Profile saved.";
+      document.dispatchEvent(new CustomEvent("smarto:profile-saved"));
     }
   } catch (error) {
     status.textContent = "Could not save.";

@@ -47,6 +47,9 @@ class TestAuthentication(FrappeTestCase):
         self.assertEqual({row.role for row in user.roles}, {"Customer"})
         self.assertEqual(user.user_type, "Website User")
         self.assertTrue(frappe.db.exists("Customer Profile", {"user": self.email}))
+        self.assertEqual(
+            frappe.db.get_value("Customer Profile", {"user": self.email}, "contact_verification_required"), 1,
+        )
         record = frappe.get_doc("SmartO Policy Acceptance", {"user": self.email})
         self.assertEqual(record.terms_version, policies.current_policy("terms").name)
         self.assertEqual(record.privacy_version, policies.current_policy("privacy").name)

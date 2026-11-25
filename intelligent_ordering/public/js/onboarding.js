@@ -71,6 +71,7 @@ form?.addEventListener("submit", async (event) => {
   error.textContent = "";
   try {
     await post("onboarding.save_business", values);
+    businessLoaded = false;
     await load();
     status.textContent = `Business details saved. ${status.textContent}`;
   } catch (failure) {
@@ -82,4 +83,8 @@ form?.addEventListener("submit", async (event) => {
   }
 });
 refresh?.addEventListener("click", () => load());
-if (form) load();
+if (form) {
+  const warning = document.querySelector("#smarto-page-script-warning");
+  if (warning) warning.hidden = true;
+  load();
+}

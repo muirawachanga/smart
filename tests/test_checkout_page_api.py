@@ -34,6 +34,8 @@ def load_modules():
     rates.list_checkout_areas = Mock()
     inventory = types.ModuleType("intelligent_ordering.utils.inventory")
     inventory.validate_checkout_stock = Mock()
+    contacts = types.ModuleType("intelligent_ordering.utils.contact_verification")
+    contacts.require_verified_contacts = Mock()
 
     def load(name, file):
         spec = importlib.util.spec_from_file_location(name, file)
@@ -47,6 +49,7 @@ def load_modules():
         "intelligent_ordering.api.cart": cart,
         "intelligent_ordering.utils.delivery_rates": rates,
         "intelligent_ordering.utils.inventory": inventory,
+        "intelligent_ordering.utils.contact_verification": contacts,
     }):
         checkout = load("checkout_under_test", root / "checkout.py")
         with patch.dict(sys.modules, {"intelligent_ordering.api.checkout": checkout}):
@@ -57,6 +60,19 @@ def load_modules():
 class TestCheckoutPageEndpoints(unittest.TestCase):
     def setUp(self):
         self.frappe, self.checkout, self.orders = load_modules()
+
+    def test_unverified_customer_is_rejected_before_order_or_payment_creation(self):
+        self.frappe.db.get_value.return_value = None
+        self.checkout.require_verified_contacts.side_effect = AccessError("Verify contacts")
+        with self.assertRaisesRegex(AccessError, "Verify contacts"):
+            self.checkout.create_order(
+                customer_name="Customer", phone="+254700000000",
+                address_line_1="1 Main Road", city="Nairobi", request_token=str(uuid4()),
+                cart_revision="a" * 64,
+            )
+        self.checkout.get_cart.assert_not_called()
+        self.frappe.get_doc.assert_not_called()
+        self.checkout.require_verified_contacts.assert_called_once_with("owner@example.test", "+254700000000")
 
     def test_only_cod_checkout_uses_normal_confirmation_save_and_restores_flag(self):
         for method in ("Cash on Delivery", "M-Pesa"):

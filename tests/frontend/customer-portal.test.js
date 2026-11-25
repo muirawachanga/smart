@@ -52,7 +52,9 @@ function install(t, kind) {
     querySelector: (selector) => selector === "[data-customer-page]" ? { dataset: { customerPage: kind } }
       : selector === "#customer-form" && ["payments", "notifications"].includes(kind) ? null : nodes.get(selector),
     createElement: () => new Element(),
+    dispatchEvent: () => {},
   });
+  setGlobal("CustomEvent", class { constructor(type) { this.type = type; } });
   setGlobal("window", { location: { pathname: "/account/payments" }, frappe: {}, confirm: () => true });
   setGlobal("FormData", class {
     *[Symbol.iterator]() {

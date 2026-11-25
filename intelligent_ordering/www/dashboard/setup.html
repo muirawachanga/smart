@@ -38,15 +38,22 @@
   </section>
   <section class="smarto-admin-section" aria-labelledby="setup-checks-heading">
     <h2 id="setup-checks-heading">Database and configuration checks</h2>
-    <p>Configured does not mean tested. This workspace makes no provider calls and never changes payments or stock.</p>
+    <p><strong>Configured</strong> means the relevant database records or settings exist; <strong>blocked</strong>
+      means a required condition is missing. Refresh after making changes. These checks do not test providers,
+      change payments or stock, or certify launch readiness.</p>
+    <p>Catalog, stock, delivery and M-Pesa checks apply to SmartO's current ordering workflow. They do not
+      determine whether a different service or fulfillment workflow is ready.</p>
     <button id="setup-refresh" class="smarto-button smarto-button-secondary" type="button">Refresh checks</button>
     <div id="setup-checks"></div>
-    <h3>Optional integrations</h3>
+    <h3>Integration status</h3>
+    <p>Africa's Talking SMS and outgoing Frappe email are required for new-customer contact verification.
+      An enabled integration does not prove that credentials or message delivery work.</p>
     <div id="setup-optional"></div>
   </section>
   <section class="smarto-admin-section" aria-labelledby="setup-manual-heading">
     <h2 id="setup-manual-heading">Required manual verification</h2>
-    <p>Keep evidence in your deployment records. These tasks cannot be certified by a configuration check.</p>
+    <p>These tasks remain <strong>not verified</strong> until you test them outside this page. Keep evidence in
+      your deployment records; the page does not save completion marks.</p>
     <div id="setup-manual"></div>
   </section>
   <section class="smarto-admin-section" aria-labelledby="setup-data-heading">
@@ -54,6 +61,10 @@
     <p>Create categories and products in the product workspace, and delivery areas in the delivery workspace. Configure warehouses in Desk,
       then receive opening stock through the inventory workflow.
       Administrator/System Manager can register named customers and staff in the accounts workspace.</p>
+    <p>Staff authenticator MFA supports a staged, role-based rollout through the Bench-only
+      <code>intelligent_ordering.utils.staff_mfa.configure</code> command. Follow the staged MFA instructions
+      in the deployment guide: preview a pilot role and verify enrollment email before activation.
+      Creating a staff account does not automatically enable MFA.</p>
     <p>Use Frappe Data Import templates for supported master data, reviewing a small test import first.
       Do not import payment success states, stock balances or order status changes to bypass validated workflows.</p>
     <nav class="smarto-admin-shortcuts" aria-label="Business setup tools">

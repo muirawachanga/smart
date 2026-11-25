@@ -38,6 +38,9 @@ update_website_context = "intelligent_ordering.utils.business.update_website_con
 after_request = ["intelligent_ordering.utils.website_errors.customer_error_response"]
 
 doc_events = {
+    "Customer Profile": {
+        "validate": "intelligent_ordering.utils.contact_verification.invalidate_changed_contacts",
+    },
     "Website Settings": {
         "validate": "intelligent_ordering.utils.business.validate_business_settings",
         "on_update": "intelligent_ordering.utils.business.audit_business_settings",
@@ -66,7 +69,10 @@ doc_events = {
                                "intelligent_ordering.utils.customer_notifications.on_update"]},
     "User": {
         "after_insert": "intelligent_ordering.utils.audit.audit_user_roles",
-        "on_update": "intelligent_ordering.utils.audit.audit_user_roles",
+        "on_update": [
+            "intelligent_ordering.utils.audit.audit_user_roles",
+            "intelligent_ordering.utils.contact_verification.invalidate_changed_email",
+        ],
     },
 }
 

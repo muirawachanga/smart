@@ -46,9 +46,11 @@ async function finishLogin(payload) {
     form.elements.password.value = "";
     form.hidden = true;
     document.querySelector("#auth-otp-form").hidden = false;
-    document.querySelector("#auth-otp-prompt").textContent = payload.verification.setup
-      ? `Enter the code from your ${payload.verification.method}.`
-      : "Verification is not configured. Contact your administrator.";
+    const verification = payload.verification;
+    document.querySelector("#auth-otp-prompt").textContent = verification.setup
+      ? (verification.prompt || `Enter the code from your ${verification.method}.`)
+      : "Verification could not be delivered or is not configured. Contact your administrator.";
+    document.querySelector("#auth-otp-form").querySelector('button[type="submit"]').disabled = !verification.setup;
     status.textContent = "Additional verification is required.";
     return;
   }

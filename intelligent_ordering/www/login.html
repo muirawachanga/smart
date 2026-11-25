@@ -18,8 +18,13 @@
 </form>
 <form id="auth-otp-form" class="smarto-checkout-form" hidden>
   <p id="auth-otp-prompt">Enter your verification code.</p>
+  <p>For first-time authenticator setup, follow the instructions sent to your registered email,
+    add the account to your authenticator app, then return to this window and enter its code.
+    Never share your setup link or verification codes.</p>
   <label>Verification code <input name="otp" autocomplete="one-time-code" maxlength="128" required></label>
   <button class="smarto-button" type="submit">Verify and sign in</button>
+  <p>Challenge expired? <a href="/login">Start sign-in again</a>.
+    Lost your authenticator? Contact your administrator for identity verification and recovery.</p>
 </form>
 <p><a href="/register">Create a customer account</a></p>
 {% endblock %}

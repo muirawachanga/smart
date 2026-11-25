@@ -94,6 +94,10 @@ class TestAccountManagement(unittest.TestCase):
         self.user.insert.assert_called_once_with()
         self.user.send_welcome_mail_to_user.assert_called_once_with()
         self.modules["intelligent_ordering.api.checkout"]._save_customer_profile.assert_called_once()
+        self.frappe.db.set_value.assert_called_once_with(
+            "Customer Profile", self.modules["intelligent_ordering.api.checkout"]._save_customer_profile.return_value.name,
+            "contact_verification_required", 1,
+        )
         self.assertEqual(self.frappe.get_doc.call_count, 1)
 
     def test_staff_creation_has_only_requested_role_and_no_customer_profile(self):

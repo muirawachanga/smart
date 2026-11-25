@@ -153,6 +153,13 @@ class TestBusinessOnboarding(unittest.TestCase):
         self.frappe.conf["host_name"] = "https://["
         self.assertEqual(self.checks()["https"], "blocked")
 
+    def test_invalid_payment_environment_does_not_break_other_checks(self):
+        self.configure()
+        self.frappe.conf["mpesa"]["environment"] = ["Production"]
+        checks = self.checks()
+        self.assertEqual(checks["payments"], "blocked")
+        self.assertEqual(checks["catalog"], "configured")
+
     def test_save_uses_existing_settings_and_only_public_fields(self):
         doc = Mock()
         self.frappe.get_doc = Mock(return_value=doc)

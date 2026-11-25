@@ -33,7 +33,8 @@ function install(t, kind, search = "") {
   const otp = nodes.get("#auth-otp-form");
   otp.elements = { otp: new Element() };
   otp.fields = ["otp"];
-  otp.querySelector = () => new Element();
+  const otpButton = new Element();
+  otp.querySelector = () => otpButton;
   const redirects = [];
   for (const [name, value] of Object.entries({
     document: {
@@ -140,6 +141,30 @@ test("two-factor login submits only the Frappe challenge and verification code",
   assert.equal(calls[1].options.body.get("otp"), "123456");
   assert.equal(calls[1].options.body.has("pwd"), false);
   assert.deepEqual(redirects, ["/dashboard/admin"]);
+});
+
+test("first-time MFA shows Frappe enrollment instructions as text", async (t) => {
+  const { form, nodes, redirects } = install(t, "login");
+  const prompt = "Check your registered email for authenticator setup. <b>Keep this window open.</b>";
+  t.mock.method(globalThis, "fetch", async () => response({
+    verification: { method: "Email", setup: true, prompt }, tmp_id: "ENROLL",
+  }));
+  await start("enroll");
+  await submit(form);
+  assert.equal(nodes.get("#auth-otp-prompt").textContent, prompt);
+  assert.deepEqual(redirects, []);
+});
+
+test("failed MFA delivery does not offer a working verification submit", async (t) => {
+  const { form, otp, nodes, redirects } = install(t, "login");
+  t.mock.method(globalThis, "fetch", async () => response({
+    verification: { method: "Email", setup: false, token_delivery: false }, tmp_id: "FAILED",
+  }));
+  await start("delivery-failed");
+  await submit(form);
+  assert.match(nodes.get("#auth-otp-prompt").textContent, /Contact your administrator/);
+  assert.equal(otp.querySelector().disabled, true);
+  assert.deepEqual(redirects, []);
 });
 
 test("registration submits exact policy versions and keeps optional marketing consent separate", async (t) => {
